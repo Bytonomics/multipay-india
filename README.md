@@ -1,0 +1,1 @@
+# multipay-adapter
