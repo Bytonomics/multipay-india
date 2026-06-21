@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/Bytonomics/multipay-adapter/domain"
+	"github.com/Bytonomics/multipay-adapter/logging"
 	"github.com/Bytonomics/multipay-adapter/ports"
 	"github.com/Bytonomics/multipay-adapter/routing"
 )
@@ -25,15 +26,19 @@ type WebhookService struct {
 }
 
 // NewWebhookService creates a new WebhookService with required dependencies.
+// The logger is wrapped with CallerLogger to automatically capture caller information.
 func NewWebhookService(
 	registry *routing.EndpointRegistry,
 	store ports.WebhookStore,
 	logger ports.Logger,
 ) *WebhookService {
+	// Wrap the logger to automatically capture caller information
+	wrappedLogger := logging.NewCallerLogger(logger, 2)
+
 	return &WebhookService{
 		registry: registry,
 		store:    store,
-		logger:   logger,
+		logger:   wrappedLogger,
 	}
 }
 
@@ -116,7 +121,7 @@ func (s *WebhookService) HandleEvent(
 	// Extract signature from headers (provider-specific header name)
 	signature, ok := headers["x-signature"]
 	if !ok {
-		signature, ok = headers["X-Signature"]
+		signature = headers["X-Signature"]
 	}
 
 	// Create a minimal adapter interface for webhook verification
@@ -266,15 +271,30 @@ func (s *WebhookService) MountHTTP(mux *http.ServeMux) error {
 				"error", err.Error(),
 			)
 			// Return 200 ACK for idempotency, even on error
+			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"status":"ack"}`))
+			if _, writeErr := w.Write([]byte(`{"status":"ack"}`)); writeErr != nil {
+				s.logger.Error(
+					"failed to write webhook error response",
+					"provider", provider,
+					"account_id", accountID,
+					"error", writeErr.Error(),
+				)
+			}
 			return
 		}
 
 		// Return HTTP 200 OK with ACK
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"ack"}`))
+		if _, writeErr := w.Write([]byte(`{"status":"ack"}`)); writeErr != nil {
+			s.logger.Error(
+				"failed to write webhook success response",
+				"provider", provider,
+				"account_id", accountID,
+				"error", writeErr.Error(),
+			)
+		}
 
 		s.logger.Debug(
 			"webhook request processed",

@@ -38,8 +38,9 @@ func (s *InstrumentService) GetInstrument(ctx context.Context, req *domain.GetIn
 		return nil, errors.New("provider not found in context")
 	}
 
-	if err := s.validator.RequireCapability(ctx, provider, domain.CapInstrumentFetch); err != nil {
-		return nil, err
+	capErr := s.validator.RequireCapability(ctx, provider, domain.CapInstrumentFetch)
+	if capErr != nil {
+		return nil, fmt.Errorf("capability check failed: %w", capErr)
 	}
 
 	adapter, err := s.resolver.Resolve(provider)
@@ -53,8 +54,9 @@ func (s *InstrumentService) GetInstrument(ctx context.Context, req *domain.GetIn
 		RequestData: req,
 	}
 
-	if err := s.pipeline.ExecuteBefore(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("before hook failed: %w", err)
+	hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	if hookErr != nil {
+		return nil, fmt.Errorf("before hook failed: %w", hookErr)
 	}
 
 	result, err := adapter.GetInstrument(ctx, req)
@@ -65,8 +67,9 @@ func (s *InstrumentService) GetInstrument(ctx context.Context, req *domain.GetIn
 	}
 
 	hookCtx.ResponseData = result
-	if err := s.pipeline.ExecuteAfter(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("after hook failed: %w", err)
+	afterErr := s.pipeline.ExecuteAfter(ctx, hookCtx)
+	if afterErr != nil {
+		return nil, fmt.Errorf("after hook failed: %w", afterErr)
 	}
 
 	return result, nil
@@ -83,8 +86,9 @@ func (s *InstrumentService) ListInstruments(ctx context.Context, req *domain.Get
 		return nil, errors.New("provider not found in context")
 	}
 
-	if err := s.validator.RequireCapability(ctx, provider, domain.CapInstrumentList); err != nil {
-		return nil, err
+	capErr := s.validator.RequireCapability(ctx, provider, domain.CapInstrumentList)
+	if capErr != nil {
+		return nil, fmt.Errorf("capability check failed: %w", capErr)
 	}
 
 	adapter, err := s.resolver.Resolve(provider)
@@ -98,8 +102,9 @@ func (s *InstrumentService) ListInstruments(ctx context.Context, req *domain.Get
 		RequestData: req,
 	}
 
-	if err := s.pipeline.ExecuteBefore(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("before hook failed: %w", err)
+	hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	if hookErr != nil {
+		return nil, fmt.Errorf("before hook failed: %w", hookErr)
 	}
 
 	result, err := adapter.ListInstruments(ctx, req)
@@ -110,8 +115,9 @@ func (s *InstrumentService) ListInstruments(ctx context.Context, req *domain.Get
 	}
 
 	hookCtx.ResponseData = result
-	if err := s.pipeline.ExecuteAfter(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("after hook failed: %w", err)
+	afterErr := s.pipeline.ExecuteAfter(ctx, hookCtx)
+	if afterErr != nil {
+		return nil, fmt.Errorf("after hook failed: %w", afterErr)
 	}
 
 	return result, nil
@@ -128,8 +134,9 @@ func (s *InstrumentService) DeleteInstrument(ctx context.Context, req *domain.Ge
 		return errors.New("provider not found in context")
 	}
 
-	if err := s.validator.RequireCapability(ctx, provider, domain.CapInstrumentDelete); err != nil {
-		return err
+	capErr := s.validator.RequireCapability(ctx, provider, domain.CapInstrumentDelete)
+	if capErr != nil {
+		return fmt.Errorf("capability check failed: %w", capErr)
 	}
 
 	adapter, err := s.resolver.Resolve(provider)
@@ -143,20 +150,22 @@ func (s *InstrumentService) DeleteInstrument(ctx context.Context, req *domain.Ge
 		RequestData: req,
 	}
 
-	if err := s.pipeline.ExecuteBefore(ctx, hookCtx); err != nil {
-		return fmt.Errorf("before hook failed: %w", err)
+	hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	if hookErr != nil {
+		return fmt.Errorf("before hook failed: %w", hookErr)
 	}
 
-	err = adapter.DeleteInstrument(ctx, req)
-	if err != nil {
-		hookCtx.Error = err
-		s.pipeline.ExecuteOnError(ctx, hookCtx, err)
-		return fmt.Errorf("delete instrument failed: %w", err)
+	deleteErr := adapter.DeleteInstrument(ctx, req)
+	if deleteErr != nil {
+		hookCtx.Error = deleteErr
+		s.pipeline.ExecuteOnError(ctx, hookCtx, deleteErr)
+		return fmt.Errorf("delete instrument failed: %w", deleteErr)
 	}
 
 	hookCtx.ResponseData = map[string]interface{}{"deleted": true}
-	if err := s.pipeline.ExecuteAfter(ctx, hookCtx); err != nil {
-		return fmt.Errorf("after hook failed: %w", err)
+	afterErr := s.pipeline.ExecuteAfter(ctx, hookCtx)
+	if afterErr != nil {
+		return fmt.Errorf("after hook failed: %w", afterErr)
 	}
 
 	return nil

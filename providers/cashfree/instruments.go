@@ -48,7 +48,7 @@ func getInstrument(ctx context.Context, adapter *Adapter, req *domain.GetInstrum
 	}
 
 	if cfInstrument == nil {
-		return nil, fmt.Errorf("Cashfree returned nil instrument: %w", domain.ErrProviderError)
+		return nil, fmt.Errorf("cashfree returned nil instrument: %w", domain.ErrProviderError)
 	}
 
 	// Map response to canonical type

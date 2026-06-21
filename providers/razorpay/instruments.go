@@ -74,7 +74,7 @@ func (a *Adapter) ListInstruments(ctx context.Context, req *domain.GetInstrument
 	}
 
 	// Map each token response to canonical domain type
-	var instruments []*domain.Instrument
+	instruments := make([]*domain.Instrument, 0, len(itemsList))
 	for _, item := range itemsList {
 		itemMap, ok := item.(map[string]interface{})
 		if !ok {

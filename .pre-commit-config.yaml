@@ -1,6 +1,6 @@
-# Pre-commit hooks configuration for golang/multipay-adapter
+# Pre-commit hooks configuration for multipay-adapter
 #
-# Setup:
+# Setup (when multipay-adapter is standalone):
 #   pre-commit install
 #
 # Usage:

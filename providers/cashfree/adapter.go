@@ -53,7 +53,7 @@ func NewAdapter(config *Config) (*Adapter, error) {
 	}
 
 	if !config.Environment.IsValid() {
-		return nil, fmt.Errorf("Environment is invalid: %w", domain.ErrInvalidRequest)
+		return nil, fmt.Errorf("environment is invalid: %w", domain.ErrInvalidRequest)
 	}
 
 	return &Adapter{

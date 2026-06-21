@@ -38,8 +38,9 @@ func (s *PaymentLinkService) CreatePaymentLink(ctx context.Context, req *domain.
 		return nil, errors.New("provider not found in context")
 	}
 
-	if err := s.validator.RequireCapability(ctx, provider, domain.CapPaymentLinkCreate); err != nil {
-		return nil, err
+	capErr := s.validator.RequireCapability(ctx, provider, domain.CapPaymentLinkCreate)
+	if capErr != nil {
+		return nil, fmt.Errorf("capability check failed: %w", capErr)
 	}
 
 	adapter, err := s.resolver.Resolve(provider)
@@ -53,8 +54,9 @@ func (s *PaymentLinkService) CreatePaymentLink(ctx context.Context, req *domain.
 		RequestData: req,
 	}
 
-	if err := s.pipeline.ExecuteBefore(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("before hook failed: %w", err)
+	hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	if hookErr != nil {
+		return nil, fmt.Errorf("before hook failed: %w", hookErr)
 	}
 
 	result, err := adapter.CreatePaymentLink(ctx, req)
@@ -65,8 +67,9 @@ func (s *PaymentLinkService) CreatePaymentLink(ctx context.Context, req *domain.
 	}
 
 	hookCtx.ResponseData = result
-	if err := s.pipeline.ExecuteAfter(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("after hook failed: %w", err)
+	afterErr := s.pipeline.ExecuteAfter(ctx, hookCtx)
+	if afterErr != nil {
+		return nil, fmt.Errorf("after hook failed: %w", afterErr)
 	}
 
 	return result, nil
@@ -83,8 +86,9 @@ func (s *PaymentLinkService) GetPaymentLink(ctx context.Context, req *domain.Get
 		return nil, errors.New("provider not found in context")
 	}
 
-	if err := s.validator.RequireCapability(ctx, provider, domain.CapPaymentLinkFetch); err != nil {
-		return nil, err
+	capErr := s.validator.RequireCapability(ctx, provider, domain.CapPaymentLinkFetch)
+	if capErr != nil {
+		return nil, fmt.Errorf("capability check failed: %w", capErr)
 	}
 
 	adapter, err := s.resolver.Resolve(provider)
@@ -98,8 +102,9 @@ func (s *PaymentLinkService) GetPaymentLink(ctx context.Context, req *domain.Get
 		RequestData: req,
 	}
 
-	if err := s.pipeline.ExecuteBefore(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("before hook failed: %w", err)
+	hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	if hookErr != nil {
+		return nil, fmt.Errorf("before hook failed: %w", hookErr)
 	}
 
 	result, err := adapter.GetPaymentLink(ctx, req)
@@ -110,8 +115,9 @@ func (s *PaymentLinkService) GetPaymentLink(ctx context.Context, req *domain.Get
 	}
 
 	hookCtx.ResponseData = result
-	if err := s.pipeline.ExecuteAfter(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("after hook failed: %w", err)
+	afterErr := s.pipeline.ExecuteAfter(ctx, hookCtx)
+	if afterErr != nil {
+		return nil, fmt.Errorf("after hook failed: %w", afterErr)
 	}
 
 	return result, nil
@@ -128,8 +134,9 @@ func (s *PaymentLinkService) CancelPaymentLink(ctx context.Context, req *domain.
 		return nil, errors.New("provider not found in context")
 	}
 
-	if err := s.validator.RequireCapability(ctx, provider, domain.CapPaymentLinkCancel); err != nil {
-		return nil, err
+	capErr := s.validator.RequireCapability(ctx, provider, domain.CapPaymentLinkCancel)
+	if capErr != nil {
+		return nil, fmt.Errorf("capability check failed: %w", capErr)
 	}
 
 	adapter, err := s.resolver.Resolve(provider)
@@ -143,8 +150,9 @@ func (s *PaymentLinkService) CancelPaymentLink(ctx context.Context, req *domain.
 		RequestData: req,
 	}
 
-	if err := s.pipeline.ExecuteBefore(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("before hook failed: %w", err)
+	hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	if hookErr != nil {
+		return nil, fmt.Errorf("before hook failed: %w", hookErr)
 	}
 
 	result, err := adapter.CancelPaymentLink(ctx, req)
@@ -155,8 +163,9 @@ func (s *PaymentLinkService) CancelPaymentLink(ctx context.Context, req *domain.
 	}
 
 	hookCtx.ResponseData = result
-	if err := s.pipeline.ExecuteAfter(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("after hook failed: %w", err)
+	afterErr := s.pipeline.ExecuteAfter(ctx, hookCtx)
+	if afterErr != nil {
+		return nil, fmt.Errorf("after hook failed: %w", afterErr)
 	}
 
 	return result, nil

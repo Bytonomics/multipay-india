@@ -31,7 +31,7 @@ func (a *Adapter) CreatePaymentLink(ctx context.Context, req *domain.CreatePayme
 		params["description"] = req.Description
 	}
 
-	if req.Notes != nil && len(req.Notes) > 0 {
+	if len(req.Notes) > 0 {
 		params["notes"] = req.Notes
 	}
 

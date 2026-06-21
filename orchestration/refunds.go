@@ -33,8 +33,9 @@ func (s *RefundService) CreateRefund(ctx context.Context, provider domain.Provid
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	if err := s.validator.RequireCapability(ctx, provider, capabilities.CapRefundCreate); err != nil {
-		return nil, fmt.Errorf("capability check failed: %w", err)
+	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapRefundCreate)
+	if capErr != nil {
+		return nil, fmt.Errorf("capability check failed: %w", capErr)
 	}
 
 	adapter, err := s.resolver.Resolve(provider)
@@ -48,8 +49,9 @@ func (s *RefundService) CreateRefund(ctx context.Context, provider domain.Provid
 		RequestData: req,
 	}
 
-	if err := s.pipeline.ExecuteBefore(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("failed to execute before hooks: %w", err)
+	hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	if hookErr != nil {
+		return nil, fmt.Errorf("failed to execute before hooks: %w", hookErr)
 	}
 
 	result, err := adapter.CreateRefund(ctx, req)
@@ -60,8 +62,9 @@ func (s *RefundService) CreateRefund(ctx context.Context, provider domain.Provid
 	}
 
 	hookCtx.ResponseData = result
-	if err := s.pipeline.ExecuteAfter(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("failed to execute after hooks: %w", err)
+	afterErr := s.pipeline.ExecuteAfter(ctx, hookCtx)
+	if afterErr != nil {
+		return nil, fmt.Errorf("failed to execute after hooks: %w", afterErr)
 	}
 
 	return result, nil
@@ -73,8 +76,9 @@ func (s *RefundService) GetRefund(ctx context.Context, provider domain.Provider,
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	if err := s.validator.RequireCapability(ctx, provider, capabilities.CapRefundFetch); err != nil {
-		return nil, fmt.Errorf("capability check failed: %w", err)
+	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapRefundFetch)
+	if capErr != nil {
+		return nil, fmt.Errorf("capability check failed: %w", capErr)
 	}
 
 	adapter, err := s.resolver.Resolve(provider)
@@ -88,8 +92,9 @@ func (s *RefundService) GetRefund(ctx context.Context, provider domain.Provider,
 		RequestData: req,
 	}
 
-	if err := s.pipeline.ExecuteBefore(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("failed to execute before hooks: %w", err)
+	hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	if hookErr != nil {
+		return nil, fmt.Errorf("failed to execute before hooks: %w", hookErr)
 	}
 
 	result, err := adapter.GetRefund(ctx, req)
@@ -100,8 +105,9 @@ func (s *RefundService) GetRefund(ctx context.Context, provider domain.Provider,
 	}
 
 	hookCtx.ResponseData = result
-	if err := s.pipeline.ExecuteAfter(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("failed to execute after hooks: %w", err)
+	afterErr := s.pipeline.ExecuteAfter(ctx, hookCtx)
+	if afterErr != nil {
+		return nil, fmt.Errorf("failed to execute after hooks: %w", afterErr)
 	}
 
 	return result, nil
@@ -113,8 +119,9 @@ func (s *RefundService) ListRefunds(ctx context.Context, provider domain.Provide
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	if err := s.validator.RequireCapability(ctx, provider, capabilities.CapRefundList); err != nil {
-		return nil, fmt.Errorf("capability check failed: %w", err)
+	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapRefundList)
+	if capErr != nil {
+		return nil, fmt.Errorf("capability check failed: %w", capErr)
 	}
 
 	adapter, err := s.resolver.Resolve(provider)
@@ -128,8 +135,9 @@ func (s *RefundService) ListRefunds(ctx context.Context, provider domain.Provide
 		RequestData: req,
 	}
 
-	if err := s.pipeline.ExecuteBefore(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("failed to execute before hooks: %w", err)
+	hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	if hookErr != nil {
+		return nil, fmt.Errorf("failed to execute before hooks: %w", hookErr)
 	}
 
 	result, err := adapter.ListRefunds(ctx, req)
@@ -140,8 +148,9 @@ func (s *RefundService) ListRefunds(ctx context.Context, provider domain.Provide
 	}
 
 	hookCtx.ResponseData = result
-	if err := s.pipeline.ExecuteAfter(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("failed to execute after hooks: %w", err)
+	afterErr := s.pipeline.ExecuteAfter(ctx, hookCtx)
+	if afterErr != nil {
+		return nil, fmt.Errorf("failed to execute after hooks: %w", afterErr)
 	}
 
 	return result, nil

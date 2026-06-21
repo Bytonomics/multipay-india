@@ -54,54 +54,6 @@ func getInt64(m map[string]interface{}, key string) int64 {
 	return 0
 }
 
-// getFloat64 safely extracts a float64 value from a map.
-// Returns 0 if the key doesn't exist or the value cannot be converted to float64.
-func getFloat64(m map[string]interface{}, key string) float64 {
-	if m == nil {
-		return 0
-	}
-	val, ok := m[key]
-	if !ok {
-		return 0
-	}
-
-	// Handle float64 directly
-	if f, ok := val.(float64); ok {
-		return f
-	}
-
-	// Handle int64
-	if i, ok := val.(int64); ok {
-		return float64(i)
-	}
-
-	// Handle string representation
-	if s, ok := val.(string); ok {
-		if f, err := strconv.ParseFloat(s, 64); err == nil {
-			return f
-		}
-	}
-
-	return 0
-}
-
-// getBool safely extracts a bool value from a map.
-// Returns false if the key doesn't exist or the value is not a bool.
-func getBool(m map[string]interface{}, key string) bool {
-	if m == nil {
-		return false
-	}
-	val, ok := m[key]
-	if !ok {
-		return false
-	}
-	b, ok := val.(bool)
-	if !ok {
-		return false
-	}
-	return b
-}
-
 // getMap safely extracts a nested map[string]interface{} from a map.
 // Returns an empty map if the key doesn't exist or the value is not a map.
 func getMap(m map[string]interface{}, key string) map[string]interface{} {

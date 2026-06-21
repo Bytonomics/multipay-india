@@ -47,11 +47,11 @@ func createOrder(ctx context.Context, adapter *Adapter, req *domain.CreateOrderR
 		nil, // httpClient (uses default)
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create order on Cashfree: %w", domain.ErrProviderError)
+		return nil, fmt.Errorf("failed to create order on cashfree: %w", domain.ErrProviderError)
 	}
 
 	if cfOrder == nil {
-		return nil, fmt.Errorf("Cashfree returned nil order: %w", domain.ErrProviderError)
+		return nil, fmt.Errorf("cashfree returned nil order: %w", domain.ErrProviderError)
 	}
 
 	// Map response to canonical type
@@ -93,7 +93,7 @@ func getOrder(ctx context.Context, adapter *Adapter, req *domain.GetOrderRequest
 	}
 
 	if cfOrder == nil {
-		return nil, fmt.Errorf("Cashfree returned nil order: %w", domain.ErrProviderError)
+		return nil, fmt.Errorf("cashfree returned nil order: %w", domain.ErrProviderError)
 	}
 
 	// Map response to canonical type

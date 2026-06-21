@@ -61,24 +61,29 @@ func (p *Pipeline) ExecuteAfter(ctx context.Context, hookCtx *ports.HookContext)
 }
 
 // ExecuteOnError runs all OnError hooks in FIFO order with the provided error.
-// All hooks execute even if some fail; errors from hooks are collected but the
-// original error is preserved (hooks cannot mask the original failure).
+// All hooks execute even if some fail; errors from hooks are logged but not propagated.
 // If a hook panics, the panic is recovered and logged.
-func (p *Pipeline) ExecuteOnError(ctx context.Context, hookCtx *ports.HookContext, err error) error {
+// OnError hooks cannot mask or modify the original error; they run for side effects only.
+func (p *Pipeline) ExecuteOnError(ctx context.Context, hookCtx *ports.HookContext, err error) {
 	if p == nil || len(p.hooks) == 0 {
-		return err
+		return
 	}
 
-	origErr := err
 	for _, h := range p.hooks {
 		// OnError hooks all execute even if some fail; we don't short-circuit.
-		_ = p.executeSafely(ctx, hookCtx, "OnError", func() error {
+		hookErr := p.executeSafely(ctx, hookCtx, "OnError", func() error {
 			return h.OnError(ctx, hookCtx)
 		})
+		if hookErr != nil {
+			// Log hook errors for debugging, but don't propagate them.
+			if logger, ok := ctx.Value("logger").(ports.Logger); ok {
+				logger.Error(
+					"error in OnError hook for operation "+hookCtx.RequestType,
+					hookErr.Error(),
+				)
+			}
+		}
 	}
-
-	// Always return the original error; OnError hooks cannot mask it.
-	return origErr
 }
 
 // executeSafely wraps hook execution with panic recovery.

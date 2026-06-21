@@ -121,7 +121,7 @@ func (a *Adapter) ListRefunds(ctx context.Context, req *domain.GetOrderRequest) 
 	}
 
 	// Map each refund response to canonical domain type
-	var refunds []*domain.Refund
+	refunds := make([]*domain.Refund, 0, len(itemsList))
 	for _, item := range itemsList {
 		itemMap, ok := item.(map[string]interface{})
 		if !ok {

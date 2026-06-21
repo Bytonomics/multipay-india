@@ -52,7 +52,9 @@ help: ## Show this help
 build: ## Build the library (compile check)
 	go build -mod=mod -v ./...
 
-build-check: test ## Verify code compiles and tests pass
+build-check: ## Verify code compiles (without running tests)
+	@echo "Verifying code compiles..."
+	go build -mod=mod -v ./...
 	@echo "✓ Build check passed"
 
 # ============================================

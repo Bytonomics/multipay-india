@@ -48,8 +48,9 @@ func (s *OrderService) CreateOrder(ctx context.Context, provider domain.Provider
 		RequestData: req,
 	}
 
-	if err := s.pipeline.ExecuteBefore(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("failed to execute before hooks: %w", err)
+	hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	if hookErr != nil {
+		return nil, fmt.Errorf("failed to execute before hooks: %w", hookErr)
 	}
 
 	result, err := adapter.CreateOrder(ctx, req)
@@ -60,8 +61,9 @@ func (s *OrderService) CreateOrder(ctx context.Context, provider domain.Provider
 	}
 
 	hookCtx.ResponseData = result
-	if err := s.pipeline.ExecuteAfter(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("failed to execute after hooks: %w", err)
+	afterErr := s.pipeline.ExecuteAfter(ctx, hookCtx)
+	if afterErr != nil {
+		return nil, fmt.Errorf("failed to execute after hooks: %w", afterErr)
 	}
 
 	return result, nil
@@ -73,8 +75,9 @@ func (s *OrderService) GetOrder(ctx context.Context, provider domain.Provider, r
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	if err := s.validator.RequireCapability(ctx, provider, capabilities.CapOrderFetch); err != nil {
-		return nil, fmt.Errorf("capability check failed: %w", err)
+	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapOrderFetch)
+	if capErr != nil {
+		return nil, fmt.Errorf("capability check failed: %w", capErr)
 	}
 
 	adapter, err := s.resolver.Resolve(provider)
@@ -88,8 +91,9 @@ func (s *OrderService) GetOrder(ctx context.Context, provider domain.Provider, r
 		RequestData: req,
 	}
 
-	if err := s.pipeline.ExecuteBefore(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("failed to execute before hooks: %w", err)
+	hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	if hookErr != nil {
+		return nil, fmt.Errorf("failed to execute before hooks: %w", hookErr)
 	}
 
 	result, err := adapter.GetOrder(ctx, req)
@@ -100,8 +104,9 @@ func (s *OrderService) GetOrder(ctx context.Context, provider domain.Provider, r
 	}
 
 	hookCtx.ResponseData = result
-	if err := s.pipeline.ExecuteAfter(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("failed to execute after hooks: %w", err)
+	afterErr := s.pipeline.ExecuteAfter(ctx, hookCtx)
+	if afterErr != nil {
+		return nil, fmt.Errorf("failed to execute after hooks: %w", afterErr)
 	}
 
 	return result, nil
@@ -113,8 +118,9 @@ func (s *OrderService) ListOrderPayments(ctx context.Context, provider domain.Pr
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	if err := s.validator.RequireCapability(ctx, provider, capabilities.CapPaymentList); err != nil {
-		return nil, fmt.Errorf("capability check failed: %w", err)
+	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapPaymentList)
+	if capErr != nil {
+		return nil, fmt.Errorf("capability check failed: %w", capErr)
 	}
 
 	adapter, err := s.resolver.Resolve(provider)
@@ -128,8 +134,9 @@ func (s *OrderService) ListOrderPayments(ctx context.Context, provider domain.Pr
 		RequestData: req,
 	}
 
-	if err := s.pipeline.ExecuteBefore(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("failed to execute before hooks: %w", err)
+	hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	if hookErr != nil {
+		return nil, fmt.Errorf("failed to execute before hooks: %w", hookErr)
 	}
 
 	result, err := adapter.ListOrderPayments(ctx, req)
@@ -140,8 +147,9 @@ func (s *OrderService) ListOrderPayments(ctx context.Context, provider domain.Pr
 	}
 
 	hookCtx.ResponseData = result
-	if err := s.pipeline.ExecuteAfter(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("failed to execute after hooks: %w", err)
+	afterErr := s.pipeline.ExecuteAfter(ctx, hookCtx)
+	if afterErr != nil {
+		return nil, fmt.Errorf("failed to execute after hooks: %w", afterErr)
 	}
 
 	return result, nil

@@ -36,18 +36,6 @@ func createPaymentLink(ctx context.Context, adapter *Adapter, req *domain.Create
 		LinkPurpose:  req.Description,
 	}
 
-	// Add notes if provided (stored as part of purpose or metadata)
-	if len(req.Notes) > 0 {
-		// Notes may need to be appended to purpose or handled separately
-		// Cashfree SDK may not have a direct Notes field on CreateLinkRequest
-	}
-
-	// Add expiry if provided
-	if req.ExpiresAt != nil {
-		// Cashfree SDK may not support ExpiresAt on CreateLinkRequest
-		// Check if LinkExpiryTime or similar field exists
-	}
-
 	// Call Cashfree SDK
 	apiVersion := "2022-09-01"
 	cfLink, _, err := cf.PGCreateLink(
@@ -58,11 +46,11 @@ func createPaymentLink(ctx context.Context, adapter *Adapter, req *domain.Create
 		nil, // httpClient (uses default)
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create payment link on Cashfree: %w", domain.ErrProviderError)
+		return nil, fmt.Errorf("failed to create payment link on cashfree: %w", domain.ErrProviderError)
 	}
 
 	if cfLink == nil {
-		return nil, fmt.Errorf("Cashfree returned nil payment link: %w", domain.ErrProviderError)
+		return nil, fmt.Errorf("cashfree returned nil payment link: %w", domain.ErrProviderError)
 	}
 
 	// Map response to canonical type
@@ -104,7 +92,7 @@ func getPaymentLink(ctx context.Context, adapter *Adapter, req *domain.GetPaymen
 	}
 
 	if cfLink == nil {
-		return nil, fmt.Errorf("Cashfree returned nil payment link: %w", domain.ErrProviderError)
+		return nil, fmt.Errorf("cashfree returned nil payment link: %w", domain.ErrProviderError)
 	}
 
 	// Map response to canonical type
@@ -138,11 +126,11 @@ func cancelPaymentLink(ctx context.Context, adapter *Adapter, req *domain.Cancel
 		nil, // httpClient (uses default)
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to cancel payment link on Cashfree: %w", domain.ErrProviderError)
+		return nil, fmt.Errorf("failed to cancel payment link on cashfree: %w", domain.ErrProviderError)
 	}
 
 	if cfLink == nil {
-		return nil, fmt.Errorf("Cashfree returned nil payment link: %w", domain.ErrProviderError)
+		return nil, fmt.Errorf("cashfree returned nil payment link: %w", domain.ErrProviderError)
 	}
 
 	// Map response to canonical type

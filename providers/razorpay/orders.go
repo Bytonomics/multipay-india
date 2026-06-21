@@ -113,7 +113,7 @@ func (a *Adapter) ListOrderPayments(ctx context.Context, req *domain.GetOrderReq
 	}
 
 	// Map each payment response to canonical domain type
-	var payments []*domain.Payment
+	payments := make([]*domain.Payment, 0, len(itemsList))
 	for _, item := range itemsList {
 		itemMap, ok := item.(map[string]interface{})
 		if !ok {

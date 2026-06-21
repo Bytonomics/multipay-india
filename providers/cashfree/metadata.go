@@ -63,7 +63,7 @@ func MapOrderMetadata(cfOrder *cf.OrderEntity) *domain.Metadata {
 
 	// Store custom order tags as serialized key-value pairs
 	// Tags are stored with "tag_" prefix for easy identification
-	if cfOrder.OrderTags != nil && len(cfOrder.OrderTags) > 0 {
+	if len(cfOrder.OrderTags) > 0 {
 		for key, value := range cfOrder.OrderTags {
 			metadata["tag_"+key] = value
 		}
@@ -165,7 +165,7 @@ func MapRefundMetadata(cfRefund *cf.RefundEntity) *domain.Metadata {
 
 	// Store custom metadata from Cashfree's refund metadata field
 	// These are stored with "meta_" prefix to distinguish from standard fields
-	if cfRefund.Metadata != nil && len(cfRefund.Metadata) > 0 {
+	if len(cfRefund.Metadata) > 0 {
 		for key, value := range cfRefund.Metadata {
 			metadata["meta_"+key] = fmt.Sprintf("%v", value)
 		}

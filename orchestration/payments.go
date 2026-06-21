@@ -33,8 +33,9 @@ func (s *PaymentService) GetPayment(ctx context.Context, provider domain.Provide
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	if err := s.validator.RequireCapability(ctx, provider, capabilities.CapPaymentFetch); err != nil {
-		return nil, fmt.Errorf("capability check failed: %w", err)
+	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapPaymentFetch)
+	if capErr != nil {
+		return nil, fmt.Errorf("capability check failed: %w", capErr)
 	}
 
 	adapter, err := s.resolver.Resolve(provider)
@@ -48,8 +49,9 @@ func (s *PaymentService) GetPayment(ctx context.Context, provider domain.Provide
 		RequestData: req,
 	}
 
-	if err := s.pipeline.ExecuteBefore(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("failed to execute before hooks: %w", err)
+	hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	if hookErr != nil {
+		return nil, fmt.Errorf("failed to execute before hooks: %w", hookErr)
 	}
 
 	result, err := adapter.GetPayment(ctx, req)
@@ -60,8 +62,9 @@ func (s *PaymentService) GetPayment(ctx context.Context, provider domain.Provide
 	}
 
 	hookCtx.ResponseData = result
-	if err := s.pipeline.ExecuteAfter(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("failed to execute after hooks: %w", err)
+	afterErr := s.pipeline.ExecuteAfter(ctx, hookCtx)
+	if afterErr != nil {
+		return nil, fmt.Errorf("failed to execute after hooks: %w", afterErr)
 	}
 
 	return result, nil
@@ -73,8 +76,9 @@ func (s *PaymentService) ListPayments(ctx context.Context, provider domain.Provi
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	if err := s.validator.RequireCapability(ctx, provider, capabilities.CapPaymentList); err != nil {
-		return nil, fmt.Errorf("capability check failed: %w", err)
+	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapPaymentList)
+	if capErr != nil {
+		return nil, fmt.Errorf("capability check failed: %w", capErr)
 	}
 
 	adapter, err := s.resolver.Resolve(provider)
@@ -88,8 +92,9 @@ func (s *PaymentService) ListPayments(ctx context.Context, provider domain.Provi
 		RequestData: req,
 	}
 
-	if err := s.pipeline.ExecuteBefore(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("failed to execute before hooks: %w", err)
+	hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	if hookErr != nil {
+		return nil, fmt.Errorf("failed to execute before hooks: %w", hookErr)
 	}
 
 	result, err := adapter.ListPayments(ctx, req)
@@ -100,8 +105,9 @@ func (s *PaymentService) ListPayments(ctx context.Context, provider domain.Provi
 	}
 
 	hookCtx.ResponseData = result
-	if err := s.pipeline.ExecuteAfter(ctx, hookCtx); err != nil {
-		return nil, fmt.Errorf("failed to execute after hooks: %w", err)
+	afterErr := s.pipeline.ExecuteAfter(ctx, hookCtx)
+	if afterErr != nil {
+		return nil, fmt.Errorf("failed to execute after hooks: %w", afterErr)
 	}
 
 	return result, nil
@@ -114,8 +120,9 @@ func (s *PaymentService) CapturePayment(ctx context.Context, provider domain.Pro
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	if err := s.validator.RequireCapability(ctx, provider, capabilities.CapPaymentCapture); err != nil {
-		return nil, fmt.Errorf("capability check failed: %w", err)
+	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapPaymentCapture)
+	if capErr != nil {
+		return nil, fmt.Errorf("capability check failed: %w", capErr)
 	}
 
 	hookCtx := &ports.HookContext{

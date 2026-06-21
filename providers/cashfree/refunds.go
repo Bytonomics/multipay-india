@@ -47,11 +47,11 @@ func createRefund(ctx context.Context, adapter *Adapter, req *domain.CreateRefun
 		nil, // httpClient (uses default)
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create refund on Cashfree: %w", domain.ErrProviderError)
+		return nil, fmt.Errorf("failed to create refund on cashfree: %w", domain.ErrProviderError)
 	}
 
 	if cfRefund == nil {
-		return nil, fmt.Errorf("Cashfree returned nil refund: %w", domain.ErrProviderError)
+		return nil, fmt.Errorf("cashfree returned nil refund: %w", domain.ErrProviderError)
 	}
 
 	// Map response to canonical type
@@ -98,7 +98,7 @@ func getRefund(ctx context.Context, adapter *Adapter, req *domain.GetRefundReque
 	}
 
 	if cfRefund == nil {
-		return nil, fmt.Errorf("Cashfree returned nil refund: %w", domain.ErrProviderError)
+		return nil, fmt.Errorf("cashfree returned nil refund: %w", domain.ErrProviderError)
 	}
 
 	// Map response to canonical type

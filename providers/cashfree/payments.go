@@ -48,7 +48,7 @@ func getPayment(ctx context.Context, adapter *Adapter, req *domain.GetPaymentReq
 	}
 
 	if cfPayment == nil {
-		return nil, fmt.Errorf("Cashfree returned nil payment: %w", domain.ErrProviderError)
+		return nil, fmt.Errorf("cashfree returned nil payment: %w", domain.ErrProviderError)
 	}
 
 	// Map response to canonical type
@@ -103,9 +103,4 @@ func listPayments(ctx context.Context, adapter *Adapter, req *domain.GetOrderReq
 	}
 
 	return result, nil
-}
-
-// capturePayment is not supported by Cashfree. Returns CapabilityError.
-func capturePayment(ctx context.Context, adapter *Adapter, req *domain.CapturePaymentRequest) (*domain.Payment, error) {
-	return nil, fmt.Errorf("capture payment not supported by Cashfree: %w", domain.ErrUnsupportedCapability)
 }
