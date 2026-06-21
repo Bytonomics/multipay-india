@@ -1,0 +1,56 @@
+# Pre-commit hooks configuration for golang/multipay-adapter
+#
+# Setup:
+#   pre-commit install
+#
+# Usage:
+#   pre-commit run --all-files              # Run all active hooks
+#   pre-commit run <hook-id>                # Run specific hook
+#
+# To skip hooks temporarily:
+#   git commit --no-verify -m "message"
+#
+# Hook execution order:
+#   1. Go format (auto-fix + goimports + gci)
+#   2. Go lint (golangci-lint with NilAway)
+#   3. Go unit tests with coverage
+
+repos:
+  # ============================================
+  # 1. GO FORMAT (auto-fix + goimports + gci)
+  # ============================================
+  - repo: local
+    hooks:
+      - id: go-format
+        name: Go format
+        description: Runs make format (golangci-lint --fix, goimports, gci)
+        entry: make format
+        language: system
+        types: [go]
+        pass_filenames: false
+
+  # ============================================
+  # 2. GO LINT (golangci-lint with NilAway)
+  # ============================================
+  - repo: local
+    hooks:
+      - id: lint-go
+        name: Run Go linters
+        description: Runs make lint (golangci-lint with NilAway)
+        entry: make lint
+        language: system
+        types: [go]
+        pass_filenames: false
+
+  # ============================================
+  # 3. GO UNIT TESTS WITH COVERAGE
+  # ============================================
+  - repo: local
+    hooks:
+      - id: check-go-tests
+        name: Run Go unit tests with coverage
+        description: Runs make unit-test-coverage (unit tests only, with race detection)
+        entry: make unit-test-coverage
+        language: system
+        types: [go]
+        pass_filenames: false
