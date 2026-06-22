@@ -280,6 +280,19 @@ The project uses a **custom golangci-lint binary** with NilAway (Uber's nil pani
 
 ---
 
+### Webhook URL Convention
+
+The library uses the URL pattern `/webhooks/{provider}/{accountID}`:
+- The user registers this URL in the provider's dashboard (Cashfree/Razorpay)
+- `provider` matches `domain.ProviderCashfree` or `domain.ProviderRazorpay`
+- `accountID` is a user-chosen identifier for multi-account support (e.g., "prod", "sandbox", "merchant_123")
+- `EndpointRegistry` tracks registered provider+account pairs and rejects unknown endpoints
+- `WebhookHandler` (in `routing/http_handler.go`) implements `http.Handler` and can be mounted on any Go HTTP router
+
+When writing code or examples, always use typed constants (`domain.ProviderCashfree`) not string literals (`"cashfree"`).
+
+---
+
 ## Adding a New Provider
 
 1. Create `providers/<name>/adapter.go` implementing `ports.ProviderAdapter`

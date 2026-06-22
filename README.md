@@ -96,12 +96,9 @@ razorpayAdapter := adapters.NewRazorpayAdapter(&adapters.RazorpayConfig{
 ### 2. Create Client
 
 ```go
-client, err := multipay.NewClient(&multipay.ClientConfig{
-    Adapters: map[string]multipay.Adapter{
-        "cashfree": cashfreeAdapter,
-        "razorpay": razorpayAdapter,
-    },
-    DefaultProvider: "cashfree",
+client, err := client.NewClient(&client.ClientConfig{
+    Providers: []ports.ProviderAdapter{cashfreeAdapter, razorpayAdapter},
+    Logger:    yourLogger,
 })
 if err != nil {
     log.Fatal(err)
@@ -113,17 +110,14 @@ if err != nil {
 ```go
 ctx := context.Background()
 
-order, err := client.Orders().Create(ctx, &multipay.Order{
-    ID:       "order_123",
-    Amount:   10000, // Amount in smallest unit (e.g., paise)
-    Currency: "INR",
-    Customer: &multipay.Customer{
+order, err := client.Orders().CreateOrder(ctx, &domain.CreateOrderRequest{
+    Provider:    domain.ProviderCashfree,
+    AmountMinor: 10000,  // 100 paisa = ₹1.00
+    Currency:    "INR",
+    CustomerInfo: &domain.CustomerInfo{
         ID:    "cust_123",
         Email: "user@example.com",
         Phone: "+919876543210",
-    },
-    Notes: map[string]string{
-        "order_ref": "OD-2024-001",
     },
 })
 if err != nil {
@@ -307,7 +301,7 @@ Before attempting an operation, check if the provider supports it:
 ```go
 // Check if provider supports refunds
 caps := client.Capabilities()
-if !caps.Supports("cashfree", "refund") {
+if !caps.Supports(domain.ProviderCashfree, capabilities.CapRefundCreate) {
     return fmt.Errorf("Cashfree does not support refunds")
 }
 
@@ -382,6 +376,21 @@ The following table shows all capabilities supported by Cashfree and Razorpay. U
 Use [`client.Capabilities().Supports(provider, capability)`](./golang/multipay-adapter/orchestration/capabilities.go) to check capability availability before attempting operations.
 
 ## Webhook Setup
+
+### How Webhook URLs Work
+
+You choose the webhook URL and register it in your provider's dashboard:
+
+1. **You define the endpoint path** in your server (e.g., `/webhooks/cashfree/acct_main`)
+2. **You register this URL** in Cashfree/Razorpay's dashboard as the webhook endpoint
+3. **The provider sends POST requests** to your URL when payment events occur
+4. **Our library processes them** via the `WebhookHandler` (an `http.Handler`)
+
+The URL pattern is `{your-base-url}/webhooks/{provider}/{accountID}`:
+- `provider` = `cashfree` or `razorpay` (matches the provider that will send to this endpoint)
+- `accountID` = your identifier for this provider account (e.g., `prod`, `sandbox`, `merchant_123`)
+
+Example: Register `https://api.yourapp.com/webhooks/cashfree/prod` in Cashfree's dashboard.
 
 ### Mounting Webhook Handler
 
@@ -553,27 +562,23 @@ Create separate clients for different regions or providers:
 
 ```go
 // Production: Cashfree
-prodClient, _ := multipay.NewClient(&multipay.ClientConfig{
-    Adapters: map[string]multipay.Adapter{
-        "cashfree": prodCashfreeAdapter,
-    },
-    DefaultProvider: "cashfree",
+prodClient, _ := client.NewClient(&client.ClientConfig{
+    Providers: []ports.ProviderAdapter{prodCashfreeAdapter},
+    Logger:    yourLogger,
 })
 
 // Staging: Razorpay
-stagingClient, _ := multipay.NewClient(&multipay.ClientConfig{
-    Adapters: map[string]multipay.Adapter{
-        "razorpay": stagingRazorpayAdapter,
-    },
-    DefaultProvider: "razorpay",
+stagingClient, _ := client.NewClient(&client.ClientConfig{
+    Providers: []ports.ProviderAdapter{stagingRazorpayAdapter},
+    Logger:    yourLogger,
 })
 
 // Route based on environment
-var client *multipay.Client
+var mpClient *client.MultiPayClient
 if os.Getenv("ENV") == "prod" {
-    client = prodClient
+    mpClient = prodClient
 } else {
-    client = stagingClient
+    mpClient = stagingClient
 }
 ```
 
@@ -609,18 +614,26 @@ cashfreeAccount2 := adapters.NewCashfreeAdapter(&adapters.CashfreeConfig{
     ClientSecret: "account2-secret",
 })
 
-client1, _ := multipay.NewClient(&multipay.ClientConfig{
-    Adapters: map[string]multipay.Adapter{
-        "cashfree": cashfreeAccount1,
-    },
+client1, _ := client.NewClient(&client.ClientConfig{
+    Providers: []ports.ProviderAdapter{cashfreeAccount1},
+    Logger:    yourLogger,
 })
 
-client2, _ := multipay.NewClient(&multipay.ClientConfig{
-    Adapters: map[string]multipay.Adapter{
-        "cashfree": cashfreeAccount2,
-    },
+client2, _ := client.NewClient(&client.ClientConfig{
+    Providers: []ports.ProviderAdapter{cashfreeAccount2},
+    Logger:    yourLogger,
 })
 ```
+
+### Multi-Account Webhook Routing
+
+Each provider+account combination gets its own webhook endpoint:
+
+- `POST /webhooks/cashfree/acct_prod` → routed to your production Cashfree adapter
+- `POST /webhooks/cashfree/acct_sandbox` → routed to your sandbox Cashfree adapter
+- `POST /webhooks/razorpay/acct_main` → routed to your Razorpay adapter
+
+Register each URL separately in the corresponding provider dashboard. The `EndpointRegistry` tracks which provider+account combinations are active and rejects webhooks for unregistered endpoints.
 
 ## Hook Pipeline
 
@@ -637,6 +650,28 @@ The library includes built-in hooks for audit logging and metrics:
 // Metrics hook (enabled by default)
 // Records: latency histograms, status counters, error rates
 ```
+
+### Hook Use Cases
+
+Hooks are middleware for payment operations. Here are practical examples of what you can build:
+
+**Before Hooks** (run before every payment operation):
+- **Idempotency**: Check if this request was already processed to prevent double-charging
+- **Rate Limiting**: Throttle requests per provider to stay within API limits
+- **Tracing**: Inject OpenTelemetry spans into the context for distributed tracing
+- **Request Logging**: Log operation start with provider, amount, and customer ID
+
+**After Hooks** (run after successful operations):
+- **Cache Invalidation**: Clear cached order/payment state after mutations
+- **Notifications**: Send Slack alerts for payments above a threshold
+- **Analytics**: Record business metrics (revenue by provider, avg order value)
+- **Audit Trail**: Write immutable audit log entries for compliance
+
+**OnError Hooks** (run when operations fail):
+- **Alerting**: Page on-call if payment failure rate exceeds 5%
+- **Retry Queuing**: Enqueue transient failures for automatic retry
+- **Error Categorization**: Tag errors as provider-side vs client-side for dashboards
+- **Fallback Logging**: Ensure failures are always recorded even if the main logger is down
 
 ### Custom Hooks
 
@@ -674,7 +709,7 @@ Hooks receive a HookContext with details about the operation:
 ```go
 type HookContext struct {
     Method      string                 // "Orders.Create", "Payments.Fetch", etc.
-    Provider    string                 // "cashfree" or "razorpay"
+    Provider    domain.Provider        // domain.ProviderCashfree, domain.ProviderRazorpay
     Request     interface{}            // Original request
     Response    interface{}            // Response (nil in before-hook)
     Status      string                 // "started", "success", "error"
