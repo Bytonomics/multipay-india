@@ -73,35 +73,38 @@ func getMap(m map[string]interface{}, key string) map[string]interface{} {
 
 // getTime safely extracts and parses a time value from a map.
 // Supports both Unix timestamp (float64/int64) and RFC3339 string formats.
-// Returns zero time if the key doesn't exist or parsing fails.
-func getTime(m map[string]interface{}, key string) time.Time {
+// Returns nil if the key doesn't exist or parsing fails.
+func getTime(m map[string]interface{}, key string) *time.Time {
 	if m == nil {
-		return time.Time{}
+		return nil
 	}
 	val, ok := m[key]
 	if !ok {
-		return time.Time{}
+		return nil
 	}
 
 	// Try as Unix timestamp (float64 or int64)
 	if f, ok := val.(float64); ok {
-		return time.Unix(int64(f), 0)
+		t := time.Unix(int64(f), 0)
+		return &t
 	}
 	if i, ok := val.(int64); ok {
-		return time.Unix(i, 0)
+		t := time.Unix(i, 0)
+		return &t
 	}
 
 	// Try as string (RFC3339 or other format)
 	if s, ok := val.(string); ok {
 		// Try RFC3339 format
 		if t, err := time.Parse(time.RFC3339, s); err == nil {
-			return t
+			return &t
 		}
 		// Try Unix timestamp as string
 		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
-			return time.Unix(i, 0)
+			t := time.Unix(i, 0)
+			return &t
 		}
 	}
 
-	return time.Time{}
+	return nil
 }

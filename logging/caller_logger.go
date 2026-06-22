@@ -1,6 +1,7 @@
 package logging
 
 import (
+	"context"
 	"fmt"
 	"runtime"
 	"strings"
@@ -51,26 +52,26 @@ func (cl *CallerLogger) callerInfo(depth int) string {
 
 // Error logs an error message with caller information automatically prepended.
 // Additional key-value pairs can be provided for structured logging context.
-func (cl *CallerLogger) Error(message string, keysAndValues ...interface{}) {
+func (cl *CallerLogger) Error(ctx context.Context, message string, keysAndValues ...interface{}) {
 	caller := cl.callerInfo(1)
 	fullMessage := fmt.Sprintf("%s %s", caller, message)
-	cl.delegate.Error(fullMessage, keysAndValues...)
+	cl.delegate.Error(ctx, fullMessage, keysAndValues...)
 }
 
 // Info logs an info message with caller information automatically prepended.
 // Additional key-value pairs can be provided for structured logging context.
-func (cl *CallerLogger) Info(message string, keysAndValues ...interface{}) {
+func (cl *CallerLogger) Info(ctx context.Context, message string, keysAndValues ...interface{}) {
 	caller := cl.callerInfo(1)
 	fullMessage := fmt.Sprintf("%s %s", caller, message)
-	cl.delegate.Info(fullMessage, keysAndValues...)
+	cl.delegate.Info(ctx, fullMessage, keysAndValues...)
 }
 
 // Debug logs a debug message with caller information automatically prepended.
 // Additional key-value pairs can be provided for structured logging context.
-func (cl *CallerLogger) Debug(message string, keysAndValues ...interface{}) {
+func (cl *CallerLogger) Debug(ctx context.Context, message string, keysAndValues ...interface{}) {
 	caller := cl.callerInfo(1)
 	fullMessage := fmt.Sprintf("%s %s", caller, message)
-	cl.delegate.Debug(fullMessage, keysAndValues...)
+	cl.delegate.Debug(ctx, fullMessage, keysAndValues...)
 }
 
 // Verify that CallerLogger implements ports.Logger interface

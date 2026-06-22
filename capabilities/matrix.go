@@ -24,6 +24,7 @@ func NewSupportMatrix() *SupportMatrix {
 		// Core shared capabilities
 		CapOrderCreate:       true,
 		CapOrderFetch:        true,
+		CapOrderListPayments: true,
 		CapPaymentFetch:      true,
 		CapPaymentList:       true,
 		CapPaymentPay:        true,
@@ -36,12 +37,52 @@ func NewSupportMatrix() *SupportMatrix {
 		CapPaymentLinkCreate: true,
 		CapPaymentLinkFetch:  true,
 		CapPaymentLinkCancel: true,
+		CapWebhookConsume:    true,
 
 		// Cashfree-specific capabilities
-		CapInstrumentCryptogram: true,
-		CapOfferCreate:          true,
-		CapOfferFetch:           true,
-		CapEligibilityFetch:     true,
+		CapInstrumentCryptogram:  true,
+		CapOfferCreate:           true,
+		CapOfferFetch:            true,
+		CapEligibilityFetch:      true,
+		CapPaymentLinkListOrders: true,
+		CapSettlementOrderFetch:  true,
+		CapSettlementList:        true,
+		CapSettlementReconFetch:  true,
+		CapReconFetch:            true,
+
+		// Razorpay-only capabilities (not supported by Cashfree)
+		CapOrderUpdate:        false,
+		CapOrderList:          false,
+		CapPaymentCapture:     false,
+		CapRefundUpdate:       false,
+		CapCustomerCreate:     false,
+		CapCustomerFetch:      false,
+		CapCustomerEdit:       false,
+		CapCustomerList:       false,
+		CapWebhookCreate:      false,
+		CapWebhookFetch:       false,
+		CapWebhookEdit:        false,
+		CapWebhookDelete:      false,
+		CapWebhookList:        false,
+		CapSubscriptionCreate: false,
+		CapSubscriptionFetch:  false,
+		CapSubscriptionList:   false,
+		CapPlanCreate:         false,
+		CapPlanFetch:          false,
+		CapPlanList:           false,
+		CapPaymentLinkUpdate:  false,
+		CapPaymentLinkNotify:  false,
+		CapPaymentLinkList:    false,
+		CapUPICreate:          false,
+		CapVPAValidate:        false,
+
+		// Razorpay-specific settlement capabilities (not supported by Cashfree)
+		CapSettlementAll:            false,
+		CapSettlementFetch:          false,
+		CapSettlementReports:        false,
+		CapSettlementOnDemandCreate: false,
+		CapSettlementOnDemandFetch:  false,
+		CapSettlementOnDemandList:   false,
 	}
 
 	// Razorpay verified capabilities from doc 144 section 2.
@@ -49,6 +90,7 @@ func NewSupportMatrix() *SupportMatrix {
 		// Core shared capabilities
 		CapOrderCreate:       true,
 		CapOrderFetch:        true,
+		CapOrderListPayments: true,
 		CapPaymentFetch:      true,
 		CapPaymentList:       true,
 		CapPaymentPay:        true,
@@ -61,6 +103,7 @@ func NewSupportMatrix() *SupportMatrix {
 		CapPaymentLinkCreate: true,
 		CapPaymentLinkFetch:  true,
 		CapPaymentLinkCancel: true,
+		CapWebhookConsume:    true,
 
 		// Razorpay-specific capabilities
 		CapOrderUpdate:        true,
@@ -87,6 +130,27 @@ func NewSupportMatrix() *SupportMatrix {
 		CapPaymentLinkList:    true,
 		CapUPICreate:          true,
 		CapVPAValidate:        true,
+
+		// Cashfree-only capabilities (not supported by Razorpay)
+		CapInstrumentCryptogram:  false,
+		CapOfferCreate:           false,
+		CapOfferFetch:            false,
+		CapEligibilityFetch:      false,
+		CapPaymentLinkListOrders: false,
+
+		// Razorpay-specific settlement capabilities
+		CapSettlementAll:            true,
+		CapSettlementFetch:          true,
+		CapSettlementReports:        true,
+		CapSettlementOnDemandCreate: true,
+		CapSettlementOnDemandFetch:  true,
+		CapSettlementOnDemandList:   true,
+
+		// Cashfree-specific (not supported by Razorpay)
+		CapSettlementOrderFetch: false,
+		CapSettlementList:       false,
+		CapSettlementReconFetch: false,
+		CapReconFetch:           false,
 	}
 
 	m := &SupportMatrix{

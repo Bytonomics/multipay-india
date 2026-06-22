@@ -11,6 +11,10 @@
 # Test binary, built with `go test -c`
 *.test
 
+
+# build/lint/test artifacts
+test-outputs/*
+
 # Code coverage profiles and other test artifacts
 *.out
 coverage.*

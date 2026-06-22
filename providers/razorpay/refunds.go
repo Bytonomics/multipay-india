@@ -25,14 +25,14 @@ func (a *Adapter) CreateRefund(ctx context.Context, req *domain.CreateRefundRequ
 	params["payment_id"] = req.OrderID
 
 	// Amount is optional for full refund; if provided, partial refund
-	if req.Amount > 0 {
-		params["amount"] = req.Amount
+	if req.AmountMinor > 0 {
+		params["amount"] = int64(req.AmountMinor)
 	}
 
 	// Add notes if provided
-	if req.Notes != "" {
+	if req.Reason != "" {
 		params["notes"] = map[string]string{
-			"note": req.Notes,
+			"note": req.Reason,
 		}
 	}
 
@@ -45,11 +45,11 @@ func (a *Adapter) CreateRefund(ctx context.Context, req *domain.CreateRefundRequ
 
 	// Map Razorpay response to canonical domain type
 	refund := &domain.Refund{
-		ID:        getString(responseMap, "id"),
-		OrderID:   getString(responseMap, "payment_id"), // Razorpay returns payment_id, map to OrderID for domain
-		Amount:    getInt64(responseMap, "amount"),
-		Status:    mapRefundStatus(getString(responseMap, "status")),
-		CreatedAt: getTime(responseMap, "created_at"),
+		ProviderRefundID: getString(responseMap, "id"),
+		OrderID:          getString(responseMap, "payment_id"), // Razorpay returns payment_id, map to OrderID for domain
+		AmountMinor:      domain.AmountMinor(getInt64(responseMap, "amount")),
+		Status:           mapRefundStatus(getString(responseMap, "status")),
+		CreatedAt:        getTime(responseMap, "created_at"),
 	}
 
 	return refund, nil
@@ -77,19 +77,19 @@ func (a *Adapter) GetRefund(ctx context.Context, req *domain.GetRefundRequest) (
 
 	// Map Razorpay response to canonical domain type
 	refund := &domain.Refund{
-		ID:        getString(responseMap, "id"),
-		OrderID:   getString(responseMap, "payment_id"), // Razorpay returns payment_id, map to OrderID for domain
-		Amount:    getInt64(responseMap, "amount"),
-		Status:    mapRefundStatus(getString(responseMap, "status")),
-		CreatedAt: getTime(responseMap, "created_at"),
+		ProviderRefundID: getString(responseMap, "id"),
+		OrderID:          getString(responseMap, "payment_id"), // Razorpay returns payment_id, map to OrderID for domain
+		AmountMinor:      domain.AmountMinor(getInt64(responseMap, "amount")),
+		Status:           mapRefundStatus(getString(responseMap, "status")),
+		CreatedAt:        getTime(responseMap, "created_at"),
 	}
 
 	return refund, nil
 }
 
 // ListRefunds retrieves all refunds for an order.
-// It takes a GetOrderRequest containing the order ID and returns a slice of canonical Refund domain objects.
-func (a *Adapter) ListRefunds(ctx context.Context, req *domain.GetOrderRequest) ([]*domain.Refund, error) {
+// It takes a ListRefundsRequest containing the order ID and returns a slice of canonical Refund domain objects.
+func (a *Adapter) ListRefunds(ctx context.Context, req *domain.ListRefundsRequest) ([]*domain.Refund, error) {
 	if req == nil {
 		return nil, domain.ErrInvalidRequest
 	}
@@ -129,11 +129,11 @@ func (a *Adapter) ListRefunds(ctx context.Context, req *domain.GetOrderRequest) 
 		}
 
 		refund := &domain.Refund{
-			ID:        getString(itemMap, "id"),
-			OrderID:   getString(itemMap, "payment_id"), // Razorpay returns payment_id, map to OrderID for domain
-			Amount:    getInt64(itemMap, "amount"),
-			Status:    mapRefundStatus(getString(itemMap, "status")),
-			CreatedAt: getTime(itemMap, "created_at"),
+			ProviderRefundID: getString(itemMap, "id"),
+			OrderID:          getString(itemMap, "payment_id"), // Razorpay returns payment_id, map to OrderID for domain
+			AmountMinor:      domain.AmountMinor(getInt64(itemMap, "amount")),
+			Status:           mapRefundStatus(getString(itemMap, "status")),
+			CreatedAt:        getTime(itemMap, "created_at"),
 		}
 
 		refunds = append(refunds, refund)

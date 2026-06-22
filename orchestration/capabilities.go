@@ -23,7 +23,7 @@ func NewCapabilityService(supportMatrix *capabilities.SupportMatrix) *Capability
 // Supports checks if a provider supports the given capability.
 // Returns true if supported, false if the provider is not found or doesn't support the capability.
 // The context is accepted for future instrumentation but is not used in the current implementation.
-func (s *CapabilityService) Supports(ctx context.Context, provider domain.Provider, cap domain.Capability) bool {
+func (s *CapabilityService) Supports(ctx context.Context, provider domain.Provider, cap capabilities.Capability) bool {
 	if s.supportMatrix == nil {
 		return false
 	}
@@ -33,66 +33,66 @@ func (s *CapabilityService) Supports(ctx context.Context, provider domain.Provid
 // AllCapabilities returns all capabilities supported by the given provider.
 // Returns an empty slice if the provider is not registered.
 // The context is accepted for future instrumentation but is not used in the current implementation.
-func (s *CapabilityService) AllCapabilities(ctx context.Context, provider domain.Provider) []domain.Capability {
+func (s *CapabilityService) AllCapabilities(ctx context.Context, provider domain.Provider) []capabilities.Capability {
 	if s.supportMatrix == nil {
-		return []domain.Capability{}
+		return []capabilities.Capability{}
 	}
 
 	// Manually collect all known capabilities for the provider
 	// by querying the SupportMatrix for each standard capability.
 	// This is a simple implementation that covers all capabilities defined in domain.
-	allCaps := []domain.Capability{
+	allCaps := []capabilities.Capability{
 		// Core shared capabilities
-		domain.CapOrderCreate,
-		domain.CapOrderFetch,
-		domain.CapPaymentFetch,
-		domain.CapPaymentList,
-		domain.CapPaymentPay,
-		domain.CapRefundCreate,
-		domain.CapRefundFetch,
-		domain.CapRefundList,
-		domain.CapInstrumentFetch,
-		domain.CapInstrumentList,
-		domain.CapInstrumentDelete,
-		domain.CapPaymentLinkCreate,
-		domain.CapPaymentLinkFetch,
-		domain.CapPaymentLinkCancel,
+		capabilities.CapOrderCreate,
+		capabilities.CapOrderFetch,
+		capabilities.CapPaymentFetch,
+		capabilities.CapPaymentList,
+		capabilities.CapPaymentPay,
+		capabilities.CapRefundCreate,
+		capabilities.CapRefundFetch,
+		capabilities.CapRefundList,
+		capabilities.CapInstrumentFetch,
+		capabilities.CapInstrumentList,
+		capabilities.CapInstrumentDelete,
+		capabilities.CapPaymentLinkCreate,
+		capabilities.CapPaymentLinkFetch,
+		capabilities.CapPaymentLinkCancel,
 
 		// Cashfree-specific capabilities
-		domain.CapInstrumentCryptogram,
-		domain.CapOfferCreate,
-		domain.CapOfferFetch,
-		domain.CapEligibilityFetch,
+		capabilities.CapInstrumentCryptogram,
+		capabilities.CapOfferCreate,
+		capabilities.CapOfferFetch,
+		capabilities.CapEligibilityFetch,
 
 		// Razorpay-specific capabilities
-		domain.CapOrderUpdate,
-		domain.CapOrderList,
-		domain.CapPaymentCapture,
-		domain.CapRefundUpdate,
-		domain.CapCustomerCreate,
-		domain.CapCustomerFetch,
-		domain.CapCustomerEdit,
-		domain.CapCustomerList,
-		domain.CapWebhookCreate,
-		domain.CapWebhookFetch,
-		domain.CapWebhookEdit,
-		domain.CapWebhookDelete,
-		domain.CapWebhookList,
-		domain.CapSubscriptionCreate,
-		domain.CapSubscriptionFetch,
-		domain.CapSubscriptionList,
-		domain.CapPlanCreate,
-		domain.CapPlanFetch,
-		domain.CapPlanList,
-		domain.CapPaymentLinkUpdate,
-		domain.CapPaymentLinkNotify,
-		domain.CapPaymentLinkList,
-		domain.CapUPICreate,
-		domain.CapVPAValidate,
+		capabilities.CapOrderUpdate,
+		capabilities.CapOrderList,
+		capabilities.CapPaymentCapture,
+		capabilities.CapRefundUpdate,
+		capabilities.CapCustomerCreate,
+		capabilities.CapCustomerFetch,
+		capabilities.CapCustomerEdit,
+		capabilities.CapCustomerList,
+		capabilities.CapWebhookCreate,
+		capabilities.CapWebhookFetch,
+		capabilities.CapWebhookEdit,
+		capabilities.CapWebhookDelete,
+		capabilities.CapWebhookList,
+		capabilities.CapSubscriptionCreate,
+		capabilities.CapSubscriptionFetch,
+		capabilities.CapSubscriptionList,
+		capabilities.CapPlanCreate,
+		capabilities.CapPlanFetch,
+		capabilities.CapPlanList,
+		capabilities.CapPaymentLinkUpdate,
+		capabilities.CapPaymentLinkNotify,
+		capabilities.CapPaymentLinkList,
+		capabilities.CapUPICreate,
+		capabilities.CapVPAValidate,
 	}
 
 	// Filter to only those supported by this provider
-	var supported []domain.Capability
+	var supported []capabilities.Capability
 	for _, cap := range allCaps {
 		if s.supportMatrix.Supports(provider, cap) {
 			supported = append(supported, cap)
@@ -105,7 +105,7 @@ func (s *CapabilityService) AllCapabilities(ctx context.Context, provider domain
 // Describe returns a human-readable description of a capability for the given provider.
 // Returns an empty string if no description is available or the provider is not found.
 // The context is accepted for future instrumentation but is not used in the current implementation.
-func (s *CapabilityService) Describe(ctx context.Context, provider domain.Provider, cap domain.Capability) string {
+func (s *CapabilityService) Describe(ctx context.Context, provider domain.Provider, cap capabilities.Capability) string {
 	if s.supportMatrix == nil {
 		return ""
 	}

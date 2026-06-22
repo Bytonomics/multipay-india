@@ -8,6 +8,7 @@ import (
 	"github.com/Bytonomics/multipay-adapter/capabilities"
 	"github.com/Bytonomics/multipay-adapter/domain"
 	"github.com/Bytonomics/multipay-adapter/hooks"
+	"github.com/Bytonomics/multipay-adapter/logging"
 	"github.com/Bytonomics/multipay-adapter/ports"
 )
 
@@ -16,19 +17,23 @@ type PaymentLinkService struct {
 	resolver  *ports.ProviderRegistry
 	validator *capabilities.Validator
 	pipeline  *hooks.Pipeline
+	logger    ports.Logger
 }
 
 // NewPaymentLinkService constructs a PaymentLinkService with dependency injection.
-func NewPaymentLinkService(resolver *ports.ProviderRegistry, validator *capabilities.Validator, pipeline *hooks.Pipeline) *PaymentLinkService {
+func NewPaymentLinkService(resolver *ports.ProviderRegistry, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger) *PaymentLinkService {
+	wrappedLogger := logging.NewCallerLogger(logger, 2)
+
 	return &PaymentLinkService{
 		resolver:  resolver,
 		validator: validator,
 		pipeline:  pipeline,
+		logger:    wrappedLogger,
 	}
 }
 
 // CreatePaymentLink creates a new shareable payment link with validation and hook execution.
-func (s *PaymentLinkService) CreatePaymentLink(ctx context.Context, req *domain.CreatePaymentLinkRequest) (*domain.PaymentLinkResponse, error) {
+func (s *PaymentLinkService) CreatePaymentLink(ctx context.Context, req *domain.CreatePaymentLinkRequest) (*domain.PaymentLink, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
@@ -38,12 +43,12 @@ func (s *PaymentLinkService) CreatePaymentLink(ctx context.Context, req *domain.
 		return nil, errors.New("provider not found in context")
 	}
 
-	capErr := s.validator.RequireCapability(ctx, provider, domain.CapPaymentLinkCreate)
+	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapPaymentLinkCreate)
 	if capErr != nil {
 		return nil, fmt.Errorf("capability check failed: %w", capErr)
 	}
 
-	adapter, err := s.resolver.Resolve(provider)
+	adapter, err := s.resolver.Resolve(ctx, provider)
 	if err != nil {
 		return nil, fmt.Errorf("provider resolution failed: %w", err)
 	}
@@ -54,7 +59,7 @@ func (s *PaymentLinkService) CreatePaymentLink(ctx context.Context, req *domain.
 		RequestData: req,
 	}
 
-	hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	ctx, hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
 	if hookErr != nil {
 		return nil, fmt.Errorf("before hook failed: %w", hookErr)
 	}
@@ -62,7 +67,9 @@ func (s *PaymentLinkService) CreatePaymentLink(ctx context.Context, req *domain.
 	result, err := adapter.CreatePaymentLink(ctx, req)
 	if err != nil {
 		hookCtx.Error = err
-		s.pipeline.ExecuteOnError(ctx, hookCtx, err)
+		if hookErr := s.pipeline.ExecuteOnError(ctx, hookCtx, err); hookErr != nil {
+			s.logger.Error(ctx, "error in OnError hook for CreatePaymentLink", "error", hookErr.Error())
+		}
 		return nil, fmt.Errorf("create payment link failed: %w", err)
 	}
 
@@ -76,7 +83,7 @@ func (s *PaymentLinkService) CreatePaymentLink(ctx context.Context, req *domain.
 }
 
 // GetPaymentLink retrieves an existing payment link with validation and hook execution.
-func (s *PaymentLinkService) GetPaymentLink(ctx context.Context, req *domain.GetPaymentLinkRequest) (*domain.PaymentLinkResponse, error) {
+func (s *PaymentLinkService) GetPaymentLink(ctx context.Context, req *domain.GetPaymentLinkRequest) (*domain.PaymentLink, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
@@ -86,12 +93,12 @@ func (s *PaymentLinkService) GetPaymentLink(ctx context.Context, req *domain.Get
 		return nil, errors.New("provider not found in context")
 	}
 
-	capErr := s.validator.RequireCapability(ctx, provider, domain.CapPaymentLinkFetch)
+	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapPaymentLinkFetch)
 	if capErr != nil {
 		return nil, fmt.Errorf("capability check failed: %w", capErr)
 	}
 
-	adapter, err := s.resolver.Resolve(provider)
+	adapter, err := s.resolver.Resolve(ctx, provider)
 	if err != nil {
 		return nil, fmt.Errorf("provider resolution failed: %w", err)
 	}
@@ -102,7 +109,7 @@ func (s *PaymentLinkService) GetPaymentLink(ctx context.Context, req *domain.Get
 		RequestData: req,
 	}
 
-	hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	ctx, hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
 	if hookErr != nil {
 		return nil, fmt.Errorf("before hook failed: %w", hookErr)
 	}
@@ -110,7 +117,9 @@ func (s *PaymentLinkService) GetPaymentLink(ctx context.Context, req *domain.Get
 	result, err := adapter.GetPaymentLink(ctx, req)
 	if err != nil {
 		hookCtx.Error = err
-		s.pipeline.ExecuteOnError(ctx, hookCtx, err)
+		if hookErr := s.pipeline.ExecuteOnError(ctx, hookCtx, err); hookErr != nil {
+			s.logger.Error(ctx, "error in OnError hook for GetPaymentLink", "error", hookErr.Error())
+		}
 		return nil, fmt.Errorf("get payment link failed: %w", err)
 	}
 
@@ -124,7 +133,7 @@ func (s *PaymentLinkService) GetPaymentLink(ctx context.Context, req *domain.Get
 }
 
 // CancelPaymentLink cancels an existing payment link with validation and hook execution.
-func (s *PaymentLinkService) CancelPaymentLink(ctx context.Context, req *domain.CancelPaymentLinkRequest) (*domain.PaymentLinkResponse, error) {
+func (s *PaymentLinkService) CancelPaymentLink(ctx context.Context, req *domain.CancelPaymentLinkRequest) (*domain.PaymentLink, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
@@ -134,12 +143,12 @@ func (s *PaymentLinkService) CancelPaymentLink(ctx context.Context, req *domain.
 		return nil, errors.New("provider not found in context")
 	}
 
-	capErr := s.validator.RequireCapability(ctx, provider, domain.CapPaymentLinkCancel)
+	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapPaymentLinkCancel)
 	if capErr != nil {
 		return nil, fmt.Errorf("capability check failed: %w", capErr)
 	}
 
-	adapter, err := s.resolver.Resolve(provider)
+	adapter, err := s.resolver.Resolve(ctx, provider)
 	if err != nil {
 		return nil, fmt.Errorf("provider resolution failed: %w", err)
 	}
@@ -150,7 +159,7 @@ func (s *PaymentLinkService) CancelPaymentLink(ctx context.Context, req *domain.
 		RequestData: req,
 	}
 
-	hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	ctx, hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
 	if hookErr != nil {
 		return nil, fmt.Errorf("before hook failed: %w", hookErr)
 	}
@@ -158,7 +167,9 @@ func (s *PaymentLinkService) CancelPaymentLink(ctx context.Context, req *domain.
 	result, err := adapter.CancelPaymentLink(ctx, req)
 	if err != nil {
 		hookCtx.Error = err
-		s.pipeline.ExecuteOnError(ctx, hookCtx, err)
+		if hookErr := s.pipeline.ExecuteOnError(ctx, hookCtx, err); hookErr != nil {
+			s.logger.Error(ctx, "error in OnError hook for CancelPaymentLink", "error", hookErr.Error())
+		}
 		return nil, fmt.Errorf("cancel payment link failed: %w", err)
 	}
 

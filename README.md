@@ -275,6 +275,68 @@ if ce := &multipay.CapabilityError{}; errors.As(err, &ce) {
 }
 ```
 
+## Supported Capabilities Matrix
+
+The following table shows all capabilities supported by Cashfree and Razorpay. Use this to determine which provider meets your feature requirements before integration.
+
+| # | Capability | Description | Cashfree | Razorpay |
+|---|---|---|---|---|
+| 1 | Order Create | Create a new order | ✓ | ✓ |
+| 2 | Order Fetch | Retrieve order details | ✓ | ✓ |
+| 3 | Order List Payments | List all payments associated with an order | ✓ | ✓ |
+| 4 | Order Update | Modify order details | ✗ | ✓ |
+| 5 | Order List | List all orders | ✗ | ✓ |
+| 6 | Payment Fetch | Retrieve payment details | ✓ | ✓ |
+| 7 | Payment List | List all payments | ✓ | ✓ |
+| 8 | Payment Pay | Initiate or process a payment | ✓ | ✓ |
+| 9 | Payment Capture | Capture an authorized payment | ✗ | ✓ |
+| 10 | Refund Create | Create a refund for a payment | ✓ | ✓ |
+| 11 | Refund Fetch | Retrieve refund details | ✓ | ✓ |
+| 12 | Refund List | List all refunds | ✓ | ✓ |
+| 13 | Refund Update | Modify refund details | ✗ | ✓ |
+| 14 | Instrument Fetch | Retrieve payment instrument details | ✓ | ✓ |
+| 15 | Instrument List | List stored payment instruments | ✓ | ✓ |
+| 16 | Instrument Delete | Delete a stored payment instrument | ✓ | ✓ |
+| 17 | Instrument Cryptogram | Fetch cryptogram for tokenized instrument | ✓ | ✗ |
+| 18 | Payment Link Create | Create a shareable payment link | ✓ | ✓ |
+| 19 | Payment Link Fetch | Retrieve payment link details | ✓ | ✓ |
+| 20 | Payment Link Cancel | Cancel an active payment link | ✓ | ✓ |
+| 21 | Payment Link Update | Modify payment link details | ✗ | ✓ |
+| 22 | Payment Link Notify | Send payment link notification to customer | ✗ | ✓ |
+| 23 | Payment Link List | List all payment links | ✗ | ✓ |
+| 24 | Payment Link List Orders | List orders within a payment link | ✓ | ✗ |
+| 25 | Webhook Consume | Consume and verify webhook events | ✓ | ✓ |
+| 26 | Webhook Create | Create a new webhook endpoint | ✗ | ✓ |
+| 27 | Webhook Fetch | Retrieve webhook configuration | ✗ | ✓ |
+| 28 | Webhook Edit | Modify webhook settings | ✗ | ✓ |
+| 29 | Webhook Delete | Delete a webhook endpoint | ✗ | ✓ |
+| 30 | Webhook List | List all webhook endpoints | ✗ | ✓ |
+| 31 | Customer Create | Create a new customer record | ✗ | ✓ |
+| 32 | Customer Fetch | Retrieve customer details | ✗ | ✓ |
+| 33 | Customer Edit | Modify customer information | ✗ | ✓ |
+| 34 | Customer List | List all customers | ✗ | ✓ |
+| 35 | Subscription Create | Create a subscription | ✗ | ✓ |
+| 36 | Subscription Fetch | Retrieve subscription details | ✗ | ✓ |
+| 37 | Subscription List | List all subscriptions | ✗ | ✓ |
+| 38 | Plan Create | Create a billing plan | ✗ | ✓ |
+| 39 | Plan Fetch | Retrieve plan details | ✗ | ✓ |
+| 40 | Plan List | List all plans | ✗ | ✓ |
+| 41 | Offer Create | Create offers or promotions | ✓ | ✗ |
+| 42 | Offer Fetch | Retrieve offer details | ✓ | ✗ |
+| 43 | Eligibility Fetch | Check eligibility for offers | ✓ | ✗ |
+| 44 | Settlement Order Fetch | Fetch settlement for a specific order | ✓ | ✓ |
+| 45 | Settlement List | List all settlements | ✓ | ✓ |
+| 46 | Settlement Recon Fetch | Fetch settlement reconciliation data | ✓ | ✓ |
+| 47 | Recon Fetch | Fetch general reconciliation data | ✓ | ✓ |
+| 48 | UPI Create | Create a UPI payment request | ✗ | ✓ |
+| 49 | VPA Validate | Validate a UPI VPA address | ✗ | ✓ |
+
+**Legend:**
+- ✓ = Supported
+- ✗ = Not supported
+
+Use [`client.Capabilities().Supports(provider, capability)`](./golang/multipay-adapter/orchestration/capabilities.go) to check capability availability before attempting operations.
+
 ## Webhook Setup
 
 ### Mounting Webhook Handler

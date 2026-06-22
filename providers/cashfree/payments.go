@@ -58,7 +58,7 @@ func getPayment(ctx context.Context, adapter *Adapter, req *domain.GetPaymentReq
 
 // listPayments retrieves all payments for a specific order from the Cashfree payment gateway.
 // Calls the Cashfree SDK to fetch payments and maps them to canonical domain.Payment types.
-func listPayments(ctx context.Context, adapter *Adapter, req *domain.GetOrderRequest) ([]*domain.Payment, error) {
+func listPayments(ctx context.Context, adapter *Adapter, req *domain.ListPaymentsRequest) ([]*domain.Payment, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required: %w", domain.ErrInvalidRequest)
 	}

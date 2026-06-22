@@ -1,6 +1,7 @@
 package ports
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -11,7 +12,7 @@ import (
 type ProviderResolver interface {
 	// Resolve returns the adapter for a given payment provider.
 	// Returns ErrProviderNotFound if the provider is not registered.
-	Resolve(provider domain.Provider) (ProviderAdapter, error)
+	Resolve(ctx context.Context, provider domain.Provider) (ProviderAdapter, error)
 }
 
 // ProviderRegistry is a registry that manages provider adapters.
@@ -26,6 +27,18 @@ func NewProviderRegistry() *ProviderRegistry {
 	return &ProviderRegistry{
 		adapters: make(map[domain.Provider]ProviderAdapter),
 	}
+}
+
+// NewProviderRegistryFromAdapters creates a registry pre-populated with the given adapters.
+// Each adapter registers itself by its ProviderName().
+func NewProviderRegistryFromAdapters(adapters []ProviderAdapter) (*ProviderRegistry, error) {
+	r := NewProviderRegistry()
+	for i := range adapters {
+		if err := r.Register(adapters[i].ProviderName(), adapters[i]); err != nil {
+			return nil, fmt.Errorf("failed to register adapter at index %d: %w", i, err)
+		}
+	}
+	return r, nil
 }
 
 // Register registers a provider adapter.
@@ -48,7 +61,7 @@ func (r *ProviderRegistry) Register(provider domain.Provider, adapter ProviderAd
 
 // Resolve resolves a provider to its registered adapter.
 // Returns domain.ErrProviderNotFound if the provider is not registered.
-func (r *ProviderRegistry) Resolve(provider domain.Provider) (ProviderAdapter, error) {
+func (r *ProviderRegistry) Resolve(ctx context.Context, provider domain.Provider) (ProviderAdapter, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 

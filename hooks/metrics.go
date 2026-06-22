@@ -33,11 +33,11 @@ func NewMetricsHook(collector MetricsCollector) *MetricsHook {
 }
 
 // Before records the start of the operation.
-func (m *MetricsHook) Before(ctx context.Context, hc *ports.HookContext) error {
+func (m *MetricsHook) Before(ctx context.Context, hc *ports.HookContext) (context.Context, error) {
 	if m.collector != nil {
 		m.collector.RecordOperationStarted(ctx, hc.Provider.String(), hc.RequestType)
 	}
-	return nil
+	return ctx, nil
 }
 
 // After records a successful operation.

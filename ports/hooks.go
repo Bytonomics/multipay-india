@@ -2,6 +2,7 @@ package ports
 
 import (
 	"context"
+	"time"
 
 	"github.com/Bytonomics/multipay-adapter/domain"
 )
@@ -22,6 +23,12 @@ type HookContext struct {
 
 	// Error is the error that occurred (only set for OnError hooks).
 	Error error
+
+	// StartTime is when hook execution began.
+	StartTime time.Time
+
+	// Metadata is for hooks to pass arbitrary data down the pipeline.
+	Metadata map[string]interface{}
 }
 
 // Hook defines lifecycle hooks for payment operations.
@@ -30,8 +37,9 @@ type HookContext struct {
 type Hook interface {
 	// Before is called before a payment operation is executed.
 	// It can inspect and potentially modify the request context.
+	// The returned context is used for the subsequent operation.
 	// Returning an error from Before will prevent the operation from executing.
-	Before(ctx context.Context, hc *HookContext) error
+	Before(ctx context.Context, hc *HookContext) (context.Context, error)
 
 	// After is called after a payment operation completes successfully.
 	// It can inspect the response and perform post-processing.

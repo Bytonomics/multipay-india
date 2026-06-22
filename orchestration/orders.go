@@ -7,6 +7,7 @@ import (
 	"github.com/Bytonomics/multipay-adapter/capabilities"
 	"github.com/Bytonomics/multipay-adapter/domain"
 	"github.com/Bytonomics/multipay-adapter/hooks"
+	"github.com/Bytonomics/multipay-adapter/logging"
 	"github.com/Bytonomics/multipay-adapter/ports"
 )
 
@@ -16,14 +17,18 @@ type OrderService struct {
 	resolver  *ports.ProviderRegistry
 	validator *capabilities.Validator
 	pipeline  *hooks.Pipeline
+	logger    ports.Logger
 }
 
 // NewOrderService constructs an OrderService with required dependencies.
-func NewOrderService(resolver *ports.ProviderRegistry, validator *capabilities.Validator, pipeline *hooks.Pipeline) *OrderService {
+func NewOrderService(resolver *ports.ProviderRegistry, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger) *OrderService {
+	wrappedLogger := logging.NewCallerLogger(logger, 2)
+
 	return &OrderService{
 		resolver:  resolver,
 		validator: validator,
 		pipeline:  pipeline,
+		logger:    wrappedLogger,
 	}
 }
 
@@ -37,7 +42,7 @@ func (s *OrderService) CreateOrder(ctx context.Context, provider domain.Provider
 		return nil, fmt.Errorf("capability check failed: %w", err)
 	}
 
-	adapter, err := s.resolver.Resolve(provider)
+	adapter, err := s.resolver.Resolve(ctx, provider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve adapter: %w", err)
 	}
@@ -48,7 +53,7 @@ func (s *OrderService) CreateOrder(ctx context.Context, provider domain.Provider
 		RequestData: req,
 	}
 
-	hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	ctx, hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
 	if hookErr != nil {
 		return nil, fmt.Errorf("failed to execute before hooks: %w", hookErr)
 	}
@@ -56,7 +61,9 @@ func (s *OrderService) CreateOrder(ctx context.Context, provider domain.Provider
 	result, err := adapter.CreateOrder(ctx, req)
 	if err != nil {
 		hookCtx.Error = err
-		s.pipeline.ExecuteOnError(ctx, hookCtx, err)
+		if hookErr := s.pipeline.ExecuteOnError(ctx, hookCtx, err); hookErr != nil {
+			s.logger.Error(ctx, "error in OnError hook for CreateOrder", "error", hookErr.Error())
+		}
 		return nil, fmt.Errorf("failed to create order: %w", err)
 	}
 
@@ -80,7 +87,7 @@ func (s *OrderService) GetOrder(ctx context.Context, provider domain.Provider, r
 		return nil, fmt.Errorf("capability check failed: %w", capErr)
 	}
 
-	adapter, err := s.resolver.Resolve(provider)
+	adapter, err := s.resolver.Resolve(ctx, provider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve adapter: %w", err)
 	}
@@ -91,7 +98,7 @@ func (s *OrderService) GetOrder(ctx context.Context, provider domain.Provider, r
 		RequestData: req,
 	}
 
-	hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	ctx, hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
 	if hookErr != nil {
 		return nil, fmt.Errorf("failed to execute before hooks: %w", hookErr)
 	}
@@ -99,7 +106,9 @@ func (s *OrderService) GetOrder(ctx context.Context, provider domain.Provider, r
 	result, err := adapter.GetOrder(ctx, req)
 	if err != nil {
 		hookCtx.Error = err
-		s.pipeline.ExecuteOnError(ctx, hookCtx, err)
+		if hookErr := s.pipeline.ExecuteOnError(ctx, hookCtx, err); hookErr != nil {
+			s.logger.Error(ctx, "error in OnError hook for GetOrder", "error", hookErr.Error())
+		}
 		return nil, fmt.Errorf("failed to get order: %w", err)
 	}
 
@@ -113,7 +122,7 @@ func (s *OrderService) GetOrder(ctx context.Context, provider domain.Provider, r
 }
 
 // ListOrderPayments validates input, checks capability, and retrieves all payments for an order.
-func (s *OrderService) ListOrderPayments(ctx context.Context, provider domain.Provider, req *domain.GetOrderRequest) ([]*domain.Payment, error) {
+func (s *OrderService) ListOrderPayments(ctx context.Context, provider domain.Provider, req *domain.ListOrderPaymentsRequest) ([]*domain.Payment, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
@@ -123,7 +132,7 @@ func (s *OrderService) ListOrderPayments(ctx context.Context, provider domain.Pr
 		return nil, fmt.Errorf("capability check failed: %w", capErr)
 	}
 
-	adapter, err := s.resolver.Resolve(provider)
+	adapter, err := s.resolver.Resolve(ctx, provider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve adapter: %w", err)
 	}
@@ -134,7 +143,7 @@ func (s *OrderService) ListOrderPayments(ctx context.Context, provider domain.Pr
 		RequestData: req,
 	}
 
-	hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	ctx, hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
 	if hookErr != nil {
 		return nil, fmt.Errorf("failed to execute before hooks: %w", hookErr)
 	}
@@ -142,7 +151,9 @@ func (s *OrderService) ListOrderPayments(ctx context.Context, provider domain.Pr
 	result, err := adapter.ListOrderPayments(ctx, req)
 	if err != nil {
 		hookCtx.Error = err
-		s.pipeline.ExecuteOnError(ctx, hookCtx, err)
+		if hookErr := s.pipeline.ExecuteOnError(ctx, hookCtx, err); hookErr != nil {
+			s.logger.Error(ctx, "error in OnError hook for ListOrderPayments", "error", hookErr.Error())
+		}
 		return nil, fmt.Errorf("failed to list order payments: %w", err)
 	}
 

@@ -7,6 +7,7 @@ import (
 
 	cf "github.com/cashfree/cashfree_pg"
 
+	"github.com/Bytonomics/multipay-adapter/capabilities"
 	"github.com/Bytonomics/multipay-adapter/domain"
 	"github.com/Bytonomics/multipay-adapter/ports"
 )
@@ -24,6 +25,12 @@ type Config struct {
 
 	// ClientSecret is the Cashfree merchant client secret.
 	ClientSecret string
+
+	// WebhookSecret is the HMAC-SHA256 secret for webhook verification.
+	WebhookSecret string
+
+	// AccountID is the unique account ID for webhook routing.
+	AccountID string
 
 	// Environment specifies the Cashfree deployment environment (Sandbox or Production).
 	Environment domain.Environment
@@ -67,25 +74,37 @@ func (a *Adapter) ProviderName() domain.Provider {
 }
 
 // ProviderCapabilities returns the list of capabilities supported by Cashfree.
-// Cashfree supports 8 core capabilities verified across both providers,
-// plus additional Cashfree-specific capabilities.
-func (a *Adapter) ProviderCapabilities() []domain.Capability {
-	return []domain.Capability{
-		// Core verified shared capabilities (supported by both Cashfree and Razorpay)
-		domain.CapOrderCreate,
-		domain.CapOrderFetch,
-		domain.CapPaymentFetch,
-		domain.CapPaymentList,
-		domain.CapRefundCreate,
-		domain.CapRefundFetch,
-		domain.CapRefundList,
-		domain.CapInstrumentFetch,
+// Cashfree supports 25 total capabilities.
+func (a *Adapter) ProviderCapabilities() []capabilities.Capability {
+	return []capabilities.Capability{
+		// Core shared capabilities
+		capabilities.CapOrderCreate,
+		capabilities.CapOrderFetch,
+		capabilities.CapOrderListPayments,
+		capabilities.CapPaymentFetch,
+		capabilities.CapPaymentList,
+		capabilities.CapPaymentPay,
+		capabilities.CapRefundCreate,
+		capabilities.CapRefundFetch,
+		capabilities.CapRefundList,
+		capabilities.CapInstrumentFetch,
+		capabilities.CapInstrumentList,
+		capabilities.CapInstrumentDelete,
+		capabilities.CapPaymentLinkCreate,
+		capabilities.CapPaymentLinkFetch,
+		capabilities.CapPaymentLinkCancel,
+		capabilities.CapWebhookConsume,
 
-		// Cashfree-specific capabilities (not in core verified overlap)
-		domain.CapInstrumentCryptogram,
-		domain.CapOfferCreate,
-		domain.CapOfferFetch,
-		domain.CapEligibilityFetch,
+		// Cashfree-specific capabilities
+		capabilities.CapInstrumentCryptogram,
+		capabilities.CapPaymentLinkListOrders,
+		capabilities.CapOfferCreate,
+		capabilities.CapOfferFetch,
+		capabilities.CapEligibilityFetch,
+		capabilities.CapSettlementOrderFetch,
+		capabilities.CapSettlementList,
+		capabilities.CapSettlementReconFetch,
+		capabilities.CapReconFetch,
 	}
 }
 
@@ -134,7 +153,7 @@ func (a *Adapter) GetOrder(ctx context.Context, req *domain.GetOrderRequest) (*d
 
 // ListOrderPayments retrieves all payments for a specific order.
 // See orders.go for implementation.
-func (a *Adapter) ListOrderPayments(ctx context.Context, req *domain.GetOrderRequest) ([]*domain.Payment, error) {
+func (a *Adapter) ListOrderPayments(ctx context.Context, req *domain.ListOrderPaymentsRequest) ([]*domain.Payment, error) {
 	return listOrderPayments(ctx, a, req)
 }
 
@@ -146,8 +165,18 @@ func (a *Adapter) GetPayment(ctx context.Context, req *domain.GetPaymentRequest)
 
 // ListPayments retrieves all payments for an order.
 // See payments.go for implementation.
-func (a *Adapter) ListPayments(ctx context.Context, req *domain.GetOrderRequest) ([]*domain.Payment, error) {
+func (a *Adapter) ListPayments(ctx context.Context, req *domain.ListPaymentsRequest) ([]*domain.Payment, error) {
 	return listPayments(ctx, a, req)
+}
+
+// CapturePayment captures a previously authorized payment.
+// Cashfree does not support explicit payment capture; payments are captured automatically.
+func (a *Adapter) CapturePayment(ctx context.Context, req *domain.CapturePaymentRequest) (*domain.Payment, error) {
+	return nil, domain.NewCapabilityError(
+		domain.ProviderCashfree,
+		string(capabilities.CapPaymentCapture),
+		"Cashfree does not support explicit payment capture",
+	)
 }
 
 // CreateRefund creates a new refund for an order.
@@ -164,7 +193,7 @@ func (a *Adapter) GetRefund(ctx context.Context, req *domain.GetRefundRequest) (
 
 // ListRefunds retrieves all refunds for an order.
 // See refunds.go for implementation.
-func (a *Adapter) ListRefunds(ctx context.Context, req *domain.GetOrderRequest) ([]*domain.Refund, error) {
+func (a *Adapter) ListRefunds(ctx context.Context, req *domain.ListRefundsRequest) ([]*domain.Refund, error) {
 	return listRefunds(ctx, a, req)
 }
 
@@ -176,42 +205,66 @@ func (a *Adapter) GetInstrument(ctx context.Context, req *domain.GetInstrumentRe
 
 // ListInstruments retrieves all instruments for a customer.
 // See instruments.go for implementation.
-func (a *Adapter) ListInstruments(ctx context.Context, req *domain.GetInstrumentRequest) ([]*domain.Instrument, error) {
+func (a *Adapter) ListInstruments(ctx context.Context, req *domain.ListInstrumentsRequest) ([]*domain.Instrument, error) {
 	return listInstruments(ctx, a, req)
 }
 
 // DeleteInstrument removes a payment instrument.
 // See instruments.go for implementation.
-func (a *Adapter) DeleteInstrument(ctx context.Context, req *domain.GetInstrumentRequest) error {
+func (a *Adapter) DeleteInstrument(ctx context.Context, req *domain.DeleteInstrumentRequest) (*domain.Instrument, error) {
 	return deleteInstrument(ctx, a, req)
 }
 
 // CreatePaymentLink creates a new shareable payment link.
 // See payment_links.go for implementation.
-func (a *Adapter) CreatePaymentLink(ctx context.Context, req *domain.CreatePaymentLinkRequest) (*domain.PaymentLinkResponse, error) {
+func (a *Adapter) CreatePaymentLink(ctx context.Context, req *domain.CreatePaymentLinkRequest) (*domain.PaymentLink, error) {
 	return createPaymentLink(ctx, a, req)
 }
 
 // GetPaymentLink retrieves an existing payment link.
 // See payment_links.go for implementation.
-func (a *Adapter) GetPaymentLink(ctx context.Context, req *domain.GetPaymentLinkRequest) (*domain.PaymentLinkResponse, error) {
+func (a *Adapter) GetPaymentLink(ctx context.Context, req *domain.GetPaymentLinkRequest) (*domain.PaymentLink, error) {
 	return getPaymentLink(ctx, a, req)
 }
 
 // CancelPaymentLink cancels an existing payment link.
 // See payment_links.go for implementation.
-func (a *Adapter) CancelPaymentLink(ctx context.Context, req *domain.CancelPaymentLinkRequest) (*domain.PaymentLinkResponse, error) {
+func (a *Adapter) CancelPaymentLink(ctx context.Context, req *domain.CancelPaymentLinkRequest) (*domain.PaymentLink, error) {
 	return cancelPaymentLink(ctx, a, req)
 }
 
 // VerifySignature verifies the authenticity of a webhook request.
 // See webhooks.go for implementation.
-func (a *Adapter) VerifySignature(ctx context.Context, signature string, payload []byte) error {
-	return verifySignature(payload, map[string]string{"X-Cashfree-Signature": signature}, a.config.ClientSecret)
+func (a *Adapter) VerifySignature(ctx context.Context, payload []byte, headers map[string]string) error {
+	return verifySignature(payload, headers, a.config.WebhookSecret)
 }
 
 // ParseEvent parses and unmarshals a webhook payload into a domain event.
 // See webhooks.go for implementation.
-func (a *Adapter) ParseEvent(ctx context.Context, payload []byte) (*domain.WebhookEvent, error) {
-	return parseEvent(ctx, payload, nil)
+func (a *Adapter) ParseEvent(ctx context.Context, payload []byte, headers map[string]string) (*domain.WebhookEvent, error) {
+	return parseEvent(ctx, payload, headers)
+}
+
+func (a *Adapter) MapOrderMetadata(_ context.Context, metadata domain.Metadata) (map[string]interface{}, error) {
+	result := make(map[string]interface{}, len(metadata))
+	for k, v := range metadata {
+		result[k] = v
+	}
+	return result, nil
+}
+
+func (a *Adapter) MapRefundMetadata(_ context.Context, metadata domain.Metadata) (map[string]interface{}, error) {
+	result := make(map[string]interface{}, len(metadata))
+	for k, v := range metadata {
+		result[k] = v
+	}
+	return result, nil
+}
+
+func (a *Adapter) MapPaymentLinkMetadata(_ context.Context, metadata domain.Metadata) (map[string]interface{}, error) {
+	result := make(map[string]interface{}, len(metadata))
+	for k, v := range metadata {
+		result[k] = v
+	}
+	return result, nil
 }

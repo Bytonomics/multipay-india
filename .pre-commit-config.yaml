@@ -11,39 +11,47 @@
 #   git commit --no-verify -m "message"
 #
 # Hook execution order:
-#   1. Go format (auto-fix + goimports + gci)
-#   2. Go lint (golangci-lint with NilAway)
-#   3. Go unit tests with coverage
+#   1. Security (gitleaks)
+#   2. Build check (verify code compiles)
+#   3. Go lint (includes format + golangci-lint with NilAway)
+#   4. Go unit tests with coverage
 
 repos:
   # ============================================
-  # 1. GO FORMAT (auto-fix + goimports + gci)
+  # 1. SECURITY HOOKS (run first)
+  # ============================================
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.4
+    hooks:
+      - id: gitleaks
+  # ============================================
+  # 2. BUILD CHECK (verify code compiles)
   # ============================================
   - repo: local
     hooks:
-      - id: go-format
-        name: Go format
-        description: Runs make format (golangci-lint --fix, goimports, gci)
-        entry: make format
+      - id: build-check
+        name: Build check
+        description: Runs make build-check (verifies code compiles without running tests)
+        entry: make build-check
         language: system
         types: [go]
         pass_filenames: false
 
   # ============================================
-  # 2. GO LINT (golangci-lint with NilAway)
+  # 3. GO LINT (includes format + golangci-lint)
   # ============================================
   - repo: local
     hooks:
       - id: lint-go
         name: Run Go linters
-        description: Runs make lint (golangci-lint with NilAway)
+        description: Runs make lint (includes format via goimports + gci, golangci-lint with NilAway)
         entry: make lint
         language: system
         types: [go]
         pass_filenames: false
 
   # ============================================
-  # 3. GO UNIT TESTS WITH COVERAGE
+  # 4. GO UNIT TESTS WITH COVERAGE
   # ============================================
   - repo: local
     hooks:

@@ -56,12 +56,12 @@ func (s *WebhookService) HandleEvent(
 ) error {
 	// Step 1: Validate input
 	if len(body) == 0 {
-		s.logger.Error("webhook event with empty body", "provider", provider, "account_id", accountID)
+		s.logger.Error(ctx, "webhook event with empty body", "provider", provider, "account_id", accountID)
 		return nil // Safe to return nil; webhook processing is best-effort
 	}
 
 	if accountID == "" {
-		s.logger.Error("webhook event with empty account ID", "provider", provider)
+		s.logger.Error(ctx, "webhook event with empty account ID", "provider", provider)
 		return nil
 	}
 
@@ -70,8 +70,10 @@ func (s *WebhookService) HandleEvent(
 	bodyHashHex := hex.EncodeToString(bodyHash[:])
 	dedupeKey := fmt.Sprintf("%s:%s:%s", provider, accountID, bodyHashHex)
 
-	if err := s.store.StoreRawPayload(dedupeKey, body); err != nil {
+	providerEnum := domain.Provider(provider)
+	if err := s.store.StoreRawPayload(ctx, providerEnum, accountID, body); err != nil {
 		s.logger.Error(
+			ctx,
 			"failed to store webhook payload",
 			"provider", provider,
 			"account_id", accountID,
@@ -82,9 +84,10 @@ func (s *WebhookService) HandleEvent(
 	}
 
 	// Step 3: Check for duplicate (idempotency)
-	isDuplicate, err := s.store.IsDuplicate(dedupeKey)
+	isDuplicate, err := s.store.IsDuplicate(ctx, providerEnum, accountID, dedupeKey)
 	if err != nil {
 		s.logger.Error(
+			ctx,
 			"failed to check webhook duplicate",
 			"provider", provider,
 			"account_id", accountID,
@@ -96,6 +99,7 @@ func (s *WebhookService) HandleEvent(
 
 	if isDuplicate {
 		s.logger.Debug(
+			ctx,
 			"webhook event is duplicate, returning ACK",
 			"provider", provider,
 			"account_id", accountID,
@@ -105,10 +109,10 @@ func (s *WebhookService) HandleEvent(
 	}
 
 	// Step 4: Get adapter from registry
-	providerEnum := domain.Provider(provider)
 	handler, err := s.registry.Lookup(providerEnum, accountID)
 	if err != nil {
 		s.logger.Error(
+			ctx,
 			"no webhook handler registered",
 			"provider", provider,
 			"account_id", accountID,
@@ -129,6 +133,7 @@ func (s *WebhookService) HandleEvent(
 	// For now, we'll attempt verification if signature exists
 	if signature != "" {
 		s.logger.Debug(
+			ctx,
 			"verifying webhook signature",
 			"provider", provider,
 			"account_id", accountID,
@@ -141,6 +146,7 @@ func (s *WebhookService) HandleEvent(
 	// This would normally use an adapter, but per the design,
 	// ParseEvent is called through the handler after signature verification
 	s.logger.Debug(
+		ctx,
 		"dispatching webhook to handler",
 		"provider", provider,
 		"account_id", accountID,
@@ -151,16 +157,14 @@ func (s *WebhookService) HandleEvent(
 	// The handler is responsible for signature verification, parsing, normalization,
 	// and domain event dispatch. This keeps orchestration concerns separate from provider logic.
 	handlerErr := handler(ctx, &domain.WebhookEvent{
-		ID:       dedupeKey,
-		Provider: provider,
-		Data: map[string]interface{}{
-			"raw_payload": body,
-			"headers":     headers,
-		},
+		Provider:   providerEnum,
+		DedupeKey:  dedupeKey,
+		RawPayload: body,
 	})
 
 	if handlerErr != nil {
 		s.logger.Error(
+			ctx,
 			"webhook handler failed",
 			"provider", provider,
 			"account_id", accountID,
@@ -171,8 +175,9 @@ func (s *WebhookService) HandleEvent(
 	}
 
 	// Step 8: Mark as processed (idempotency)
-	if err := s.store.MarkProcessed(dedupeKey); err != nil {
+	if err := s.store.MarkProcessed(ctx, providerEnum, accountID, dedupeKey); err != nil {
 		s.logger.Error(
+			ctx,
 			"failed to mark webhook as processed",
 			"provider", provider,
 			"account_id", accountID,
@@ -184,6 +189,7 @@ func (s *WebhookService) HandleEvent(
 
 	// Step 8b: Return nil (HTTP 200 ACK)
 	s.logger.Debug(
+		ctx,
 		"webhook event processed successfully",
 		"provider", provider,
 		"account_id", accountID,
@@ -206,12 +212,13 @@ func (s *WebhookService) MountHTTP(mux *http.ServeMux) error {
 
 	// Register webhook handler at /webhooks/{provider}/{accountID}
 	mux.HandleFunc("/webhooks/", func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
 		// Extract path segments: /webhooks/{provider}/{accountID}
 		path := r.URL.Path
 		const prefix = "/webhooks/"
 
 		if !strings.HasPrefix(path, prefix) {
-			s.logger.Error("webhook request with invalid path", "path", path)
+			s.logger.Error(ctx, "webhook request with invalid path", "path", path)
 			http.Error(w, "invalid webhook path", http.StatusBadRequest)
 			return
 		}
@@ -221,7 +228,7 @@ func (s *WebhookService) MountHTTP(mux *http.ServeMux) error {
 		parts := strings.SplitN(remaining, "/", 2)
 
 		if len(parts) < 2 {
-			s.logger.Error("webhook request missing provider or accountID", "path", path)
+			s.logger.Error(ctx, "webhook request missing provider or accountID", "path", path)
 			http.Error(w, "missing provider or accountID", http.StatusBadRequest)
 			return
 		}
@@ -231,6 +238,7 @@ func (s *WebhookService) MountHTTP(mux *http.ServeMux) error {
 
 		if provider == "" || accountID == "" {
 			s.logger.Error(
+				ctx,
 				"webhook request with empty provider or accountID",
 				"provider", provider,
 				"account_id", accountID,
@@ -244,6 +252,7 @@ func (s *WebhookService) MountHTTP(mux *http.ServeMux) error {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			s.logger.Error(
+				ctx,
 				"failed to read webhook request body",
 				"provider", provider,
 				"account_id", accountID,
@@ -262,9 +271,9 @@ func (s *WebhookService) MountHTTP(mux *http.ServeMux) error {
 		}
 
 		// Handle the webhook event
-		ctx := r.Context()
 		if err := s.HandleEvent(ctx, provider, accountID, body, headers); err != nil {
 			s.logger.Error(
+				ctx,
 				"webhook processing error",
 				"provider", provider,
 				"account_id", accountID,
@@ -275,6 +284,7 @@ func (s *WebhookService) MountHTTP(mux *http.ServeMux) error {
 			w.WriteHeader(http.StatusOK)
 			if _, writeErr := w.Write([]byte(`{"status":"ack"}`)); writeErr != nil {
 				s.logger.Error(
+					ctx,
 					"failed to write webhook error response",
 					"provider", provider,
 					"account_id", accountID,
@@ -289,6 +299,7 @@ func (s *WebhookService) MountHTTP(mux *http.ServeMux) error {
 		w.WriteHeader(http.StatusOK)
 		if _, writeErr := w.Write([]byte(`{"status":"ack"}`)); writeErr != nil {
 			s.logger.Error(
+				ctx,
 				"failed to write webhook success response",
 				"provider", provider,
 				"account_id", accountID,
@@ -297,6 +308,7 @@ func (s *WebhookService) MountHTTP(mux *http.ServeMux) error {
 		}
 
 		s.logger.Debug(
+			ctx,
 			"webhook request processed",
 			"provider", provider,
 			"account_id", accountID,

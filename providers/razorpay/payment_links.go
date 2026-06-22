@@ -9,11 +9,11 @@ import (
 
 // CreatePaymentLink creates a new shareable payment link.
 // It takes a CreatePaymentLinkRequest and returns a canonical PaymentLinkResponse domain object.
-func (a *Adapter) CreatePaymentLink(ctx context.Context, req *domain.CreatePaymentLinkRequest) (*domain.PaymentLinkResponse, error) {
+func (a *Adapter) CreatePaymentLink(ctx context.Context, req *domain.CreatePaymentLinkRequest) (*domain.PaymentLink, error) {
 	if req == nil {
 		return nil, domain.ErrInvalidRequest
 	}
-	if req.Amount <= 0 {
+	if req.AmountMinor <= 0 {
 		return nil, domain.ErrInvalidRequest
 	}
 	if req.Currency == "" {
@@ -22,35 +22,33 @@ func (a *Adapter) CreatePaymentLink(ctx context.Context, req *domain.CreatePayme
 
 	// Build Razorpay payment link creation parameters
 	params := map[string]interface{}{
-		"amount":   req.Amount,
-		"currency": req.Currency,
+		"amount":   req.AmountMinor,
+		"currency": string(req.Currency),
 	}
 
 	// Add optional fields if provided
-	if req.Description != "" {
-		params["description"] = req.Description
+	if req.Purpose != "" {
+		params["description"] = req.Purpose
 	}
 
-	if len(req.Notes) > 0 {
-		params["notes"] = req.Notes
+	if len(req.Metadata) > 0 {
+		params["notes"] = req.Metadata
 	}
 
-	if req.NotifyEmail != "" {
+	if req.NotifyEmail != nil && *req.NotifyEmail {
 		params["notify"] = map[string]interface{}{
 			"email": true,
 		}
-		params["notify_email"] = req.NotifyEmail
 	}
 
-	if req.NotifyPhone != "" {
+	if req.NotifySMS != nil && *req.NotifySMS {
 		params["notify"] = map[string]interface{}{
 			"sms": true,
 		}
-		params["notify_phone"] = req.NotifyPhone
 	}
 
-	if req.ExpiresAt != nil {
-		params["expire_by"] = req.ExpiresAt.Unix()
+	if req.ExpiryTime != nil {
+		params["expire_by"] = req.ExpiryTime.Unix()
 	}
 
 	// Call Razorpay SDK to create payment link
@@ -61,23 +59,21 @@ func (a *Adapter) CreatePaymentLink(ctx context.Context, req *domain.CreatePayme
 	}
 
 	// Map Razorpay response to canonical domain type
-	linkResponse := &domain.PaymentLinkResponse{
-		ID:          getString(responseMap, "id"),
-		URL:         getString(responseMap, "short_url"),
-		Amount:      getInt64(responseMap, "amount"),
-		Currency:    getString(responseMap, "currency"),
-		Description: getString(responseMap, "description"),
-		Status:      getString(responseMap, "status"),
-		NotifyEmail: getString(responseMap, "notify_email"),
-		NotifyPhone: getString(responseMap, "notify_phone"),
-		CreatedAt:   getTime(responseMap, "created_at"),
-		UpdatedAt:   getTime(responseMap, "updated_at"),
+	linkResponse := &domain.PaymentLink{
+		ProviderLinkID: getString(responseMap, "id"),
+		LinkID:         getString(responseMap, "id"),
+		LinkURL:        getString(responseMap, "short_url"),
+		AmountMinor:    domain.AmountMinor(getInt64(responseMap, "amount")),
+		AmountPaid:     domain.AmountMinor(getInt64(responseMap, "amount_paid")),
+		Currency:       domain.Currency(getString(responseMap, "currency")),
+		Purpose:        getString(responseMap, "description"),
+		Status:         domain.PaymentLinkStatus(getString(responseMap, "status")),
+		CreatedAt:      getTime(responseMap, "created_at"),
 	}
 
-	// Handle optional ExpiresAt field
+	// Handle optional ExpiryTime field
 	if expireBy, ok := responseMap["expire_by"].(float64); ok && expireBy > 0 {
-		expireTime := getTime(responseMap, "expire_by")
-		linkResponse.ExpiresAt = &expireTime
+		linkResponse.ExpiryTime = getTime(responseMap, "expire_by")
 	}
 
 	return linkResponse, nil
@@ -85,7 +81,7 @@ func (a *Adapter) CreatePaymentLink(ctx context.Context, req *domain.CreatePayme
 
 // GetPaymentLink retrieves an existing payment link.
 // It takes a GetPaymentLinkRequest with link ID and returns a canonical PaymentLinkResponse domain object.
-func (a *Adapter) GetPaymentLink(ctx context.Context, req *domain.GetPaymentLinkRequest) (*domain.PaymentLinkResponse, error) {
+func (a *Adapter) GetPaymentLink(ctx context.Context, req *domain.GetPaymentLinkRequest) (*domain.PaymentLink, error) {
 	if req == nil {
 		return nil, domain.ErrInvalidRequest
 	}
@@ -105,23 +101,21 @@ func (a *Adapter) GetPaymentLink(ctx context.Context, req *domain.GetPaymentLink
 	}
 
 	// Map Razorpay response to canonical domain type
-	linkResponse := &domain.PaymentLinkResponse{
-		ID:          getString(responseMap, "id"),
-		URL:         getString(responseMap, "short_url"),
-		Amount:      getInt64(responseMap, "amount"),
-		Currency:    getString(responseMap, "currency"),
-		Description: getString(responseMap, "description"),
-		Status:      getString(responseMap, "status"),
-		NotifyEmail: getString(responseMap, "notify_email"),
-		NotifyPhone: getString(responseMap, "notify_phone"),
-		CreatedAt:   getTime(responseMap, "created_at"),
-		UpdatedAt:   getTime(responseMap, "updated_at"),
+	linkResponse := &domain.PaymentLink{
+		ProviderLinkID: getString(responseMap, "id"),
+		LinkID:         getString(responseMap, "id"),
+		LinkURL:        getString(responseMap, "short_url"),
+		AmountMinor:    domain.AmountMinor(getInt64(responseMap, "amount")),
+		AmountPaid:     domain.AmountMinor(getInt64(responseMap, "amount_paid")),
+		Currency:       domain.Currency(getString(responseMap, "currency")),
+		Purpose:        getString(responseMap, "description"),
+		Status:         domain.PaymentLinkStatus(getString(responseMap, "status")),
+		CreatedAt:      getTime(responseMap, "created_at"),
 	}
 
-	// Handle optional ExpiresAt field
+	// Handle optional ExpiryTime field
 	if expireBy, ok := responseMap["expire_by"].(float64); ok && expireBy > 0 {
-		expireTime := getTime(responseMap, "expire_by")
-		linkResponse.ExpiresAt = &expireTime
+		linkResponse.ExpiryTime = getTime(responseMap, "expire_by")
 	}
 
 	return linkResponse, nil
@@ -129,7 +123,7 @@ func (a *Adapter) GetPaymentLink(ctx context.Context, req *domain.GetPaymentLink
 
 // CancelPaymentLink cancels an existing payment link.
 // It takes a CancelPaymentLinkRequest with link ID and returns the updated PaymentLinkResponse domain object.
-func (a *Adapter) CancelPaymentLink(ctx context.Context, req *domain.CancelPaymentLinkRequest) (*domain.PaymentLinkResponse, error) {
+func (a *Adapter) CancelPaymentLink(ctx context.Context, req *domain.CancelPaymentLinkRequest) (*domain.PaymentLink, error) {
 	if req == nil {
 		return nil, domain.ErrInvalidRequest
 	}
@@ -149,23 +143,21 @@ func (a *Adapter) CancelPaymentLink(ctx context.Context, req *domain.CancelPayme
 	}
 
 	// Map Razorpay response to canonical domain type
-	linkResponse := &domain.PaymentLinkResponse{
-		ID:          getString(responseMap, "id"),
-		URL:         getString(responseMap, "short_url"),
-		Amount:      getInt64(responseMap, "amount"),
-		Currency:    getString(responseMap, "currency"),
-		Description: getString(responseMap, "description"),
-		Status:      getString(responseMap, "status"),
-		NotifyEmail: getString(responseMap, "notify_email"),
-		NotifyPhone: getString(responseMap, "notify_phone"),
-		CreatedAt:   getTime(responseMap, "created_at"),
-		UpdatedAt:   getTime(responseMap, "updated_at"),
+	linkResponse := &domain.PaymentLink{
+		ProviderLinkID: getString(responseMap, "id"),
+		LinkID:         getString(responseMap, "id"),
+		LinkURL:        getString(responseMap, "short_url"),
+		AmountMinor:    domain.AmountMinor(getInt64(responseMap, "amount")),
+		AmountPaid:     domain.AmountMinor(getInt64(responseMap, "amount_paid")),
+		Currency:       domain.Currency(getString(responseMap, "currency")),
+		Purpose:        getString(responseMap, "description"),
+		Status:         domain.PaymentLinkStatus(getString(responseMap, "status")),
+		CreatedAt:      getTime(responseMap, "created_at"),
 	}
 
-	// Handle optional ExpiresAt field
+	// Handle optional ExpiryTime field
 	if expireBy, ok := responseMap["expire_by"].(float64); ok && expireBy > 0 {
-		expireTime := getTime(responseMap, "expire_by")
-		linkResponse.ExpiresAt = &expireTime
+		linkResponse.ExpiryTime = getTime(responseMap, "expire_by")
 	}
 
 	return linkResponse, nil

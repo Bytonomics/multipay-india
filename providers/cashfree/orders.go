@@ -17,7 +17,7 @@ func createOrder(ctx context.Context, adapter *Adapter, req *domain.CreateOrderR
 		return nil, fmt.Errorf("request is required: %w", domain.ErrInvalidRequest)
 	}
 
-	if req.Amount <= 0 {
+	if req.AmountMinor <= 0 {
 		return nil, fmt.Errorf("amount must be positive: %w", domain.ErrInvalidRequest)
 	}
 
@@ -27,14 +27,13 @@ func createOrder(ctx context.Context, adapter *Adapter, req *domain.CreateOrderR
 
 	// Build Cashfree CreateOrderRequest
 	cfReq := &cf.CreateOrderRequest{
-		OrderAmount:   AmountMinorToCashfree(req.Amount),
+		OrderAmount:   AmountMinorToCashfree(int64(req.AmountMinor)),
 		OrderCurrency: string(req.Currency),
 		CustomerDetails: cf.CustomerDetails{
 			CustomerId:    req.Customer.CustomerID,
 			CustomerEmail: *cf.NewNullableString(stringPtr(req.Customer.Email)),
 			CustomerPhone: req.Customer.Phone,
 		},
-		OrderNote: *cf.NewNullableString(stringPtr(req.Receipt)),
 	}
 
 	// Call Cashfree SDK
@@ -103,7 +102,7 @@ func getOrder(ctx context.Context, adapter *Adapter, req *domain.GetOrderRequest
 
 // listOrderPayments retrieves all payments associated with a specific order.
 // Calls the Cashfree SDK to fetch payments and maps them to canonical domain.Payment types.
-func listOrderPayments(ctx context.Context, adapter *Adapter, req *domain.GetOrderRequest) ([]*domain.Payment, error) {
+func listOrderPayments(ctx context.Context, adapter *Adapter, req *domain.ListOrderPaymentsRequest) ([]*domain.Payment, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required: %w", domain.ErrInvalidRequest)
 	}

@@ -29,20 +29,20 @@ func (a *Adapter) GetPayment(ctx context.Context, req *domain.GetPaymentRequest)
 
 	// Map Razorpay response to canonical domain type
 	payment := &domain.Payment{
-		ID:        getString(responseMap, "id"),
-		OrderID:   getString(responseMap, "order_id"),
-		Amount:    getInt64(responseMap, "amount"),
-		Status:    mapPaymentStatus(getString(responseMap, "status")),
-		Method:    getString(responseMap, "method"),
-		CreatedAt: getTime(responseMap, "created_at"),
+		ProviderPaymentID: getString(responseMap, "id"),
+		OrderID:           getString(responseMap, "order_id"),
+		AmountMinor:       domain.AmountMinor(getInt64(responseMap, "amount")),
+		Status:            mapPaymentStatus(getString(responseMap, "status")),
+		PaymentMethod:     getString(responseMap, "method"),
+		PaymentTime:       getTime(responseMap, "created_at"),
 	}
 
 	return payment, nil
 }
 
 // ListPayments retrieves all payments for an order.
-// It takes a GetOrderRequest containing the order ID and returns a slice of canonical Payment domain objects.
-func (a *Adapter) ListPayments(ctx context.Context, req *domain.GetOrderRequest) ([]*domain.Payment, error) {
+// It takes a ListPaymentsRequest containing the order ID and returns a slice of canonical Payment domain objects.
+func (a *Adapter) ListPayments(ctx context.Context, req *domain.ListPaymentsRequest) ([]*domain.Payment, error) {
 	if req == nil {
 		return nil, domain.ErrInvalidRequest
 	}
@@ -81,12 +81,12 @@ func (a *Adapter) ListPayments(ctx context.Context, req *domain.GetOrderRequest)
 		}
 
 		payment := &domain.Payment{
-			ID:        getString(itemMap, "id"),
-			OrderID:   getString(itemMap, "order_id"),
-			Amount:    getInt64(itemMap, "amount"),
-			Status:    mapPaymentStatus(getString(itemMap, "status")),
-			Method:    getString(itemMap, "method"),
-			CreatedAt: getTime(itemMap, "created_at"),
+			ProviderPaymentID: getString(itemMap, "id"),
+			OrderID:           getString(itemMap, "order_id"),
+			AmountMinor:       domain.AmountMinor(getInt64(itemMap, "amount")),
+			Status:            mapPaymentStatus(getString(itemMap, "status")),
+			PaymentMethod:     getString(itemMap, "method"),
+			PaymentTime:       getTime(itemMap, "created_at"),
 		}
 
 		payments = append(payments, payment)
@@ -108,7 +108,7 @@ func (a *Adapter) CapturePayment(ctx context.Context, req *domain.CapturePayment
 
 	// Call Razorpay SDK to capture payment
 	// Razorpay Capture method signature: Capture(paymentID string, amount int, options, headers map[string]string)
-	responseMap, err := a.client.Payment.Capture(req.PaymentID, int(req.Amount), nil, nil)
+	responseMap, err := a.client.Payment.Capture(req.PaymentID, int(req.AmountMinor), nil, nil)
 	if err != nil {
 		// Check if payment not found
 		if err.Error() == "Payment not found" {
@@ -119,12 +119,12 @@ func (a *Adapter) CapturePayment(ctx context.Context, req *domain.CapturePayment
 
 	// Map Razorpay response to canonical domain type
 	payment := &domain.Payment{
-		ID:        getString(responseMap, "id"),
-		OrderID:   getString(responseMap, "order_id"),
-		Amount:    getInt64(responseMap, "amount"),
-		Status:    mapPaymentStatus(getString(responseMap, "status")),
-		Method:    getString(responseMap, "method"),
-		CreatedAt: getTime(responseMap, "created_at"),
+		ProviderPaymentID: getString(responseMap, "id"),
+		OrderID:           getString(responseMap, "order_id"),
+		AmountMinor:       domain.AmountMinor(getInt64(responseMap, "amount")),
+		Status:            mapPaymentStatus(getString(responseMap, "status")),
+		PaymentMethod:     getString(responseMap, "method"),
+		PaymentTime:       getTime(responseMap, "created_at"),
 	}
 
 	return payment, nil

@@ -33,18 +33,18 @@ func (a *Adapter) GetInstrument(ctx context.Context, req *domain.GetInstrumentRe
 
 	// Map Razorpay response to canonical domain type
 	instrument := &domain.Instrument{
-		ID:         getString(responseMap, "id"),
-		CustomerID: getString(responseMap, "customer_id"),
-		Type:       getString(responseMap, "method"), // Razorpay uses "method" field for instrument type
-		CreatedAt:  getTime(responseMap, "created_at"),
+		InstrumentID:   getString(responseMap, "id"),
+		CustomerID:     getString(responseMap, "customer_id"),
+		InstrumentType: getString(responseMap, "method"), // Razorpay uses "method" field for instrument type
+		CreatedAt:      getTime(responseMap, "created_at"),
 	}
 
 	return instrument, nil
 }
 
 // ListInstruments retrieves all instruments for a customer (called "tokens" in Razorpay).
-// It takes a GetInstrumentRequest with customer ID and returns a slice of canonical Instrument domain objects.
-func (a *Adapter) ListInstruments(ctx context.Context, req *domain.GetInstrumentRequest) ([]*domain.Instrument, error) {
+// It takes a ListInstrumentsRequest with customer ID and returns a slice of canonical Instrument domain objects.
+func (a *Adapter) ListInstruments(ctx context.Context, req *domain.ListInstrumentsRequest) ([]*domain.Instrument, error) {
 	if req == nil {
 		return nil, domain.ErrInvalidRequest
 	}
@@ -82,10 +82,10 @@ func (a *Adapter) ListInstruments(ctx context.Context, req *domain.GetInstrument
 		}
 
 		instrument := &domain.Instrument{
-			ID:         getString(itemMap, "id"),
-			CustomerID: getString(itemMap, "customer_id"),
-			Type:       getString(itemMap, "method"), // Razorpay uses "method" field for instrument type
-			CreatedAt:  getTime(itemMap, "created_at"),
+			InstrumentID:   getString(itemMap, "id"),
+			CustomerID:     getString(itemMap, "customer_id"),
+			InstrumentType: getString(itemMap, "method"), // Razorpay uses "method" field for instrument type
+			CreatedAt:      getTime(itemMap, "created_at"),
 		}
 
 		instruments = append(instruments, instrument)
@@ -95,28 +95,36 @@ func (a *Adapter) ListInstruments(ctx context.Context, req *domain.GetInstrument
 }
 
 // DeleteInstrument removes a payment instrument (called "token" in Razorpay).
-// It takes a GetInstrumentRequest with customer and instrument IDs and returns an error if deletion fails.
-func (a *Adapter) DeleteInstrument(ctx context.Context, req *domain.GetInstrumentRequest) error {
+// It takes a DeleteInstrumentRequest with customer and instrument IDs and returns the deleted Instrument domain object.
+func (a *Adapter) DeleteInstrument(ctx context.Context, req *domain.DeleteInstrumentRequest) (*domain.Instrument, error) {
 	if req == nil {
-		return domain.ErrInvalidRequest
+		return nil, domain.ErrInvalidRequest
 	}
 	if req.CustomerID == "" {
-		return domain.ErrInvalidRequest
+		return nil, domain.ErrInvalidRequest
 	}
 	if req.InstrumentID == "" {
-		return domain.ErrInvalidRequest
+		return nil, domain.ErrInvalidRequest
 	}
 
 	// Call Razorpay SDK to delete token (instrument)
 	// Razorpay Token.Delete signature: Delete(customerID string, tokenID string, options map[string]interface{}, headers map[string]string)
-	_, err := a.client.Token.Delete(req.CustomerID, req.InstrumentID, nil, nil)
+	responseMap, err := a.client.Token.Delete(req.CustomerID, req.InstrumentID, nil, nil)
 	if err != nil {
 		// Check if token not found
 		if err.Error() == "Token not found" {
-			return domain.ErrInstrumentNotFound
+			return nil, domain.ErrInstrumentNotFound
 		}
-		return fmt.Errorf("failed to delete instrument: %w", err)
+		return nil, fmt.Errorf("failed to delete instrument: %w", err)
 	}
 
-	return nil
+	// Map Razorpay response to canonical domain type
+	instrument := &domain.Instrument{
+		InstrumentID:   getString(responseMap, "id"),
+		CustomerID:     getString(responseMap, "customer_id"),
+		InstrumentType: getString(responseMap, "method"), // Razorpay uses "method" field for instrument type
+		CreatedAt:      getTime(responseMap, "created_at"),
+	}
+
+	return instrument, nil
 }

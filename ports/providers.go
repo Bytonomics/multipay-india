@@ -3,6 +3,7 @@ package ports
 import (
 	"context"
 
+	"github.com/Bytonomics/multipay-adapter/capabilities"
 	"github.com/Bytonomics/multipay-adapter/domain"
 )
 
@@ -15,7 +16,7 @@ type OrderProvider interface {
 	GetOrder(ctx context.Context, req *domain.GetOrderRequest) (*domain.Order, error)
 
 	// ListOrderPayments retrieves all payments associated with a specific order.
-	ListOrderPayments(ctx context.Context, req *domain.GetOrderRequest) ([]*domain.Payment, error)
+	ListOrderPayments(ctx context.Context, req *domain.ListOrderPaymentsRequest) ([]*domain.Payment, error)
 }
 
 // PaymentProvider defines operations for payments.
@@ -24,7 +25,10 @@ type PaymentProvider interface {
 	GetPayment(ctx context.Context, req *domain.GetPaymentRequest) (*domain.Payment, error)
 
 	// ListPayments retrieves all payments for an order.
-	ListPayments(ctx context.Context, req *domain.GetOrderRequest) ([]*domain.Payment, error)
+	ListPayments(ctx context.Context, req *domain.ListPaymentsRequest) ([]*domain.Payment, error)
+
+	// CapturePayment captures an authorized payment.
+	CapturePayment(ctx context.Context, req *domain.CapturePaymentRequest) (*domain.Payment, error)
 }
 
 // RefundProvider defines operations for refunds.
@@ -36,7 +40,7 @@ type RefundProvider interface {
 	GetRefund(ctx context.Context, req *domain.GetRefundRequest) (*domain.Refund, error)
 
 	// ListRefunds retrieves all refunds for an order.
-	ListRefunds(ctx context.Context, req *domain.GetOrderRequest) ([]*domain.Refund, error)
+	ListRefunds(ctx context.Context, req *domain.ListRefundsRequest) ([]*domain.Refund, error)
 }
 
 // InstrumentProvider defines operations for payment instruments.
@@ -45,37 +49,37 @@ type InstrumentProvider interface {
 	GetInstrument(ctx context.Context, req *domain.GetInstrumentRequest) (*domain.Instrument, error)
 
 	// ListInstruments retrieves all instruments for a customer.
-	ListInstruments(ctx context.Context, req *domain.GetInstrumentRequest) ([]*domain.Instrument, error)
+	ListInstruments(ctx context.Context, req *domain.ListInstrumentsRequest) ([]*domain.Instrument, error)
 
 	// DeleteInstrument removes a payment instrument.
-	DeleteInstrument(ctx context.Context, req *domain.GetInstrumentRequest) error
+	DeleteInstrument(ctx context.Context, req *domain.DeleteInstrumentRequest) (*domain.Instrument, error)
 }
 
 // PaymentLinkProvider defines operations for payment links.
 type PaymentLinkProvider interface {
 	// CreatePaymentLink creates a new shareable payment link.
-	CreatePaymentLink(ctx context.Context, req *domain.CreatePaymentLinkRequest) (*domain.PaymentLinkResponse, error)
+	CreatePaymentLink(ctx context.Context, req *domain.CreatePaymentLinkRequest) (*domain.PaymentLink, error)
 
 	// GetPaymentLink retrieves an existing payment link.
-	GetPaymentLink(ctx context.Context, req *domain.GetPaymentLinkRequest) (*domain.PaymentLinkResponse, error)
+	GetPaymentLink(ctx context.Context, req *domain.GetPaymentLinkRequest) (*domain.PaymentLink, error)
 
 	// CancelPaymentLink cancels an existing payment link.
-	CancelPaymentLink(ctx context.Context, req *domain.CancelPaymentLinkRequest) (*domain.PaymentLinkResponse, error)
+	CancelPaymentLink(ctx context.Context, req *domain.CancelPaymentLinkRequest) (*domain.PaymentLink, error)
 }
 
 // WebhookConsumerProvider defines operations for webhook processing.
 type WebhookConsumerProvider interface {
 	// VerifySignature verifies the authenticity of a webhook request.
 	// Returns an error if verification fails.
-	VerifySignature(ctx context.Context, signature string, payload []byte) error
+	VerifySignature(ctx context.Context, payload []byte, headers map[string]string) error
 
 	// ParseEvent parses and unmarshals a webhook payload into a domain event.
-	ParseEvent(ctx context.Context, payload []byte) (*domain.WebhookEvent, error)
+	ParseEvent(ctx context.Context, payload []byte, headers map[string]string) (*domain.WebhookEvent, error)
 }
 
 // ProviderAdapter is the main port that embeds all provider-specific capability interfaces.
 // An adapter implementing this interface provides all payment operations for a specific provider.
-// It also includes metadata methods for provider identification and capability discovery.
+// It also includes methods for provider identification and capability discovery.
 type ProviderAdapter interface {
 	OrderProvider
 	PaymentProvider
@@ -83,10 +87,11 @@ type ProviderAdapter interface {
 	InstrumentProvider
 	PaymentLinkProvider
 	WebhookConsumerProvider
+	MetadataMapper
 
 	// ProviderName returns the provider identifier for this adapter.
 	ProviderName() domain.Provider
 
 	// ProviderCapabilities returns the list of capabilities supported by this provider.
-	ProviderCapabilities() []domain.Capability
+	ProviderCapabilities() []capabilities.Capability
 }

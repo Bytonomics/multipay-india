@@ -26,7 +26,7 @@ func NewValidator(matrix *SupportMatrix) *Validator {
 // This method provides early validation before any SDK call.
 func (v *Validator) RequireCapability(ctx context.Context, provider domain.Provider, cap Capability) error {
 	if v.matrix == nil {
-		return domain.NewCapabilityError(provider, cap, "validator matrix is nil")
+		return domain.NewCapabilityError(provider, string(cap), "validator matrix is nil")
 	}
 
 	if !v.matrix.Supports(provider, cap) {
@@ -35,7 +35,7 @@ func (v *Validator) RequireCapability(ctx context.Context, provider domain.Provi
 		if description != "" {
 			msg = fmt.Sprintf("%s (%s)", msg, description)
 		}
-		return domain.NewCapabilityError(provider, cap, msg)
+		return domain.NewCapabilityError(provider, string(cap), msg)
 	}
 
 	return nil

@@ -42,13 +42,16 @@ var (
 
 	// ErrWebhookEventNotFound is returned when a webhook event cannot be processed
 	ErrWebhookEventNotFound = errors.New("webhook event not found")
+
+	// ErrHookPanic is returned when a hook panics during execution
+	ErrHookPanic = errors.New("hook panic")
 )
 
 // CapabilityError represents an error when a provider does not support a capability.
 // It wraps ErrUnsupportedCapability and can be detected with errors.Is().
 type CapabilityError struct {
 	Provider   Provider
-	Capability Capability
+	Capability string
 	Message    string
 }
 
@@ -63,10 +66,10 @@ func (e *CapabilityError) Unwrap() error {
 }
 
 // NewCapabilityError constructs a CapabilityError.
-func NewCapabilityError(provider Provider, cap Capability, msg string) *CapabilityError {
+func NewCapabilityError(provider Provider, capability string, msg string) *CapabilityError {
 	return &CapabilityError{
 		Provider:   provider,
-		Capability: cap,
+		Capability: capability,
 		Message:    msg,
 	}
 }
@@ -130,8 +133,7 @@ func NewProviderAPIError(provider Provider, code int, errCode, msg string) *Prov
 }
 
 // WebhookError represents an error during webhook processing.
-// Unlike other typed errors, this does not wrap a sentinel since webhook errors
-// are context-specific and not part of the standard error chain.
+// It wraps ErrWebhookVerificationFailed and can be detected with errors.Is().
 type WebhookError struct {
 	Reason    string
 	Provider  Provider
@@ -143,16 +145,26 @@ func (e *WebhookError) Error() string {
 	return fmt.Sprintf("webhook error: provider %s (account %s): %s", e.Provider, e.AccountID, e.Reason)
 }
 
+// Unwrap returns the sentinel error for chain traversal with errors.Is().
+func (e *WebhookError) Unwrap() error {
+	return ErrWebhookVerificationFailed
+}
+
 // HookPanicError represents an error when a hook panics during execution.
-// It wraps both the panic value and the original operation context.
+// It wraps ErrHookPanic and can be detected with errors.Is().
 type HookPanicError struct {
-	HookName  string
-	Operation string
-	PanicVal  interface{}
-	Message   string
+	Phase      string // "Before", "After", "OnError"
+	Operation  string // "CreateOrder", etc.
+	PanicValue any    // The panic value
+	StackTrace string // Full stack trace
 }
 
 // Error implements the error interface.
 func (e *HookPanicError) Error() string {
-	return fmt.Sprintf("hook panic in %s during %s: %v: %s", e.HookName, e.Operation, e.PanicVal, e.Message)
+	return fmt.Sprintf("hook panic in %s phase for operation %s: %v", e.Phase, e.Operation, e.PanicValue)
+}
+
+// Unwrap returns the sentinel error for chain traversal with errors.Is().
+func (e *HookPanicError) Unwrap() error {
+	return ErrHookPanic
 }

@@ -22,6 +22,24 @@ func (p Provider) IsValid() bool {
 	return false
 }
 
+// AmountMinor represents monetary amounts in minor units (paisa/cents).
+// 100 AmountMinor = 1 major currency unit.
+type AmountMinor int64
+
+// Currency identifies the transaction currency.
+type Currency string
+
+const (
+	CurrencyINR Currency = "INR"
+	CurrencyUSD Currency = "USD"
+	CurrencyEUR Currency = "EUR"
+)
+
+// String returns the string representation.
+func (c Currency) String() string {
+	return string(c)
+}
+
 // Environment identifies the Cashfree-specific deployment environment.
 type Environment string
 
@@ -143,59 +161,27 @@ func (w WebhookEventType) IsValid() bool {
 	return false
 }
 
-// Capability represents a feature that may or may not be supported by a payment provider.
-type Capability string
+// PaymentLinkStatus represents the payment link lifecycle.
+type PaymentLinkStatus string
 
-// Core Shared Capabilities (supported by both Cashfree and Razorpay)
 const (
-	CapOrderCreate       Capability = "order_create"
-	CapOrderFetch        Capability = "order_fetch"
-	CapPaymentFetch      Capability = "payment_fetch"
-	CapPaymentList       Capability = "payment_list"
-	CapPaymentPay        Capability = "payment_pay"
-	CapRefundCreate      Capability = "refund_create"
-	CapRefundFetch       Capability = "refund_fetch"
-	CapRefundList        Capability = "refund_list"
-	CapInstrumentFetch   Capability = "instrument_fetch"
-	CapInstrumentList    Capability = "instrument_list"
-	CapInstrumentDelete  Capability = "instrument_delete"
-	CapPaymentLinkCreate Capability = "payment_link_create"
-	CapPaymentLinkFetch  Capability = "payment_link_fetch"
-	CapPaymentLinkCancel Capability = "payment_link_cancel"
+	PaymentLinkStatusActive        PaymentLinkStatus = "active"
+	PaymentLinkStatusPaid          PaymentLinkStatus = "paid"
+	PaymentLinkStatusExpired       PaymentLinkStatus = "expired"
+	PaymentLinkStatusCancelled     PaymentLinkStatus = "cancelled"
+	PaymentLinkStatusPartiallyPaid PaymentLinkStatus = "partially_paid"
 )
 
-// Cashfree-specific Capabilities
-const (
-	CapInstrumentCryptogram Capability = "instrument_cryptogram"
-	CapOfferCreate          Capability = "offer_create"
-	CapOfferFetch           Capability = "offer_fetch"
-	CapEligibilityFetch     Capability = "eligibility_fetch"
-)
+// String returns the string representation of the PaymentLinkStatus.
+func (p PaymentLinkStatus) String() string {
+	return string(p)
+}
 
-// Razorpay-specific Capabilities
-const (
-	CapOrderUpdate        Capability = "order_update"
-	CapOrderList          Capability = "order_list"
-	CapPaymentCapture     Capability = "payment_capture"
-	CapRefundUpdate       Capability = "refund_update"
-	CapCustomerCreate     Capability = "customer_create"
-	CapCustomerFetch      Capability = "customer_fetch"
-	CapCustomerEdit       Capability = "customer_edit"
-	CapCustomerList       Capability = "customer_list"
-	CapWebhookCreate      Capability = "webhook_create"
-	CapWebhookFetch       Capability = "webhook_fetch"
-	CapWebhookEdit        Capability = "webhook_edit"
-	CapWebhookDelete      Capability = "webhook_delete"
-	CapWebhookList        Capability = "webhook_list"
-	CapSubscriptionCreate Capability = "subscription_create"
-	CapSubscriptionFetch  Capability = "subscription_fetch"
-	CapSubscriptionList   Capability = "subscription_list"
-	CapPlanCreate         Capability = "plan_create"
-	CapPlanFetch          Capability = "plan_fetch"
-	CapPlanList           Capability = "plan_list"
-	CapPaymentLinkUpdate  Capability = "payment_link_update"
-	CapPaymentLinkNotify  Capability = "payment_link_notify"
-	CapPaymentLinkList    Capability = "payment_link_list"
-	CapUPICreate          Capability = "upi_create"
-	CapVPAValidate        Capability = "vpa_validate"
-)
+// IsValid checks if the PaymentLinkStatus value is valid.
+func (p PaymentLinkStatus) IsValid() bool {
+	switch p {
+	case PaymentLinkStatusActive, PaymentLinkStatusPaid, PaymentLinkStatusExpired, PaymentLinkStatusCancelled, PaymentLinkStatusPartiallyPaid:
+		return true
+	}
+	return false
+}

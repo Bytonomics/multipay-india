@@ -6,6 +6,7 @@ import (
 
 	"github.com/razorpay/razorpay-go"
 
+	"github.com/Bytonomics/multipay-adapter/capabilities"
 	"github.com/Bytonomics/multipay-adapter/domain"
 	"github.com/Bytonomics/multipay-adapter/ports"
 )
@@ -17,6 +18,12 @@ type Config struct {
 
 	// Secret is the Razorpay secret key.
 	Secret string
+
+	// WebhookSecret is the HMAC-SHA256 secret for webhook verification.
+	WebhookSecret string
+
+	// AccountID is the unique account ID for webhook routing.
+	AccountID string
 }
 
 // Adapter implements the ProviderAdapter interface for Razorpay.
@@ -61,61 +68,87 @@ func (a *Adapter) ProviderName() domain.Provider {
 
 // ProviderCapabilities returns all capabilities supported by Razorpay.
 // This includes both core shared capabilities and Razorpay-specific capabilities.
-// Returns all 27 Razorpay-supported capabilities.
-func (a *Adapter) ProviderCapabilities() []domain.Capability {
-	return []domain.Capability{
-		// Core shared capabilities (14)
-		domain.CapOrderCreate,
-		domain.CapOrderFetch,
-		domain.CapPaymentFetch,
-		domain.CapPaymentList,
-		domain.CapPaymentPay,
-		domain.CapRefundCreate,
-		domain.CapRefundFetch,
-		domain.CapRefundList,
-		domain.CapInstrumentFetch,
-		domain.CapInstrumentList,
-		domain.CapInstrumentDelete,
-		domain.CapPaymentLinkCreate,
-		domain.CapPaymentLinkFetch,
-		domain.CapPaymentLinkCancel,
+// Returns all 29 Razorpay-supported capabilities.
+func (a *Adapter) ProviderCapabilities() []capabilities.Capability {
+	return []capabilities.Capability{
+		// Core shared capabilities (16)
+		capabilities.CapOrderCreate,
+		capabilities.CapOrderFetch,
+		capabilities.CapOrderListPayments,
+		capabilities.CapPaymentFetch,
+		capabilities.CapPaymentList,
+		capabilities.CapPaymentPay,
+		capabilities.CapRefundCreate,
+		capabilities.CapRefundFetch,
+		capabilities.CapRefundList,
+		capabilities.CapInstrumentFetch,
+		capabilities.CapInstrumentList,
+		capabilities.CapInstrumentDelete,
+		capabilities.CapPaymentLinkCreate,
+		capabilities.CapPaymentLinkFetch,
+		capabilities.CapPaymentLinkCancel,
+		capabilities.CapWebhookConsume,
 
 		// Razorpay-specific capabilities (13)
-		domain.CapOrderUpdate,
-		domain.CapOrderList,
-		domain.CapPaymentCapture,
-		domain.CapRefundUpdate,
-		domain.CapCustomerCreate,
-		domain.CapCustomerFetch,
-		domain.CapCustomerEdit,
-		domain.CapCustomerList,
-		domain.CapWebhookCreate,
-		domain.CapWebhookFetch,
-		domain.CapWebhookEdit,
-		domain.CapWebhookDelete,
-		domain.CapWebhookList,
-		domain.CapSubscriptionCreate,
-		domain.CapSubscriptionFetch,
-		domain.CapSubscriptionList,
-		domain.CapPlanCreate,
-		domain.CapPlanFetch,
-		domain.CapPlanList,
-		domain.CapPaymentLinkUpdate,
-		domain.CapPaymentLinkNotify,
-		domain.CapPaymentLinkList,
-		domain.CapUPICreate,
-		domain.CapVPAValidate,
+		capabilities.CapOrderUpdate,
+		capabilities.CapOrderList,
+		capabilities.CapPaymentCapture,
+		capabilities.CapRefundUpdate,
+		capabilities.CapCustomerCreate,
+		capabilities.CapCustomerFetch,
+		capabilities.CapCustomerEdit,
+		capabilities.CapCustomerList,
+		capabilities.CapWebhookCreate,
+		capabilities.CapWebhookFetch,
+		capabilities.CapWebhookEdit,
+		capabilities.CapWebhookDelete,
+		capabilities.CapWebhookList,
+		capabilities.CapSubscriptionCreate,
+		capabilities.CapSubscriptionFetch,
+		capabilities.CapSubscriptionList,
+		capabilities.CapPlanCreate,
+		capabilities.CapPlanFetch,
+		capabilities.CapPlanList,
+		capabilities.CapPaymentLinkUpdate,
+		capabilities.CapPaymentLinkNotify,
+		capabilities.CapPaymentLinkList,
+		capabilities.CapUPICreate,
+		capabilities.CapVPAValidate,
 	}
 }
 
 // VerifySignature verifies the authenticity of a webhook request from Razorpay.
 // See webhooks.go for implementation.
-func (a *Adapter) VerifySignature(ctx context.Context, signature string, payload []byte) error {
-	return verifySignature(payload, map[string]string{"X-Razorpay-Signature": signature}, a.config.Secret)
+func (a *Adapter) VerifySignature(ctx context.Context, payload []byte, headers map[string]string) error {
+	return verifySignature(payload, headers, a.config.WebhookSecret)
 }
 
 // ParseEvent parses and unmarshals a Razorpay webhook payload into a domain event.
 // See webhooks.go for implementation.
-func (a *Adapter) ParseEvent(ctx context.Context, payload []byte) (*domain.WebhookEvent, error) {
-	return parseEvent(ctx, payload, nil)
+func (a *Adapter) ParseEvent(ctx context.Context, payload []byte, headers map[string]string) (*domain.WebhookEvent, error) {
+	return parseEvent(ctx, payload, headers)
+}
+
+func (a *Adapter) MapOrderMetadata(_ context.Context, metadata domain.Metadata) (map[string]interface{}, error) {
+	notes := make(map[string]interface{}, len(metadata))
+	for k, v := range metadata {
+		notes[k] = v
+	}
+	return map[string]interface{}{"notes": notes}, nil
+}
+
+func (a *Adapter) MapRefundMetadata(_ context.Context, metadata domain.Metadata) (map[string]interface{}, error) {
+	notes := make(map[string]interface{}, len(metadata))
+	for k, v := range metadata {
+		notes[k] = v
+	}
+	return map[string]interface{}{"notes": notes}, nil
+}
+
+func (a *Adapter) MapPaymentLinkMetadata(_ context.Context, metadata domain.Metadata) (map[string]interface{}, error) {
+	notes := make(map[string]interface{}, len(metadata))
+	for k, v := range metadata {
+		notes[k] = v
+	}
+	return map[string]interface{}{"notes": notes}, nil
 }

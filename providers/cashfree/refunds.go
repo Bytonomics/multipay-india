@@ -27,13 +27,13 @@ func createRefund(ctx context.Context, adapter *Adapter, req *domain.CreateRefun
 
 	// Build Cashfree refund request
 	refundAmount := 0.0
-	if req.Amount > 0 {
-		refundAmount = AmountMinorToCashfree(req.Amount)
+	if req.AmountMinor > 0 {
+		refundAmount = AmountMinorToCashfree(int64(req.AmountMinor))
 	}
 
 	cfReq := &cf.OrderCreateRefundRequest{
 		RefundAmount: refundAmount,
-		RefundNote:   stringPtr(req.Notes),
+		RefundNote:   stringPtr(req.Reason),
 	}
 
 	// Call Cashfree SDK to create refund
@@ -108,7 +108,7 @@ func getRefund(ctx context.Context, adapter *Adapter, req *domain.GetRefundReque
 
 // listRefunds retrieves all refunds for a specific order from the Cashfree payment gateway.
 // Calls the Cashfree SDK to fetch refunds and maps them to canonical domain.Refund types.
-func listRefunds(ctx context.Context, adapter *Adapter, req *domain.GetOrderRequest) ([]*domain.Refund, error) {
+func listRefunds(ctx context.Context, adapter *Adapter, req *domain.ListRefundsRequest) ([]*domain.Refund, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required: %w", domain.ErrInvalidRequest)
 	}

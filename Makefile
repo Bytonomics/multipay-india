@@ -52,10 +52,26 @@ help: ## Show this help
 build: ## Build the library (compile check)
 	go build -mod=mod -v ./...
 
-build-check: ## Verify code compiles (without running tests)
-	@echo "Verifying code compiles..."
-	go build -mod=mod -v ./...
-	@echo "✓ Build check passed"
+build-check: test-output-dir ## Verify code compiles (without running tests)
+	@echo "=== Production code ===" | tee test-outputs/build-check.log
+	@FAILED=0; \
+	if ! bash -c 'set -o pipefail; go build -gcflags="-e" -mod=mod -v ./... 2>&1 | tee -a test-outputs/build-check.log'; then \
+		echo "✗ FAILED: production code" | tee -a test-outputs/build-check.log; FAILED=1; \
+	fi; \
+	[ $$FAILED -eq 0 ] || exit 1
+	@echo "=== Unit tests ===" | tee -a test-outputs/build-check.log
+	@FAILED=0; \
+	if ! bash -c 'go test -c -gcflags="-e" -mod=mod -o /dev/null ./... 2>&1 | (grep -v "no test files" || true) | tee -a test-outputs/build-check.log; exit $${PIPESTATUS[0]}'; then \
+		echo "✗ FAILED: unit tests" | tee -a test-outputs/build-check.log; FAILED=1; \
+	fi; \
+	[ $$FAILED -eq 0 ] || exit 1
+	@echo "=== Integration tests ===" | tee -a test-outputs/build-check.log
+	@FAILED=0; \
+	if ! bash -c 'go test -c -gcflags="-e" -mod=mod -o /dev/null -tags integration ./... 2>&1 | (grep -v "no test files" || true) | tee -a test-outputs/build-check.log; exit $${PIPESTATUS[0]}'; then \
+		echo "✗ FAILED: integration tests" | tee -a test-outputs/build-check.log; FAILED=1; \
+	fi; \
+	[ $$FAILED -eq 0 ] || exit 1
+	@echo "✓ Build check passed" | tee -a test-outputs/build-check.log
 
 # ============================================
 # TESTING
@@ -152,7 +168,9 @@ build-custom-lint: setup-safe
 
 format: setup-safe ## Format code with gofmt, goimports, and gci
 	@echo "Formatting code..."
-	@./tools/golangci-lint/custom-gcl run --fix ./... 2>/dev/null || true
+	@./tools/golangci-lint/custom-gcl run --fix \
+		--disable fatcontext \
+		./... 2>/dev/null || true
 	@echo "Fixing imports with goimports..."
 	@which goimports > /dev/null 2>&1 || (echo "Installing goimports..." && go install golang.org/x/tools/cmd/goimports@latest)
 	@goimports -w -local github.com/Bytonomics/multipay-adapter .
@@ -160,6 +178,8 @@ format: setup-safe ## Format code with gofmt, goimports, and gci
 	@which gci > /dev/null 2>&1 || (echo "Installing gci..." && go install github.com/daixiang0/gci@latest)
 	@gci write --skip-generated -s standard -s default -s "prefix(github.com/Bytonomics)" .
 	@echo "✅ Format complete"
+	@echo ""
+	@echo "NOTE: fatcontext linter is disabled because it causes auto-fix to convert = to := (variable shadowing in hooks/pipeline.go:41)"
 
 lint: lint-go ## Run Go linters
 	@echo "✅ Go lint passed"

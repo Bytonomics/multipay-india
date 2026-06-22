@@ -1,6 +1,7 @@
 package cashfree
 
 import (
+	"encoding/json"
 	"math"
 	"strconv"
 	"time"
@@ -32,13 +33,17 @@ func MapOrderEntityToCanonical(cfOrder *cf.OrderEntity) *domain.Order {
 	}
 
 	order := &domain.Order{
-		ID:        StringPtrToStr(cfOrder.OrderId),
-		Amount:    AmountCashfreeToMinor(FloatPtrToFloat64(cfOrder.OrderAmount)),
-		Currency:  domain.Currency(StringPtrToStr(cfOrder.OrderCurrency)),
-		Receipt:   StringPtrToStr(cfOrder.OrderNote.Get()),
-		Notes:     StringPtrToStr(cfOrder.OrderNote.Get()),
-		Status:    mapOrderStatus(cfOrder.OrderStatus),
-		CreatedAt: time.Now(), // Cashfree SDK may not provide creation timestamp in order response
+		ProviderOrderID: strconv.FormatInt(derefInt64(cfOrder.CfOrderId), 10),
+		OrderID:         StringPtrToStr(cfOrder.OrderId),
+		Status:          mapOrderStatus(cfOrder.OrderStatus),
+		AmountMinor:     domain.AmountMinor(AmountCashfreeToMinor(FloatPtrToFloat64(cfOrder.OrderAmount))),
+		Currency:        domain.Currency(StringPtrToStr(cfOrder.OrderCurrency)),
+		SessionID:       StringPtrToStr(cfOrder.PaymentSessionId),
+		ExpiryTime:      cfOrder.OrderExpiryTime,
+		CreatedAt:       cfOrder.CreatedAt,
+		Customer:        nil,
+		Metadata:        domain.Metadata(cfOrder.OrderTags),
+		Raw:             rawResponse(cfOrder),
 	}
 
 	return order
@@ -56,12 +61,20 @@ func MapPaymentEntityToCanonical(cfPayment *cf.PaymentEntity) *domain.Payment {
 	}
 
 	payment := &domain.Payment{
-		ID:        paymentID,
-		OrderID:   StringPtrToStr(cfPayment.OrderId),
-		Amount:    AmountCashfreeToMinor(FloatPtrToFloat64(cfPayment.PaymentAmount)),
-		Status:    mapPaymentStatus(cfPayment.PaymentStatus),
-		Method:    "", // PaymentMethod is a complex type in Cashfree SDK, extract as needed
-		CreatedAt: TimeFromTimestamp(cfPayment.PaymentTime),
+		ProviderPaymentID: paymentID,
+		OrderID:           StringPtrToStr(cfPayment.OrderId),
+		Status:            mapPaymentStatus(cfPayment.PaymentStatus),
+		AmountMinor:       domain.AmountMinor(AmountCashfreeToMinor(FloatPtrToFloat64(cfPayment.PaymentAmount))),
+		Currency:          domain.Currency(StringPtrToStr(cfPayment.PaymentCurrency)),
+		PaymentGroup:      StringPtrToStr(cfPayment.PaymentGroup),
+		PaymentMethod:     "", // PaymentMethod is complex; extract as needed
+		PaymentTime:       timePtr(TimeFromTimestamp(cfPayment.PaymentTime)),
+		CompletionTime:    timePtr(TimeFromTimestamp(cfPayment.PaymentCompletionTime)),
+		IsCaptured:        derefBool(cfPayment.IsCaptured),
+		BankReference:     StringPtrToStr(cfPayment.BankReference),
+		ErrorCode:         "",
+		ErrorMessage:      "",
+		Raw:               rawResponse(cfPayment),
 	}
 
 	return payment
@@ -139,6 +152,15 @@ func TimeFromTimestamp(ts *string) time.Time {
 	return t
 }
 
+// timePtr converts a time.Time value to a pointer to time.Time.
+// Returns nil if the input time is zero.
+func timePtr(t time.Time) *time.Time {
+	if t.IsZero() {
+		return nil
+	}
+	return &t
+}
+
 // MapRefundEntityToCanonical maps a Cashfree RefundEntity to the canonical domain.Refund type.
 func MapRefundEntityToCanonical(cfRefund *cf.RefundEntity) *domain.Refund {
 	if cfRefund == nil {
@@ -151,11 +173,18 @@ func MapRefundEntityToCanonical(cfRefund *cf.RefundEntity) *domain.Refund {
 	}
 
 	refund := &domain.Refund{
-		ID:        refundID,
-		OrderID:   StringPtrToStr(cfRefund.OrderId),
-		Amount:    AmountCashfreeToMinor(FloatPtrToFloat64(cfRefund.RefundAmount)),
-		Status:    mapRefundStatus(cfRefund.RefundStatus),
-		CreatedAt: TimeFromTimestamp(cfRefund.CreatedAt),
+		ProviderRefundID: refundID,
+		RefundID:         refundID,
+		OrderID:          StringPtrToStr(cfRefund.OrderId),
+		PaymentID:        strconv.FormatInt(derefInt64(cfRefund.CfPaymentId), 10),
+		Status:           mapRefundStatus(cfRefund.RefundStatus),
+		AmountMinor:      domain.AmountMinor(AmountCashfreeToMinor(FloatPtrToFloat64(cfRefund.RefundAmount))),
+		Currency:         domain.Currency(StringPtrToStr(cfRefund.RefundCurrency)),
+		Reason:           StringPtrToStr(cfRefund.RefundNote),
+		ARN:              StringPtrToStr(cfRefund.RefundArn),
+		CreatedAt:        timePtr(TimeFromTimestamp(cfRefund.CreatedAt)),
+		ProcessedAt:      timePtr(TimeFromTimestamp(cfRefund.ProcessedAt)),
+		Raw:              rawResponse(cfRefund),
 	}
 
 	return refund
@@ -198,44 +227,71 @@ func MapInstrumentEntityToCanonical(cfInstrument *cf.InstrumentEntity) *domain.I
 	}
 
 	instrument := &domain.Instrument{
-		ID:         instrumentID,
-		CustomerID: StringPtrToStr(cfInstrument.CustomerId),
-		Type:       instrumentType,
-		CreatedAt:  TimeFromTimestamp(cfInstrument.CreatedAt),
+		CustomerID:     StringPtrToStr(cfInstrument.CustomerId),
+		InstrumentID:   instrumentID,
+		InstrumentType: instrumentType,
+		DisplayValue:   StringPtrToStr(cfInstrument.InstrumentDisplay),
+		Status:         StringPtrToStr(cfInstrument.InstrumentStatus),
+		CreatedAt:      timePtr(TimeFromTimestamp(cfInstrument.CreatedAt)),
+		Raw:            rawResponse(cfInstrument),
 	}
 
 	return instrument
 }
 
-// MapLinkEntityToCanonical maps a Cashfree LinkEntity (payment link) to the canonical domain.PaymentLinkResponse type.
-func MapLinkEntityToCanonical(cfLink *cf.LinkEntity) *domain.PaymentLinkResponse {
+// MapLinkEntityToCanonical maps a Cashfree LinkEntity (payment link) to the canonical domain.PaymentLink type.
+func MapLinkEntityToCanonical(cfLink *cf.LinkEntity) *domain.PaymentLink {
 	if cfLink == nil {
 		return nil
 	}
 
-	// Parse ExpiresAt timestamp to *time.Time
-	var expiresAt *time.Time
-	expiresAtTime := TimeFromTimestamp(cfLink.LinkExpiryTime)
-	if !expiresAtTime.IsZero() {
-		expiresAt = &expiresAtTime
+	// Parse LinkStatus to PaymentLinkStatus
+	var linkStatus domain.PaymentLinkStatus
+	if cfLink.LinkStatus != nil {
+		linkStatus = domain.PaymentLinkStatus(*cfLink.LinkStatus)
 	}
 
-	// Parse CreatedAt timestamp to time.Time
-	createdAt := TimeFromTimestamp(cfLink.LinkCreatedAt)
-
-	link := &domain.PaymentLinkResponse{
-		ID:          StringPtrToStr(cfLink.LinkId),
-		URL:         StringPtrToStr(cfLink.LinkUrl),
-		Amount:      AmountCashfreeToMinor(FloatPtrToFloat64(cfLink.LinkAmount)),
-		Currency:    StringPtrToStr(cfLink.LinkCurrency),
-		Description: StringPtrToStr(cfLink.LinkPurpose),
-		Status:      StringPtrToStr(cfLink.LinkStatus),
-		NotifyEmail: "", // Cashfree LinkNotifyEntity only has boolean flags, not actual email values
-		NotifyPhone: "", // Cashfree LinkNotifyEntity only has boolean flags, not actual phone values
-		ExpiresAt:   expiresAt,
-		CreatedAt:   createdAt,
-		UpdatedAt:   createdAt, // Cashfree doesn't provide UpdatedAt, use CreatedAt as fallback
+	link := &domain.PaymentLink{
+		ProviderLinkID: strconv.FormatInt(derefInt64(cfLink.CfLinkId), 10),
+		LinkID:         StringPtrToStr(cfLink.LinkId),
+		Status:         linkStatus,
+		AmountMinor:    domain.AmountMinor(AmountCashfreeToMinor(FloatPtrToFloat64(cfLink.LinkAmount))),
+		AmountPaid:     domain.AmountMinor(AmountCashfreeToMinor(FloatPtrToFloat64(cfLink.LinkAmountPaid))),
+		Currency:       domain.Currency(StringPtrToStr(cfLink.LinkCurrency)),
+		Purpose:        StringPtrToStr(cfLink.LinkPurpose),
+		LinkURL:        StringPtrToStr(cfLink.LinkUrl),
+		Customer:       nil, // Customer info not directly available from LinkEntity
+		CreatedAt:      timePtr(TimeFromTimestamp(cfLink.LinkCreatedAt)),
+		ExpiryTime:     timePtr(TimeFromTimestamp(cfLink.LinkExpiryTime)),
+		Metadata:       nil,
+		Raw:            rawResponse(cfLink),
 	}
 
 	return link
+}
+
+// derefInt64 safely dereferences an int64 pointer or returns 0.
+func derefInt64(i *int64) int64 {
+	if i == nil {
+		return 0
+	}
+	return *i
+}
+
+// derefBool safely dereferences a bool pointer or returns false.
+func derefBool(b *bool) bool {
+	if b == nil {
+		return false
+	}
+	return *b
+}
+
+// rawResponse marshals a Cashfree SDK entity to JSON and returns it as RawProviderResponse.
+func rawResponse(v interface{}) domain.RawProviderResponse {
+	data, err := json.Marshal(v)
+	if err != nil {
+		// If marshaling fails, return empty response
+		return domain.RawProviderResponse(nil)
+	}
+	return domain.RawProviderResponse(data)
 }

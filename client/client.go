@@ -63,19 +63,25 @@ func NewClient(cfg *ClientConfig) (*MultiPayClient, error) {
 		}
 	}
 
+	// Use provided logger or noop logger if not configured
+	logger := cfg.Logger
+	if logger == nil {
+		logger = ports.NewNoopLogger()
+	}
+
 	// Create hook pipeline from configured hooks (empty if none provided)
 	var hookList []ports.Hook
 	if cfg.Hooks != nil {
 		hookList = cfg.Hooks
 	}
-	pipeline := hooks.NewPipeline(hookList...)
+	pipeline := hooks.NewPipeline(logger, hookList...)
 
 	// Create all 7 orchestration services with shared registry, validator, and pipeline
-	orderService := orchestration.NewOrderService(registry, validator, pipeline)
-	paymentService := orchestration.NewPaymentService(registry, validator, pipeline)
-	refundService := orchestration.NewRefundService(registry, validator, pipeline)
-	instrumentService := orchestration.NewInstrumentService(registry, validator, pipeline)
-	paymentLinkService := orchestration.NewPaymentLinkService(registry, validator, pipeline)
+	orderService := orchestration.NewOrderService(registry, validator, pipeline, logger)
+	paymentService := orchestration.NewPaymentService(registry, validator, pipeline, logger)
+	refundService := orchestration.NewRefundService(registry, validator, pipeline, logger)
+	instrumentService := orchestration.NewInstrumentService(registry, validator, pipeline, logger)
+	paymentLinkService := orchestration.NewPaymentLinkService(registry, validator, pipeline, logger)
 
 	// WebhookService has a different constructor (requires EndpointRegistry, Store, Logger)
 	endpointRegistry := routing.NewEndpointRegistry()

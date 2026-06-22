@@ -124,13 +124,19 @@ func parseEvent(ctx context.Context, body []byte, headers map[string]string) (*d
 		eventTime = time.Now()
 	}
 
+	// Convert the Data map to JSON bytes for RawPayload.
+	rawPayloadBytes, err := json.Marshal(payload.Data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payload to JSON: %w", err)
+	}
+
 	// Construct and return the domain webhook event.
 	event := &domain.WebhookEvent{
-		ID:        payload.EventID,
-		EventType: domainEventType,
-		Provider:  domain.ProviderCashfree.String(),
-		Data:      payload.Data,
-		Timestamp: eventTime,
+		Provider:   domain.ProviderCashfree,
+		EventType:  domainEventType,
+		EventTime:  &eventTime,
+		RawPayload: rawPayloadBytes,
+		DedupeKey:  payload.EventID,
 	}
 
 	return event, nil

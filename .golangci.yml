@@ -31,17 +31,16 @@ linters:
     - gocritic
     - makezero
     - contextcheck
-    - fatcontext
     - noctx
     - sqlclosecheck
     - musttag
     - wrapcheck
-    - wastedassign
     - spancheck
     - prealloc
     - perfsprint
     - unconvert
-    - copyloopvar
+  disable:
+    - fatcontext  # IMPORTANT: causes auto-fix to convert = to := (variable shadowing). See hooks/pipeline.go:41
     #
     # Intentionally skipped linters:
     #

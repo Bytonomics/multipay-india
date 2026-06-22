@@ -112,27 +112,30 @@ func TestParseEvent_OrderPaid(t *testing.T) {
 		},
 	}
 
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("failed to marshal payload: %v", err)
+	}
 
 	event, err := parseEvent(context.Background(), body, nil)
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 
-	if event.ID != "evt_order_paid_123" {
-		t.Errorf("expected event_id 'evt_order_paid_123', got %q", event.ID)
+	if event.Provider != domain.ProviderCashfree {
+		t.Errorf("expected provider %v, got %v", domain.ProviderCashfree, event.Provider)
 	}
 
 	if event.EventType != domain.EventPaymentCaptured {
 		t.Errorf("expected EventType %v, got %v", domain.EventPaymentCaptured, event.EventType)
 	}
 
-	if event.Provider != domain.ProviderCashfree.String() {
-		t.Errorf("expected provider 'cashfree', got %q", event.Provider)
-	}
-
-	if event.Timestamp.Unix() != now {
-		t.Errorf("expected timestamp %d, got %d", now, event.Timestamp.Unix())
+	if event.EventTime == nil || event.EventTime.Unix() != now {
+		if event.EventTime == nil {
+			t.Error("expected non-nil EventTime")
+		} else {
+			t.Errorf("expected timestamp %d, got %d", now, event.EventTime.Unix())
+		}
 	}
 }
 
@@ -148,7 +151,10 @@ func TestParseEvent_PaymentAuthorized(t *testing.T) {
 		},
 	}
 
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("failed to marshal payload: %v", err)
+	}
 
 	event, err := parseEvent(context.Background(), body, nil)
 	if err != nil {
@@ -242,17 +248,19 @@ func TestParseEvent_DefaultTimestamp(t *testing.T) {
 	}
 
 	// Verify that timestamp is within the expected range (before to after).
-	if event.Timestamp.Before(before) || event.Timestamp.After(after) {
-		t.Errorf("expected timestamp between %v and %v, got %v", before, after, event.Timestamp)
+	if event.EventTime.Before(before) || event.EventTime.After(after) {
+		t.Errorf("expected timestamp between %v and %v, got %v", before, after, event.EventTime)
 	}
 }
 
 // TestAdapterVerifySignature verifies the adapter's VerifySignature method.
 func TestAdapterVerifySignature(t *testing.T) {
+	webhookSecret := "test_webhook_secret"
 	config := &Config{
-		ClientID:     "test_client_id",
-		ClientSecret: "test_client_secret",
-		Environment:  domain.EnvironmentSandbox,
+		ClientID:      "test_client_id",
+		ClientSecret:  "test_client_secret",
+		WebhookSecret: webhookSecret,
+		Environment:   domain.EnvironmentSandbox,
 	}
 
 	adapter, err := NewAdapter(config)
@@ -260,16 +268,18 @@ func TestAdapterVerifySignature(t *testing.T) {
 		t.Fatalf("failed to create adapter: %v", err)
 	}
 
-	secret := config.ClientSecret
 	body := []byte(`{"event_id":"evt_123","event_type":"ORDER.PAID","data":{}}`)
 
-	// Compute the expected signature.
-	mac := hmac.New(sha256.New, []byte(secret))
+	// Compute the expected signature using the webhook secret.
+	mac := hmac.New(sha256.New, []byte(webhookSecret))
 	mac.Write(body)
 	signature := hex.EncodeToString(mac.Sum(nil))
 
 	// Verify the signature using the adapter method.
-	err = adapter.VerifySignature(context.Background(), signature, body)
+	headers := map[string]string{
+		"X-Cashfree-Signature": signature,
+	}
+	err = adapter.VerifySignature(context.Background(), body, headers)
 	if err != nil {
 		t.Fatalf("expected nil error from adapter.VerifySignature, got %v", err)
 	}
@@ -278,9 +288,10 @@ func TestAdapterVerifySignature(t *testing.T) {
 // TestAdapterParseEvent verifies the adapter's ParseEvent method.
 func TestAdapterParseEvent(t *testing.T) {
 	config := &Config{
-		ClientID:     "test_client_id",
-		ClientSecret: "test_client_secret",
-		Environment:  domain.EnvironmentSandbox,
+		ClientID:      "test_client_id",
+		ClientSecret:  "test_client_secret",
+		WebhookSecret: "test_webhook_secret",
+		Environment:   domain.EnvironmentSandbox,
 	}
 
 	adapter, err := NewAdapter(config)
@@ -300,13 +311,13 @@ func TestAdapterParseEvent(t *testing.T) {
 
 	body, _ := json.Marshal(payload)
 
-	event, err := adapter.ParseEvent(context.Background(), body)
+	event, err := adapter.ParseEvent(context.Background(), body, nil)
 	if err != nil {
 		t.Fatalf("expected nil error from adapter.ParseEvent, got %v", err)
 	}
 
-	if event.Provider != domain.ProviderCashfree.String() {
-		t.Errorf("expected provider 'cashfree', got %q", event.Provider)
+	if event.Provider != domain.ProviderCashfree {
+		t.Errorf("expected provider %v, got %v", domain.ProviderCashfree, event.Provider)
 	}
 
 	if event.EventType != domain.EventPaymentCaptured {

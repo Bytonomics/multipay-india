@@ -7,6 +7,7 @@ import (
 	"github.com/Bytonomics/multipay-adapter/capabilities"
 	"github.com/Bytonomics/multipay-adapter/domain"
 	"github.com/Bytonomics/multipay-adapter/hooks"
+	"github.com/Bytonomics/multipay-adapter/logging"
 	"github.com/Bytonomics/multipay-adapter/ports"
 )
 
@@ -16,14 +17,18 @@ type PaymentService struct {
 	resolver  *ports.ProviderRegistry
 	validator *capabilities.Validator
 	pipeline  *hooks.Pipeline
+	logger    ports.Logger
 }
 
 // NewPaymentService constructs a PaymentService with required dependencies.
-func NewPaymentService(resolver *ports.ProviderRegistry, validator *capabilities.Validator, pipeline *hooks.Pipeline) *PaymentService {
+func NewPaymentService(resolver *ports.ProviderRegistry, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger) *PaymentService {
+	wrappedLogger := logging.NewCallerLogger(logger, 2)
+
 	return &PaymentService{
 		resolver:  resolver,
 		validator: validator,
 		pipeline:  pipeline,
+		logger:    wrappedLogger,
 	}
 }
 
@@ -38,7 +43,7 @@ func (s *PaymentService) GetPayment(ctx context.Context, provider domain.Provide
 		return nil, fmt.Errorf("capability check failed: %w", capErr)
 	}
 
-	adapter, err := s.resolver.Resolve(provider)
+	adapter, err := s.resolver.Resolve(ctx, provider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve adapter: %w", err)
 	}
@@ -49,7 +54,7 @@ func (s *PaymentService) GetPayment(ctx context.Context, provider domain.Provide
 		RequestData: req,
 	}
 
-	hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	ctx, hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
 	if hookErr != nil {
 		return nil, fmt.Errorf("failed to execute before hooks: %w", hookErr)
 	}
@@ -57,7 +62,9 @@ func (s *PaymentService) GetPayment(ctx context.Context, provider domain.Provide
 	result, err := adapter.GetPayment(ctx, req)
 	if err != nil {
 		hookCtx.Error = err
-		s.pipeline.ExecuteOnError(ctx, hookCtx, err)
+		if hookErr := s.pipeline.ExecuteOnError(ctx, hookCtx, err); hookErr != nil {
+			s.logger.Error(ctx, "error in OnError hook for GetPayment", "error", hookErr.Error())
+		}
 		return nil, fmt.Errorf("failed to get payment: %w", err)
 	}
 
@@ -71,7 +78,7 @@ func (s *PaymentService) GetPayment(ctx context.Context, provider domain.Provide
 }
 
 // ListPayments validates input, checks capability, and retrieves all payments for an order.
-func (s *PaymentService) ListPayments(ctx context.Context, provider domain.Provider, req *domain.GetOrderRequest) ([]*domain.Payment, error) {
+func (s *PaymentService) ListPayments(ctx context.Context, provider domain.Provider, req *domain.ListPaymentsRequest) ([]*domain.Payment, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
@@ -81,7 +88,7 @@ func (s *PaymentService) ListPayments(ctx context.Context, provider domain.Provi
 		return nil, fmt.Errorf("capability check failed: %w", capErr)
 	}
 
-	adapter, err := s.resolver.Resolve(provider)
+	adapter, err := s.resolver.Resolve(ctx, provider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve adapter: %w", err)
 	}
@@ -92,7 +99,7 @@ func (s *PaymentService) ListPayments(ctx context.Context, provider domain.Provi
 		RequestData: req,
 	}
 
-	hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	ctx, hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
 	if hookErr != nil {
 		return nil, fmt.Errorf("failed to execute before hooks: %w", hookErr)
 	}
@@ -100,7 +107,9 @@ func (s *PaymentService) ListPayments(ctx context.Context, provider domain.Provi
 	result, err := adapter.ListPayments(ctx, req)
 	if err != nil {
 		hookCtx.Error = err
-		s.pipeline.ExecuteOnError(ctx, hookCtx, err)
+		if hookErr := s.pipeline.ExecuteOnError(ctx, hookCtx, err); hookErr != nil {
+			s.logger.Error(ctx, "error in OnError hook for ListPayments", "error", hookErr.Error())
+		}
 		return nil, fmt.Errorf("failed to list payments: %w", err)
 	}
 
@@ -131,7 +140,8 @@ func (s *PaymentService) CapturePayment(ctx context.Context, provider domain.Pro
 		RequestData: req,
 	}
 
-	if err := s.pipeline.ExecuteBefore(ctx, hookCtx); err != nil {
+	ctx, err := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	if err != nil {
 		return nil, fmt.Errorf("failed to execute before hooks: %w", err)
 	}
 
@@ -141,6 +151,8 @@ func (s *PaymentService) CapturePayment(ctx context.Context, provider domain.Pro
 	// For now, we document this limitation and return an error.
 	// Future: Add CapturePayment to PaymentProvider interface or create specialized interfaces per provider.
 	hookCtx.Error = domain.ErrUnsupportedCapability
-	s.pipeline.ExecuteOnError(ctx, hookCtx, domain.ErrUnsupportedCapability)
+	if hookErr := s.pipeline.ExecuteOnError(ctx, hookCtx, domain.ErrUnsupportedCapability); hookErr != nil {
+		s.logger.Error(ctx, "error in OnError hook for CapturePayment", "error", hookErr.Error())
+	}
 	return nil, fmt.Errorf("capture payment is not yet implemented in adapter interface: %w", domain.ErrUnsupportedCapability)
 }

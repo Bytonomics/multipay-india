@@ -17,10 +17,14 @@ func (a *Adapter) CreateOrder(ctx context.Context, req *domain.CreateOrderReques
 
 	// Build Razorpay order creation parameters
 	params := map[string]interface{}{
-		"amount":   req.Amount, // paisa
+		"amount":   req.AmountMinor, // paisa
 		"currency": string(req.Currency),
-		"receipt":  req.Receipt,
 		"notes":    req.Metadata,
+	}
+
+	// Add optional order ID as receipt if provided
+	if req.OrderID != "" {
+		params["receipt"] = req.OrderID
 	}
 
 	// Call Razorpay SDK to create order
@@ -31,13 +35,11 @@ func (a *Adapter) CreateOrder(ctx context.Context, req *domain.CreateOrderReques
 
 	// Map Razorpay response to canonical domain type
 	order := &domain.Order{
-		ID:        getString(responseMap, "id"),
-		Amount:    getInt64(responseMap, "amount"),
-		Currency:  domain.Currency(getString(responseMap, "currency")),
-		Receipt:   getString(responseMap, "receipt"),
-		Status:    mapOrderStatus(getString(responseMap, "status")),
-		Notes:     getString(responseMap, "notes"),
-		CreatedAt: getTime(responseMap, "created_at"),
+		ProviderOrderID: getString(responseMap, "id"),
+		AmountMinor:     domain.AmountMinor(getInt64(responseMap, "amount")),
+		Currency:        domain.Currency(getString(responseMap, "currency")),
+		Status:          mapOrderStatus(getString(responseMap, "status")),
+		CreatedAt:       getTime(responseMap, "created_at"),
 	}
 
 	return order, nil
@@ -65,21 +67,19 @@ func (a *Adapter) GetOrder(ctx context.Context, req *domain.GetOrderRequest) (*d
 
 	// Map Razorpay response to canonical domain type
 	order := &domain.Order{
-		ID:        getString(responseMap, "id"),
-		Amount:    getInt64(responseMap, "amount"),
-		Currency:  domain.Currency(getString(responseMap, "currency")),
-		Receipt:   getString(responseMap, "receipt"),
-		Status:    mapOrderStatus(getString(responseMap, "status")),
-		Notes:     getString(responseMap, "notes"),
-		CreatedAt: getTime(responseMap, "created_at"),
+		ProviderOrderID: getString(responseMap, "id"),
+		AmountMinor:     domain.AmountMinor(getInt64(responseMap, "amount")),
+		Currency:        domain.Currency(getString(responseMap, "currency")),
+		Status:          mapOrderStatus(getString(responseMap, "status")),
+		CreatedAt:       getTime(responseMap, "created_at"),
 	}
 
 	return order, nil
 }
 
 // ListOrderPayments retrieves all payments associated with a specific order.
-// It takes a GetOrderRequest with order ID and returns a slice of canonical Payment domain objects.
-func (a *Adapter) ListOrderPayments(ctx context.Context, req *domain.GetOrderRequest) ([]*domain.Payment, error) {
+// It takes a ListOrderPaymentsRequest with order ID and returns a slice of canonical Payment domain objects.
+func (a *Adapter) ListOrderPayments(ctx context.Context, req *domain.ListOrderPaymentsRequest) ([]*domain.Payment, error) {
 	if req == nil {
 		return nil, domain.ErrInvalidRequest
 	}
@@ -121,12 +121,12 @@ func (a *Adapter) ListOrderPayments(ctx context.Context, req *domain.GetOrderReq
 		}
 
 		payment := &domain.Payment{
-			ID:        getString(itemMap, "id"),
-			OrderID:   getString(itemMap, "order_id"),
-			Amount:    getInt64(itemMap, "amount"),
-			Status:    mapPaymentStatus(getString(itemMap, "status")),
-			Method:    getString(itemMap, "method"),
-			CreatedAt: getTime(itemMap, "created_at"),
+			ProviderPaymentID: getString(itemMap, "id"),
+			OrderID:           getString(itemMap, "order_id"),
+			AmountMinor:       domain.AmountMinor(getInt64(itemMap, "amount")),
+			Status:            mapPaymentStatus(getString(itemMap, "status")),
+			PaymentMethod:     getString(itemMap, "method"),
+			PaymentTime:       getTime(itemMap, "created_at"),
 		}
 
 		payments = append(payments, payment)

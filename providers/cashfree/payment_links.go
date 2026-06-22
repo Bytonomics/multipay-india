@@ -11,13 +11,13 @@ import (
 
 // createPaymentLink creates a new shareable payment link on the Cashfree payment gateway.
 // Maps the canonical domain.CreatePaymentLinkRequest to a Cashfree CreateLinkRequest,
-// calls the SDK, and maps the response back to a canonical domain.PaymentLinkResponse.
-func createPaymentLink(ctx context.Context, adapter *Adapter, req *domain.CreatePaymentLinkRequest) (*domain.PaymentLinkResponse, error) {
+// calls the SDK, and maps the response back to a canonical domain.PaymentLink.
+func createPaymentLink(ctx context.Context, adapter *Adapter, req *domain.CreatePaymentLinkRequest) (*domain.PaymentLink, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required: %w", domain.ErrInvalidRequest)
 	}
 
-	if req.Amount <= 0 {
+	if req.AmountMinor <= 0 {
 		return nil, fmt.Errorf("amount must be positive: %w", domain.ErrInvalidRequest)
 	}
 
@@ -31,9 +31,9 @@ func createPaymentLink(ctx context.Context, adapter *Adapter, req *domain.Create
 
 	// Build Cashfree CreateLinkRequest
 	cfReq := &cf.CreateLinkRequest{
-		LinkAmount:   AmountMinorToCashfree(req.Amount),
-		LinkCurrency: req.Currency,
-		LinkPurpose:  req.Description,
+		LinkAmount:   AmountMinorToCashfree(int64(req.AmountMinor)),
+		LinkCurrency: string(req.Currency),
+		LinkPurpose:  req.Purpose,
 	}
 
 	// Call Cashfree SDK
@@ -60,8 +60,8 @@ func createPaymentLink(ctx context.Context, adapter *Adapter, req *domain.Create
 
 // getPaymentLink retrieves an existing payment link from the Cashfree payment gateway.
 // Maps the canonical domain.GetPaymentLinkRequest to a Cashfree fetch request,
-// calls the SDK, and maps the response back to a canonical domain.PaymentLinkResponse.
-func getPaymentLink(ctx context.Context, adapter *Adapter, req *domain.GetPaymentLinkRequest) (*domain.PaymentLinkResponse, error) {
+// calls the SDK, and maps the response back to a canonical domain.PaymentLink.
+func getPaymentLink(ctx context.Context, adapter *Adapter, req *domain.GetPaymentLinkRequest) (*domain.PaymentLink, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required: %w", domain.ErrInvalidRequest)
 	}
@@ -102,8 +102,8 @@ func getPaymentLink(ctx context.Context, adapter *Adapter, req *domain.GetPaymen
 
 // cancelPaymentLink cancels an existing payment link on the Cashfree payment gateway.
 // Maps the canonical domain.CancelPaymentLinkRequest to a Cashfree cancel request,
-// calls the SDK, and maps the response back to a canonical domain.PaymentLinkResponse.
-func cancelPaymentLink(ctx context.Context, adapter *Adapter, req *domain.CancelPaymentLinkRequest) (*domain.PaymentLinkResponse, error) {
+// calls the SDK, and maps the response back to a canonical domain.PaymentLink.
+func cancelPaymentLink(ctx context.Context, adapter *Adapter, req *domain.CancelPaymentLinkRequest) (*domain.PaymentLink, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required: %w", domain.ErrInvalidRequest)
 	}
