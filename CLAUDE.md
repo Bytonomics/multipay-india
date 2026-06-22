@@ -264,6 +264,22 @@ The project uses a **custom golangci-lint binary** with NilAway (Uber's nil pani
 
 ---
 
+### DESIGN.md Must Stay in Sync
+
+`DESIGN.md` is the architecture reference for this library. Any change to interfaces, service signatures, error types, hook behavior, capability matrix, webhook flow, or currency conversion MUST be reflected in DESIGN.md in the same commit. Do NOT defer documentation updates — stale DESIGN.md is worse than no DESIGN.md because it actively misleads.
+
+**Specifically update DESIGN.md when changing:**
+- `ports/providers.go` — ProviderAdapter interface composition
+- `domain/errors.go` — sentinel errors or typed error structs
+- `orchestration/*.go` — service method signatures or pipeline flow
+- `orchestration/webhooks.go` — the 8-step webhook flow
+- `hooks/pipeline.go` — hook execution order (FIFO/LIFO)
+- `client/client.go` — DI construction flow
+- `capabilities/matrix.go` — provider capability entries
+- `providers/cashfree/mappers.go` — currency conversion logic
+
+---
+
 ## Adding a New Provider
 
 1. Create `providers/<name>/adapter.go` implementing `ports.ProviderAdapter`

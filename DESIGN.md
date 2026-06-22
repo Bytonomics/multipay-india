@@ -27,38 +27,39 @@ graph TD
     RazorpayAdapter --> RazorpaySDK["Razorpay Go SDK"]
 ```
 
-**Explanation**: The MultiPayClient is the main entry point that callers interact with. It wraps 8 orchestration services (Orders, Payments, Refunds, Instruments, Payment Links, Webhooks, Capabilities, and Audit) that use a consistent pipeline of hooks, capability validation, and provider resolution to dispatch requests to payment provider adapters (Cashfree or Razorpay). These adapters wrap the official SDKs from each provider.
+**Explanation**: The MultiPayClient is the main entry point that callers interact with. It wraps 7 orchestration services (Orders, Payments, Refunds, Instruments, Payment Links, Webhooks, and Capabilities) that use a consistent pipeline of hooks, capability validation, and provider resolution to dispatch requests to payment provider adapters (Cashfree or Razorpay). These adapters wrap the official SDKs from each provider.
 
 ## Hook Pipeline Flow
 
 ```mermaid
 sequenceDiagram
     Caller->>Service: method(ctx, req)
-    Service->>Validator: pedantigo.Validate(req)
-    Service->>CapValidator: RequireCapability(provider, cap)
-    Service->>Resolver: Resolve(provider)
-    Service->>Pipeline: ExecuteBefore(hookCtx)
-    Service->>Adapter: method(ctx, req)
+    Service->>Service: nil check + extract req.Provider
+    Service->>CapValidator: RequireCapability(ctx, provider, cap)
+    Service->>Resolver: Resolve(ctx, provider)
+    Service->>Pipeline: ExecuteBefore(ctx, hookCtx) → enriched ctx
+    Service->>Adapter: method(enriched ctx, req)
     alt success
-        Service->>Pipeline: ExecuteAfter(hookCtx)
+        Service->>Pipeline: ExecuteAfter(ctx, hookCtx)
         Service-->>Caller: result, nil
     else error
-        Service->>Pipeline: ExecuteOnError(hookCtx, err)
-        Service-->>Caller: nil, error
+        Service->>Pipeline: ExecuteOnError(ctx, hookCtx, err)
+        Service-->>Caller: nil, wrapped error
     end
 ```
 
 **Explanation**: Every service method follows a consistent, predictable flow:
 
-1. **Validate**: Request is validated using pedantigo struct validators
-2. **Capability Check**: The requested provider's capability is verified
-3. **Provider Resolution**: The appropriate adapter is resolved from the registry
-4. **Before Hooks**: Registered before-hooks execute (e.g., audit, metrics collection)
-5. **Provider Call**: The adapter method is invoked with the validated request
-6. **After/Error Hooks**: Success triggers after-hooks; errors trigger error-hooks
-7. **Return**: Result or error is returned to caller
+1. **Input Validation**: Request nil check; provider extracted from `req.Provider`
+2. **Capability Check**: The requested provider's capability is verified via `capabilities.Validator`
+3. **Provider Resolution**: The appropriate adapter is resolved from the `ports.ProviderResolver` interface
+4. **Before Hooks (FIFO)**: Registered before-hooks execute and may enrich the context (e.g., trace IDs)
+5. **Provider Call**: The adapter method is invoked with the enriched context
+6. **After Hooks (LIFO)**: On success, after-hooks execute in reverse registration order
+7. **Error Hooks (LIFO)**: On failure, error-hooks execute in reverse order; errors are logged but not propagated
+8. **Return**: Result or wrapped error is returned to caller
 
-This pipeline ensures consistent behavior across all operations: validation happens first, hooks are predictable, and errors are handled uniformly.
+All services share the same `ProviderResolver`, `Validator`, `Pipeline`, `Logger`, and `Clock` instances, injected at construction via `client.NewClient()`.
 
 ## Webhook Routing Flow
 
@@ -97,60 +98,68 @@ This design ensures that even if a webhook is delivered multiple times, the hand
 
 ```mermaid
 flowchart TD
-    A[Request arrives] --> B{pedantigo validate}
-    B -->|fail| C[Return ValidationError]
-    B -->|pass| D{RequireCapability}
+    A[Request arrives] --> B{nil check}
+    B -->|nil| C[Return ErrInvalidRequest]
+    B -->|ok| D{RequireCapability}
     D -->|unsupported| E[Return CapabilityError]
     D -->|supported| F[Resolve Provider]
-    F --> G[Execute Before Hooks]
+    F --> G[Execute Before Hooks FIFO]
     G --> H[Call Adapter]
-    H -->|success| I[Execute After Hooks]
-    H -->|error| J[Execute Error Hooks]
+    H -->|success| I[Execute After Hooks LIFO]
+    H -->|error| J[Execute Error Hooks LIFO]
     I --> K[Return Result]
-    J --> L[Return Error]
+    J --> L[Return Wrapped Error]
 ```
 
 **Explanation**: The capability matrix is a critical control point in the request flow:
 
-- **Early Validation**: Requests are validated using pedantigo before any provider-specific logic
-- **Capability Check**: Every operation checks if the resolved provider supports the requested capability
-- **Fail Fast**: Unsupported capabilities immediately return a CapabilityError, preventing wasted work
-- **Graceful Degradation**: Callers can catch CapabilityError and fall back to alternative flows
-- **Audit Trail**: Before/error hooks log all capability decisions, creating a complete audit trail
+- **Input Validation**: Request nil check runs first; provider is extracted from `req.Provider`
+- **Capability Check**: Every operation checks if the provider supports the requested capability via `capabilities.Validator`
+- **Fail Fast**: Unsupported capabilities immediately return a `*domain.CapabilityError` (wraps `ErrUnsupportedCapability`), preventing wasted SDK calls
+- **Graceful Degradation**: Callers can catch `CapabilityError` via `errors.As()` and fall back to alternative flows
+- **Hook Ordering**: Before hooks run FIFO; After and OnError hooks run LIFO (middleware stack pattern)
 
-This design allows callers to query capabilities upfront, or attempt operations and handle CapabilityError gracefully.
+The `SupportMatrix` is immutable after construction — built from hardcoded maps verified against vendor SDK documentation. It includes explicit `false` entries for unsupported capabilities.
 
 ## Dependency Injection and Construction Flow
 
 ```mermaid
 flowchart LR
     Config["ClientConfig"] --> NewClient
+    NewClient --> Logger["Logger / NoopLogger"]
+    NewClient --> Clock["Clock / RealClock"]
     NewClient --> SM["SupportMatrix"]
     NewClient --> CV["CapValidator"]
     NewClient --> PR["ProviderRegistry"]
     NewClient --> HP["HookPipeline"]
     NewClient --> ER["EndpointRegistry"]
     SM --> CV
-    PR --> Services
+    PR --> Services["5 Core Services"]
     CV --> Services
     HP --> Services
-    ER --> WebhookSvc["WebhookService"]
+    Logger --> Services
+    Clock --> Services
+    PR --> WebhookSvc["WebhookService"]
+    HP --> WebhookSvc
+    ER --> WebhookSvc
     Services --> MPC["MultiPayClient"]
     WebhookSvc --> MPC
+    CapSvc["CapabilityService"] --> MPC
 ```
 
 **Explanation**: The MultiPayClient is constructed from a ClientConfig in a deterministic flow:
 
-1. **Parse Config**: ClientConfig is validated and contains adapter credentials for all providers
-2. **Create Support Matrix**: Based on adapters enabled in config, build a capability matrix
-3. **Create Capability Validator**: Uses the support matrix to validate operations
-4. **Create Provider Registry**: Maps provider names to adapter instances
-5. **Create Hook Pipeline**: Initializes before-hook and after-hook chains
-6. **Create Endpoint Registry**: Maps webhook endpoints to handlers
-7. **Create Services**: All 8 services are instantiated with shared dependencies
-8. **Return Client**: The fully-constructed MultiPayClient is returned
-
-This dependency graph ensures that all dependencies are available before any service is used, and shared components (like the hook pipeline) are reused across services.
+1. **Validate Config**: At least one provider adapter required; all providers must be non-nil
+2. **Default Logger/Clock**: If `cfg.Logger` is nil, use `ports.NewNoopLogger()`; if `cfg.Clock` is nil, use `ports.NewRealClock()`
+3. **Create Support Matrix**: Static, immutable capability map for both Cashfree and Razorpay
+4. **Create Capability Validator**: Uses the support matrix for early unsupported-capability errors
+5. **Create Provider Registry**: Built from adapter list via `NewProviderRegistryFromAdapters()`
+6. **Create Hook Pipeline**: Wraps configured hooks with panic recovery; accepts logger
+7. **Create Endpoint Registry**: Maps webhook provider+account pairs to routes
+8. **Create 5 Core Services**: OrderService, PaymentService, RefundService, InstrumentService, PaymentLinkService — all share resolver, validator, pipeline, logger, clock
+9. **Create WebhookService**: Takes resolver (for adapter lookup), pipeline, store, endpoint registry, logger
+10. **Create CapabilityService**: Thin wrapper around SupportMatrix
+11. **Return Client**: The fully-constructed MultiPayClient with all 7 service accessors
 
 ## Core Design Principles
 
@@ -181,52 +190,31 @@ All request and response types are defined once in the library and used everywhe
 
 ### 5. Provider Adapter Interface
 
-All adapters implement a common interface:
+`ProviderAdapter` is a composed interface embedding 7 sub-interfaces (defined in `ports/providers.go`):
 
-```
-type Adapter interface {
-    // Order operations
-    CreateOrder(ctx context.Context, req *Order) (*Order, error)
-    FetchOrder(ctx context.Context, id string) (*Order, error)
-    ListOrderPayments(ctx context.Context, id string) ([]*Payment, error)
+```go
+type ProviderAdapter interface {
+    OrderProvider           // CreateOrder, GetOrder, ListOrderPayments
+    PaymentProvider         // GetPayment, ListPayments, CapturePayment
+    RefundProvider          // CreateRefund, GetRefund, ListRefunds
+    InstrumentProvider      // GetInstrument, ListInstruments, DeleteInstrument
+    PaymentLinkProvider     // CreatePaymentLink, GetPaymentLink, CancelPaymentLink
+    WebhookConsumerProvider // VerifySignature(ctx, payload, headers), ParseEvent(ctx, payload, headers)
+    MetadataMapper          // MapOrderMetadata, MapRefundMetadata, MapPaymentLinkMetadata
 
-    // Payment operations
-    FetchPayment(ctx context.Context, id string) (*Payment, error)
-    ListPayments(ctx context.Context, filters ...) ([]*Payment, error)
-    CapturePayment(ctx context.Context, paymentID, amount) (*Payment, error)
-
-    // Refund operations
-    CreateRefund(ctx context.Context, req *RefundRequest) (*Refund, error)
-    FetchRefund(ctx context.Context, id string) (*Refund, error)
-    ListRefunds(ctx context.Context, filters ...) ([]*Refund, error)
-
-    // Instrument operations
-    FetchInstrument(ctx context.Context, id string) (*Instrument, error)
-    ListInstruments(ctx context.Context, filters ...) ([]*Instrument, error)
-    DeleteInstrument(ctx context.Context, id string) error
-
-    // Payment Link operations
-    CreatePaymentLink(ctx context.Context, req *PaymentLinkRequest) (*PaymentLink, error)
-    FetchPaymentLink(ctx context.Context, id string) (*PaymentLink, error)
-    CancelPaymentLink(ctx context.Context, id string) (*PaymentLink, error)
-
-    // Webhook operations
-    VerifySignature(ctx context.Context, body []byte, headers map[string]string) error
-    ParseEvent(ctx context.Context, body []byte) (interface{}, error)
-
-    // Capability reporting
-    Supports(capability string) bool
+    ProviderName() domain.Provider
+    ProviderCapabilities() []capabilities.Capability
 }
 ```
 
-All providers implement this interface, ensuring consistent APIs regardless of which provider is used.
+All methods accept typed request structs from `domain/` (e.g., `*domain.CreateOrderRequest`) and return typed response structs (e.g., `*domain.Order`). Provider SDK types never leak outside adapters. Both adapters have compile-time interface checks: `var _ ports.ProviderAdapter = (*Adapter)(nil)`.
 
 ### 6. Configuration and Multi-Account Support
 
-- **ClientConfig**: Contains credentials for all enabled providers
-- **Multi-Instance**: Callers can create multiple MultiPayClient instances, one per region or tenant
-- **Thread-Safe**: All clients are fully thread-safe; no global state
-- **Hot Reloading**: Some providers support credential reloading without restarting the client
+- **ClientConfig**: Contains provider adapters, optional hooks, webhook store, logger, and clock
+- **Multi-Instance**: Multiple `MultiPayClient` instances can coexist in one process with different provider/account bindings
+- **Thread-Safe**: No package-level mutable state (except Cashfree SDK mutex — a workaround for the upstream SDK's global vars)
+- **Webhook Segregation**: Separate endpoints per provider+account via `routing.EndpointRegistry`
 
 ### 7. Testing and Mocking
 
@@ -239,88 +227,63 @@ All providers implement this interface, ensuring consistent APIs regardless of w
 
 ### Sentinel Errors
 
-Expected error conditions are represented as sentinel errors:
+All sentinel errors live in `domain/errors.go`. Each typed error wraps a sentinel via `Unwrap()`:
 
 ```go
 var (
-    ErrOrderNotFound           = errors.New("order not found")
-    ErrRefundNotFound          = errors.New("refund not found")
-    ErrPaymentNotFound         = errors.New("payment not found")
-    ErrRefundAlreadyProcessed  = errors.New("refund already processed")
-    ErrAmountExceedsRemaining  = errors.New("refund amount exceeds remaining balance")
+    ErrProviderNotFound          = errors.New("provider not found")
+    ErrOrderNotFound             = errors.New("order not found")
+    ErrPaymentNotFound           = errors.New("payment not found")
+    ErrRefundNotFound            = errors.New("refund not found")
+    ErrInstrumentNotFound        = errors.New("instrument not found")
+    ErrPaymentLinkNotFound       = errors.New("payment link not found")
+    ErrInvalidRequest            = errors.New("invalid request")
+    ErrUnsupportedCapability     = errors.New("unsupported capability")
+    ErrProviderError             = errors.New("provider error")
+    ErrWebhookVerificationFailed = errors.New("webhook verification failed")
+    ErrWebhookEventNotFound      = errors.New("webhook event not found")
+    ErrHookPanic                 = errors.New("hook panic")
 )
 ```
 
-Callers can check errors with:
+### Typed Error Structs
+
+All typed errors implement `Error()` and `Unwrap()` returning the appropriate sentinel:
+
+| Error Type | Wraps Sentinel | Key Fields |
+|---|---|---|
+| `*CapabilityError` | `ErrUnsupportedCapability` | `Provider`, `Capability string`, `Message` |
+| `*ValidationError` | `ErrInvalidRequest` | `Field`, `Message` |
+| `*ProviderAPIError` | `ErrProviderError` | `Provider`, `StatusCode int`, `ErrorCode`, `Message`, `RawBody []byte` |
+| `*WebhookError` | `ErrWebhookVerificationFailed` | `Reason`, `Provider`, `AccountID` |
+| `*HookPanicError` | `ErrHookPanic` | `Phase`, `Operation`, `PanicValue`, `StackTrace` |
 
 ```go
-if errors.Is(err, ErrOrderNotFound) {
-    // Handle not found case
-}
-```
+// Check sentinel
+if errors.Is(err, domain.ErrOrderNotFound) { ... }
 
-### ProviderAPIError
-
-When a provider API returns an error, it is wrapped in ProviderAPIError:
-
-```go
-type ProviderAPIError struct {
-    Provider string      // "cashfree" or "razorpay"
-    Code     string      // Provider-specific error code
-    Message  string      // Human-readable message
-    Err      error       // Original provider error
-}
-```
-
-Callers can inspect provider-specific details while also checking for known error patterns:
-
-```go
-if errors.Is(err, ErrOrderNotFound) {
-    // Handle missing order
-} else if pe := &ProviderAPIError{}; errors.As(err, &pe) {
-    // Handle provider-specific error
-    log.Printf("Provider %s error: %s", pe.Provider, pe.Message)
-}
-```
-
-### CapabilityError
-
-When a provider doesn't support a requested operation:
-
-```go
-type CapabilityError struct {
-    Provider    string     // "cashfree" or "razorpay"
-    Capability  string     // "refund", "tokenization", etc.
-    Reason      string     // Why it's not supported
-}
-```
-
-Callers can gracefully degrade:
-
-```go
-_, err := client.CreateRefund(ctx, req)
-if ce := &CapabilityError{}; errors.As(err, &ce) {
-    // Fall back to manual refund flow
-    return manualRefundFlow(ctx, order)
+// Extract typed error
+var capErr *domain.CapabilityError
+if errors.As(err, &capErr) {
+    log.Printf("Provider %s doesn't support %s", capErr.Provider, capErr.Capability)
 }
 ```
 
 ## Webhook Deduplication
 
-Webhooks are deduplicated using a key composed of:
+Webhooks are deduplicated using a `DedupeKey` generated by each provider's `ParseEvent()`:
 
-- **Provider**: Which provider sent the webhook (cashfree/razorpay)
-- **Transaction ID**: The provider's transaction or order ID
-- **Webhook Type**: The type of event (order.paid, refund.created, etc.)
+- **Cashfree**: `DedupeKey = event_id` from the webhook payload
+- **Razorpay**: `DedupeKey = event_id` from the webhook payload
+- **Fallback** (routing layer): SHA256 hash of the raw body when `DedupeKey` is empty
 
-The deduplication store (Redis, in-memory cache, or custom backend) is responsible for:
+The `ports.WebhookStore` interface (implemented by the consumer) provides:
 
-1. **Detecting Duplicates**: Check if deduplication key has been seen before
-2. **Storing Raw Payloads**: Keep the raw webhook body for audit and debugging
-3. **Recording Timestamps**: Track when each webhook was processed
-4. **Expiring Entries**: Clean up old entries after 24 hours (configurable)
+1. **StoreRawPayload(ctx, provider, accountID, payload)**: Persist raw body for audit (ledger-first)
+2. **IsDuplicate(ctx, provider, accountID, dedupeKey)**: Check if event was already processed
+3. **MarkProcessed(ctx, provider, accountID, dedupeKey)**: Record successful processing
 
-This ensures that even if a provider resends the same webhook multiple times (common during network issues), the event handler is called exactly once.
+Duplicate webhooks receive a 200 ACK immediately — the provider won't retry.
 
 ## Thread Safety
 
@@ -336,20 +299,34 @@ There are no global variables or shared mutable state. Each MultiPayClient owns 
 
 ## Observability
 
-The library provides built-in observability via hooks:
+The library provides built-in observability via hooks and structured logging:
 
-1. **Audit Hook**: Logs all operations (method, provider, duration, status)
-2. **Metrics Hook**: Records latency histograms and status counters
-3. **Tracing Hook**: Propagates OpenTelemetry trace context
-4. **Custom Hooks**: Callers can add custom hooks for additional observability
+1. **AuditHook** (`hooks/audit.go`): Logs operation start/complete/failure with provider and duration
+2. **MetricsHook** (`hooks/metrics.go`): Records operation metrics via a `MetricsCollector` interface (consumer-implemented)
+3. **CallerLogger** (`logging/caller_logger.go`): Wraps `ports.Logger` to automatically prepend `[file:line function]` to all log messages
+4. **Custom Hooks**: Callers can implement `ports.Hook` (Before/After/OnError) for additional observability
+5. **Panic Recovery**: All hook phases have `defer recover()` with full stack traces logged via `HookPanicError`
 
-All hooks are optional and can be disabled. The default configuration includes audit and metrics hooks.
+Logger is mandatory (panics on nil at construction). All log methods accept `context.Context` for trace correlation.
 
 ## Security Considerations
 
-1. **Signature Verification**: All webhooks are signature-verified using provider public keys
-2. **Credential Isolation**: Provider credentials are never logged or included in audit trails
-3. **HTTPS Only**: All provider API calls use HTTPS
-4. **Input Validation**: All requests are validated using pedantigo before provider calls
-5. **Output Sanitization**: Sensitive fields are not included in audit logs or metrics
-6. **Rate Limiting**: Implemented at the client level to prevent overloading providers
+1. **Webhook Signature Verification**: HMAC-SHA256 verification per provider (Cashfree uses `X-Cashfree-Signature`, Razorpay uses `X-Razorpay-Signature`); constant-time comparison via `crypto/subtle`
+2. **Credential Isolation**: Provider credentials are never logged; `CallerLogger` only adds caller location, not request data
+3. **Cashfree SDK Global Guard**: Package-level `sync.Mutex` prevents concurrent credential corruption (Cashfree SDK uses global vars)
+4. **POST-Only Webhooks**: `WebhookHandler.ServeHTTP` rejects non-POST requests with 405
+5. **Signature vs Other Errors**: Webhook handler differentiates `ErrWebhookVerificationFailed` (400) from other errors (500) via `errors.Is()`
+
+## Currency Conversion
+
+Amount conversion between minor units (`AmountMinor int64`) and provider major units uses ISO 4217 exponents via `bojanz/currency`:
+
+- **Exponent 0** (JPY, KRW, VND): factor = 1 — no conversion
+- **Exponent 2** (INR, USD, EUR): factor = 100
+- **Exponent 3** (BHD, KWD, OMR): factor = 1000
+
+Conversion functions in `providers/cashfree/mappers.go`:
+- `AmountMinorToMajor(minorAmount int64, currencyCode string) float64` — outbound to Cashfree
+- `AmountMajorToMinor(majorAmount float64, currencyCode string) int64` — inbound from Cashfree
+
+Razorpay uses minor units natively — no conversion needed.
