@@ -13,6 +13,9 @@ type AuditHook struct {
 
 // NewAuditHook constructs an AuditHook with the provided logger.
 func NewAuditHook(logger ports.Logger) *AuditHook {
+	if logger == nil {
+		panic("logger is required (cannot be nil)")
+	}
 	return &AuditHook{
 		logger: logger,
 	}
@@ -20,31 +23,27 @@ func NewAuditHook(logger ports.Logger) *AuditHook {
 
 // Before logs the operation before it executes.
 func (a *AuditHook) Before(ctx context.Context, hc *ports.HookContext) (context.Context, error) {
-	if a.logger != nil {
-		a.logger.Info(ctx,
-			"audit: operation starting",
-			"provider", hc.Provider.String(),
-			"operation", hc.RequestType,
-		)
-	}
+	a.logger.Info(ctx,
+		"audit: operation starting",
+		"provider", hc.Provider.String(),
+		"operation", hc.RequestType,
+	)
 	return ctx, nil
 }
 
 // After logs the operation after successful completion.
 func (a *AuditHook) After(ctx context.Context, hc *ports.HookContext) error {
-	if a.logger != nil {
-		a.logger.Info(ctx,
-			"audit: operation completed",
-			"provider", hc.Provider.String(),
-			"operation", hc.RequestType,
-		)
-	}
+	a.logger.Info(ctx,
+		"audit: operation completed",
+		"provider", hc.Provider.String(),
+		"operation", hc.RequestType,
+	)
 	return nil
 }
 
 // OnError logs the operation when it fails.
 func (a *AuditHook) OnError(ctx context.Context, hc *ports.HookContext) error {
-	if a.logger != nil && hc.Error != nil {
+	if hc.Error != nil {
 		a.logger.Error(ctx,
 			"audit: operation failed",
 			"provider", hc.Provider.String(),

@@ -14,14 +14,18 @@ import (
 // RefundService orchestrates refund operations across multiple payment providers.
 // It handles validation, capability checking, and hook execution.
 type RefundService struct {
-	resolver  *ports.ProviderRegistry
+	resolver  ports.ProviderResolver
 	validator *capabilities.Validator
 	pipeline  *hooks.Pipeline
 	logger    ports.Logger
+	clock     ports.Clock
 }
 
 // NewRefundService constructs a RefundService with required dependencies.
-func NewRefundService(resolver *ports.ProviderRegistry, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger) *RefundService {
+func NewRefundService(resolver ports.ProviderResolver, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger, clock ports.Clock) *RefundService {
+	if logger == nil {
+		panic("logger is required (cannot be nil)")
+	}
 	wrappedLogger := logging.NewCallerLogger(logger, 2)
 
 	return &RefundService{
@@ -29,14 +33,17 @@ func NewRefundService(resolver *ports.ProviderRegistry, validator *capabilities.
 		validator: validator,
 		pipeline:  pipeline,
 		logger:    wrappedLogger,
+		clock:     clock,
 	}
 }
 
 // CreateRefund validates input, checks capability, and creates a refund for an order.
-func (s *RefundService) CreateRefund(ctx context.Context, provider domain.Provider, req *domain.CreateRefundRequest) (*domain.Refund, error) {
+func (s *RefundService) CreateRefund(ctx context.Context, req *domain.CreateRefundRequest) (*domain.Refund, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
+
+	provider := req.Provider
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapRefundCreate)
 	if capErr != nil {
@@ -52,6 +59,7 @@ func (s *RefundService) CreateRefund(ctx context.Context, provider domain.Provid
 		Provider:    provider,
 		RequestType: "CreateRefund",
 		RequestData: req,
+		StartTime:   s.clock.Now(),
 	}
 
 	ctx, hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
@@ -78,10 +86,12 @@ func (s *RefundService) CreateRefund(ctx context.Context, provider domain.Provid
 }
 
 // GetRefund validates input, checks capability, and retrieves a specific refund.
-func (s *RefundService) GetRefund(ctx context.Context, provider domain.Provider, req *domain.GetRefundRequest) (*domain.Refund, error) {
+func (s *RefundService) GetRefund(ctx context.Context, req *domain.GetRefundRequest) (*domain.Refund, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
+
+	provider := req.Provider
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapRefundFetch)
 	if capErr != nil {
@@ -97,6 +107,7 @@ func (s *RefundService) GetRefund(ctx context.Context, provider domain.Provider,
 		Provider:    provider,
 		RequestType: "GetRefund",
 		RequestData: req,
+		StartTime:   s.clock.Now(),
 	}
 
 	ctx, hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
@@ -123,10 +134,12 @@ func (s *RefundService) GetRefund(ctx context.Context, provider domain.Provider,
 }
 
 // ListRefunds validates input, checks capability, and retrieves all refunds for an order.
-func (s *RefundService) ListRefunds(ctx context.Context, provider domain.Provider, req *domain.ListRefundsRequest) ([]*domain.Refund, error) {
+func (s *RefundService) ListRefunds(ctx context.Context, req *domain.ListRefundsRequest) ([]*domain.Refund, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
+
+	provider := req.Provider
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapRefundList)
 	if capErr != nil {
@@ -142,6 +155,7 @@ func (s *RefundService) ListRefunds(ctx context.Context, provider domain.Provide
 		Provider:    provider,
 		RequestType: "ListRefunds",
 		RequestData: req,
+		StartTime:   s.clock.Now(),
 	}
 
 	ctx, hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)

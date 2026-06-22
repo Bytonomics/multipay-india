@@ -31,7 +31,8 @@ func getPayment(ctx context.Context, adapter *Adapter, req *domain.GetPaymentReq
 
 	// Call Cashfree SDK to fetch payment
 	apiVersion := "2022-09-01"
-	cfPayment, _, err := cf.PGOrderFetchPayment(
+	cfPayment, _, err := cf.PGOrderFetchPaymentWithContext(
+		ctx,
 		stringPtr(apiVersion),
 		req.OrderID,
 		req.PaymentID,
@@ -73,7 +74,8 @@ func listPayments(ctx context.Context, adapter *Adapter, req *domain.ListPayment
 
 	// Call Cashfree SDK to fetch payments for the order
 	apiVersion := "2022-09-01"
-	cfPayments, _, err := cf.PGOrderFetchPayments(
+	cfPayments, _, err := cf.PGOrderFetchPaymentsWithContext(
+		ctx,
 		stringPtr(apiVersion),
 		req.OrderID,
 		nil, // xRequestId
@@ -93,7 +95,7 @@ func listPayments(ctx context.Context, adapter *Adapter, req *domain.ListPayment
 	}
 
 	// Map response to canonical types
-	result := make([]*domain.Payment, 0)
+	result := make([]*domain.Payment, 0, len(cfPayments))
 	for i := range cfPayments {
 		cfPayment := &cfPayments[i]
 		payment := MapPaymentEntityToCanonical(cfPayment)

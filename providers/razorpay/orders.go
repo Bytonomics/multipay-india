@@ -36,10 +36,12 @@ func (a *Adapter) CreateOrder(ctx context.Context, req *domain.CreateOrderReques
 	// Map Razorpay response to canonical domain type
 	order := &domain.Order{
 		ProviderOrderID: getString(responseMap, "id"),
+		OrderID:         getString(responseMap, "receipt"),
 		AmountMinor:     domain.AmountMinor(getInt64(responseMap, "amount")),
 		Currency:        domain.Currency(getString(responseMap, "currency")),
 		Status:          mapOrderStatus(getString(responseMap, "status")),
 		CreatedAt:       getTime(responseMap, "created_at"),
+		Raw:             rawMapResponse(responseMap),
 	}
 
 	return order, nil
@@ -59,8 +61,8 @@ func (a *Adapter) GetOrder(ctx context.Context, req *domain.GetOrderRequest) (*d
 	responseMap, err := a.client.Order.Fetch(req.OrderID, nil, nil)
 	if err != nil {
 		// Check if order not found
-		if err.Error() == "Order not found" {
-			return nil, domain.ErrOrderNotFound
+		if isNotFoundError(err) {
+			return nil, fmt.Errorf("order %s not found: %w", req.OrderID, domain.ErrOrderNotFound)
 		}
 		return nil, fmt.Errorf("failed to fetch order: %w", err)
 	}
@@ -68,10 +70,12 @@ func (a *Adapter) GetOrder(ctx context.Context, req *domain.GetOrderRequest) (*d
 	// Map Razorpay response to canonical domain type
 	order := &domain.Order{
 		ProviderOrderID: getString(responseMap, "id"),
+		OrderID:         getString(responseMap, "receipt"),
 		AmountMinor:     domain.AmountMinor(getInt64(responseMap, "amount")),
 		Currency:        domain.Currency(getString(responseMap, "currency")),
 		Status:          mapOrderStatus(getString(responseMap, "status")),
 		CreatedAt:       getTime(responseMap, "created_at"),
+		Raw:             rawMapResponse(responseMap),
 	}
 
 	return order, nil
@@ -91,8 +95,8 @@ func (a *Adapter) ListOrderPayments(ctx context.Context, req *domain.ListOrderPa
 	paymentsData, err := a.client.Order.Payments(req.OrderID, nil, nil)
 	if err != nil {
 		// Check if order not found
-		if err.Error() == "Order not found" {
-			return nil, domain.ErrOrderNotFound
+		if isNotFoundError(err) {
+			return nil, fmt.Errorf("order %s not found: %w", req.OrderID, domain.ErrOrderNotFound)
 		}
 		return nil, fmt.Errorf("failed to list order payments: %w", err)
 	}

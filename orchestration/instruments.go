@@ -2,7 +2,6 @@ package orchestration
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/Bytonomics/multipay-adapter/capabilities"
@@ -14,14 +13,18 @@ import (
 
 // InstrumentService orchestrates instrument operations with validation, capability checking, and hooks.
 type InstrumentService struct {
-	resolver  *ports.ProviderRegistry
+	resolver  ports.ProviderResolver
 	validator *capabilities.Validator
 	pipeline  *hooks.Pipeline
 	logger    ports.Logger
+	clock     ports.Clock
 }
 
 // NewInstrumentService constructs an InstrumentService with dependency injection.
-func NewInstrumentService(resolver *ports.ProviderRegistry, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger) *InstrumentService {
+func NewInstrumentService(resolver ports.ProviderResolver, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger, clock ports.Clock) *InstrumentService {
+	if logger == nil {
+		panic("logger is required (cannot be nil)")
+	}
 	wrappedLogger := logging.NewCallerLogger(logger, 2)
 
 	return &InstrumentService{
@@ -29,6 +32,7 @@ func NewInstrumentService(resolver *ports.ProviderRegistry, validator *capabilit
 		validator: validator,
 		pipeline:  pipeline,
 		logger:    wrappedLogger,
+		clock:     clock,
 	}
 }
 
@@ -38,10 +42,7 @@ func (s *InstrumentService) GetInstrument(ctx context.Context, req *domain.GetIn
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	provider, ok := ctx.Value("provider").(domain.Provider)
-	if !ok {
-		return nil, errors.New("provider not found in context")
-	}
+	provider := req.Provider
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapInstrumentFetch)
 	if capErr != nil {
@@ -57,6 +58,7 @@ func (s *InstrumentService) GetInstrument(ctx context.Context, req *domain.GetIn
 		Provider:    provider,
 		RequestType: "GetInstrument",
 		RequestData: req,
+		StartTime:   s.clock.Now(),
 	}
 
 	ctx, hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
@@ -88,10 +90,7 @@ func (s *InstrumentService) ListInstruments(ctx context.Context, req *domain.Lis
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	provider, ok := ctx.Value("provider").(domain.Provider)
-	if !ok {
-		return nil, errors.New("provider not found in context")
-	}
+	provider := req.Provider
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapInstrumentList)
 	if capErr != nil {
@@ -107,6 +106,7 @@ func (s *InstrumentService) ListInstruments(ctx context.Context, req *domain.Lis
 		Provider:    provider,
 		RequestType: "ListInstruments",
 		RequestData: req,
+		StartTime:   s.clock.Now(),
 	}
 
 	ctx, hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
@@ -138,10 +138,7 @@ func (s *InstrumentService) DeleteInstrument(ctx context.Context, req *domain.De
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	provider, ok := ctx.Value("provider").(domain.Provider)
-	if !ok {
-		return nil, errors.New("provider not found in context")
-	}
+	provider := req.Provider
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapInstrumentDelete)
 	if capErr != nil {
@@ -157,6 +154,7 @@ func (s *InstrumentService) DeleteInstrument(ctx context.Context, req *domain.De
 		Provider:    provider,
 		RequestType: "DeleteInstrument",
 		RequestData: req,
+		StartTime:   s.clock.Now(),
 	}
 
 	ctx, hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)

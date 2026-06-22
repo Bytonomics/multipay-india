@@ -21,8 +21,8 @@ func (a *Adapter) GetPayment(ctx context.Context, req *domain.GetPaymentRequest)
 	responseMap, err := a.client.Payment.Fetch(req.PaymentID, nil, nil)
 	if err != nil {
 		// Check if payment not found
-		if err.Error() == "Payment not found" {
-			return nil, domain.ErrPaymentNotFound
+		if isNotFoundError(err) {
+			return nil, fmt.Errorf("payment %s not found: %w", req.PaymentID, domain.ErrPaymentNotFound)
 		}
 		return nil, fmt.Errorf("failed to fetch payment: %w", err)
 	}
@@ -32,9 +32,15 @@ func (a *Adapter) GetPayment(ctx context.Context, req *domain.GetPaymentRequest)
 		ProviderPaymentID: getString(responseMap, "id"),
 		OrderID:           getString(responseMap, "order_id"),
 		AmountMinor:       domain.AmountMinor(getInt64(responseMap, "amount")),
+		Currency:          domain.Currency(getString(responseMap, "currency")),
 		Status:            mapPaymentStatus(getString(responseMap, "status")),
 		PaymentMethod:     getString(responseMap, "method"),
+		IsCaptured:        getBool(responseMap, "captured"),
+		BankReference:     getString(responseMap, "bank_account"),
+		ErrorCode:         getString(responseMap, "error_code"),
+		ErrorMessage:      getString(responseMap, "error_description"),
 		PaymentTime:       getTime(responseMap, "created_at"),
+		Raw:               rawMapResponse(responseMap),
 	}
 
 	return payment, nil
@@ -59,8 +65,8 @@ func (a *Adapter) ListPayments(ctx context.Context, req *domain.ListPaymentsRequ
 	paymentsData, err := a.client.Payment.All(params, nil)
 	if err != nil {
 		// Check if order not found
-		if err.Error() == "Order not found" {
-			return nil, domain.ErrOrderNotFound
+		if isNotFoundError(err) {
+			return nil, fmt.Errorf("order %s not found: %w", req.OrderID, domain.ErrOrderNotFound)
 		}
 		return nil, fmt.Errorf("failed to list payments: %w", err)
 	}
@@ -84,9 +90,15 @@ func (a *Adapter) ListPayments(ctx context.Context, req *domain.ListPaymentsRequ
 			ProviderPaymentID: getString(itemMap, "id"),
 			OrderID:           getString(itemMap, "order_id"),
 			AmountMinor:       domain.AmountMinor(getInt64(itemMap, "amount")),
+			Currency:          domain.Currency(getString(itemMap, "currency")),
 			Status:            mapPaymentStatus(getString(itemMap, "status")),
 			PaymentMethod:     getString(itemMap, "method"),
+			IsCaptured:        getBool(itemMap, "captured"),
+			BankReference:     getString(itemMap, "bank_account"),
+			ErrorCode:         getString(itemMap, "error_code"),
+			ErrorMessage:      getString(itemMap, "error_description"),
 			PaymentTime:       getTime(itemMap, "created_at"),
+			Raw:               rawMapResponse(itemMap),
 		}
 
 		payments = append(payments, payment)
@@ -111,8 +123,8 @@ func (a *Adapter) CapturePayment(ctx context.Context, req *domain.CapturePayment
 	responseMap, err := a.client.Payment.Capture(req.PaymentID, int(req.AmountMinor), nil, nil)
 	if err != nil {
 		// Check if payment not found
-		if err.Error() == "Payment not found" {
-			return nil, domain.ErrPaymentNotFound
+		if isNotFoundError(err) {
+			return nil, fmt.Errorf("payment %s not found: %w", req.PaymentID, domain.ErrPaymentNotFound)
 		}
 		return nil, fmt.Errorf("failed to capture payment: %w", err)
 	}
@@ -122,9 +134,15 @@ func (a *Adapter) CapturePayment(ctx context.Context, req *domain.CapturePayment
 		ProviderPaymentID: getString(responseMap, "id"),
 		OrderID:           getString(responseMap, "order_id"),
 		AmountMinor:       domain.AmountMinor(getInt64(responseMap, "amount")),
+		Currency:          domain.Currency(getString(responseMap, "currency")),
 		Status:            mapPaymentStatus(getString(responseMap, "status")),
 		PaymentMethod:     getString(responseMap, "method"),
+		IsCaptured:        getBool(responseMap, "captured"),
+		BankReference:     getString(responseMap, "bank_account"),
+		ErrorCode:         getString(responseMap, "error_code"),
+		ErrorMessage:      getString(responseMap, "error_description"),
 		PaymentTime:       getTime(responseMap, "created_at"),
+		Raw:               rawMapResponse(responseMap),
 	}
 
 	return payment, nil

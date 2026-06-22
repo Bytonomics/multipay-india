@@ -14,14 +14,18 @@ import (
 // OrderService orchestrates order operations across multiple payment providers.
 // It handles validation, capability checking, and hook execution.
 type OrderService struct {
-	resolver  *ports.ProviderRegistry
+	resolver  ports.ProviderResolver
 	validator *capabilities.Validator
 	pipeline  *hooks.Pipeline
 	logger    ports.Logger
+	clock     ports.Clock
 }
 
 // NewOrderService constructs an OrderService with required dependencies.
-func NewOrderService(resolver *ports.ProviderRegistry, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger) *OrderService {
+func NewOrderService(resolver ports.ProviderResolver, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger, clock ports.Clock) *OrderService {
+	if logger == nil {
+		panic("logger is required (cannot be nil)")
+	}
 	wrappedLogger := logging.NewCallerLogger(logger, 2)
 
 	return &OrderService{
@@ -29,14 +33,17 @@ func NewOrderService(resolver *ports.ProviderRegistry, validator *capabilities.V
 		validator: validator,
 		pipeline:  pipeline,
 		logger:    wrappedLogger,
+		clock:     clock,
 	}
 }
 
 // CreateOrder validates input, checks capability, and creates an order on the payment provider.
-func (s *OrderService) CreateOrder(ctx context.Context, provider domain.Provider, req *domain.CreateOrderRequest) (*domain.Order, error) {
+func (s *OrderService) CreateOrder(ctx context.Context, req *domain.CreateOrderRequest) (*domain.Order, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
+
+	provider := req.Provider
 
 	if err := s.validator.RequireCapability(ctx, provider, capabilities.CapOrderCreate); err != nil {
 		return nil, fmt.Errorf("capability check failed: %w", err)
@@ -51,6 +58,7 @@ func (s *OrderService) CreateOrder(ctx context.Context, provider domain.Provider
 		Provider:    provider,
 		RequestType: "CreateOrder",
 		RequestData: req,
+		StartTime:   s.clock.Now(),
 	}
 
 	ctx, hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
@@ -77,10 +85,12 @@ func (s *OrderService) CreateOrder(ctx context.Context, provider domain.Provider
 }
 
 // GetOrder validates input, checks capability, and retrieves an order from the payment provider.
-func (s *OrderService) GetOrder(ctx context.Context, provider domain.Provider, req *domain.GetOrderRequest) (*domain.Order, error) {
+func (s *OrderService) GetOrder(ctx context.Context, req *domain.GetOrderRequest) (*domain.Order, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
+
+	provider := req.Provider
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapOrderFetch)
 	if capErr != nil {
@@ -96,6 +106,7 @@ func (s *OrderService) GetOrder(ctx context.Context, provider domain.Provider, r
 		Provider:    provider,
 		RequestType: "GetOrder",
 		RequestData: req,
+		StartTime:   s.clock.Now(),
 	}
 
 	ctx, hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
@@ -122,12 +133,14 @@ func (s *OrderService) GetOrder(ctx context.Context, provider domain.Provider, r
 }
 
 // ListOrderPayments validates input, checks capability, and retrieves all payments for an order.
-func (s *OrderService) ListOrderPayments(ctx context.Context, provider domain.Provider, req *domain.ListOrderPaymentsRequest) ([]*domain.Payment, error) {
+func (s *OrderService) ListOrderPayments(ctx context.Context, req *domain.ListOrderPaymentsRequest) ([]*domain.Payment, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapPaymentList)
+	provider := req.Provider
+
+	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapOrderListPayments)
 	if capErr != nil {
 		return nil, fmt.Errorf("capability check failed: %w", capErr)
 	}
@@ -141,6 +154,7 @@ func (s *OrderService) ListOrderPayments(ctx context.Context, provider domain.Pr
 		Provider:    provider,
 		RequestType: "ListOrderPayments",
 		RequestData: req,
+		StartTime:   s.clock.Now(),
 	}
 
 	ctx, hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)

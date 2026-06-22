@@ -2,7 +2,9 @@ package cashfree
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 
 	cf "github.com/cashfree/cashfree_pg"
 
@@ -38,7 +40,8 @@ func createOrder(ctx context.Context, adapter *Adapter, req *domain.CreateOrderR
 
 	// Call Cashfree SDK
 	apiVersion := "2022-09-01"
-	cfOrder, _, err := cf.PGCreateOrder(
+	cfOrder, _, err := cf.PGCreateOrderWithContext(
+		ctx,
 		stringPtr(apiVersion),
 		cfReq,
 		nil, // xRequestId
@@ -76,7 +79,8 @@ func getOrder(ctx context.Context, adapter *Adapter, req *domain.GetOrderRequest
 
 	// Call Cashfree SDK to fetch order
 	apiVersion := "2022-09-01"
-	cfOrder, _, err := cf.PGFetchOrder(
+	cfOrder, _, err := cf.PGFetchOrderWithContext(
+		ctx,
 		stringPtr(apiVersion),
 		req.OrderID,
 		nil, // xRequestId
@@ -117,7 +121,8 @@ func listOrderPayments(ctx context.Context, adapter *Adapter, req *domain.ListOr
 
 	// Call Cashfree SDK to fetch payments for the order
 	apiVersion := "2022-09-01"
-	cfPayments, _, err := cf.PGOrderFetchPayments(
+	cfPayments, _, err := cf.PGOrderFetchPaymentsWithContext(
+		ctx,
 		stringPtr(apiVersion),
 		req.OrderID,
 		nil, // xRequestId
@@ -137,7 +142,7 @@ func listOrderPayments(ctx context.Context, adapter *Adapter, req *domain.ListOr
 	}
 
 	// Map response to canonical types
-	result := make([]*domain.Payment, 0)
+	result := make([]*domain.Payment, 0, len(cfPayments))
 	for i := range cfPayments {
 		cfPayment := &cfPayments[i]
 		payment := MapPaymentEntityToCanonical(cfPayment)
@@ -155,10 +160,13 @@ func stringPtr(s string) *string {
 }
 
 // isNotFoundError checks if an error from Cashfree SDK indicates a 404 not found response.
-// This is a simplified check; in production, you might want more sophisticated error detection.
 func isNotFoundError(err error) bool {
-	// Cashfree SDK typically wraps 404 errors in APIError types.
-	// For now, this is a placeholder. Real implementation would inspect the error type.
-	// In the Cashfree SDK, 404 errors are typically APIError404 types.
-	return false // Placeholder for now
+	var genericErr cf.GenericOpenAPIError
+	if errors.As(err, &genericErr) {
+		// Check HTTP status code or error message for 404 indication
+		// Cashfree returns GenericOpenAPIError with status code in the error string
+		return strings.Contains(strings.ToLower(genericErr.Error()), "404") ||
+			strings.Contains(strings.ToLower(genericErr.Error()), "not found")
+	}
+	return false
 }

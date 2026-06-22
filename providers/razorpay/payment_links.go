@@ -69,6 +69,7 @@ func (a *Adapter) CreatePaymentLink(ctx context.Context, req *domain.CreatePayme
 		Purpose:        getString(responseMap, "description"),
 		Status:         domain.PaymentLinkStatus(getString(responseMap, "status")),
 		CreatedAt:      getTime(responseMap, "created_at"),
+		Raw:            rawMapResponse(responseMap),
 	}
 
 	// Handle optional ExpiryTime field
@@ -94,8 +95,8 @@ func (a *Adapter) GetPaymentLink(ctx context.Context, req *domain.GetPaymentLink
 	responseMap, err := a.client.PaymentLink.Fetch(req.LinkID, nil, nil)
 	if err != nil {
 		// Check if payment link not found
-		if err.Error() == "Payment link not found" {
-			return nil, domain.ErrPaymentLinkNotFound
+		if isNotFoundError(err) {
+			return nil, fmt.Errorf("payment link %s not found: %w", req.LinkID, domain.ErrPaymentLinkNotFound)
 		}
 		return nil, fmt.Errorf("failed to fetch payment link: %w", err)
 	}
@@ -111,6 +112,7 @@ func (a *Adapter) GetPaymentLink(ctx context.Context, req *domain.GetPaymentLink
 		Purpose:        getString(responseMap, "description"),
 		Status:         domain.PaymentLinkStatus(getString(responseMap, "status")),
 		CreatedAt:      getTime(responseMap, "created_at"),
+		Raw:            rawMapResponse(responseMap),
 	}
 
 	// Handle optional ExpiryTime field
@@ -136,8 +138,8 @@ func (a *Adapter) CancelPaymentLink(ctx context.Context, req *domain.CancelPayme
 	responseMap, err := a.client.PaymentLink.Cancel(req.LinkID, nil, nil)
 	if err != nil {
 		// Check if payment link not found
-		if err.Error() == "Payment link not found" {
-			return nil, domain.ErrPaymentLinkNotFound
+		if isNotFoundError(err) {
+			return nil, fmt.Errorf("payment link %s not found: %w", req.LinkID, domain.ErrPaymentLinkNotFound)
 		}
 		return nil, fmt.Errorf("failed to cancel payment link: %w", err)
 	}
@@ -153,6 +155,7 @@ func (a *Adapter) CancelPaymentLink(ctx context.Context, req *domain.CancelPayme
 		Purpose:        getString(responseMap, "description"),
 		Status:         domain.PaymentLinkStatus(getString(responseMap, "status")),
 		CreatedAt:      getTime(responseMap, "created_at"),
+		Raw:            rawMapResponse(responseMap),
 	}
 
 	// Handle optional ExpiryTime field

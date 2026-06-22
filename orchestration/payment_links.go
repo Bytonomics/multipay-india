@@ -2,7 +2,6 @@ package orchestration
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/Bytonomics/multipay-adapter/capabilities"
@@ -14,14 +13,18 @@ import (
 
 // PaymentLinkService orchestrates payment link operations with validation, capability checking, and hooks.
 type PaymentLinkService struct {
-	resolver  *ports.ProviderRegistry
+	resolver  ports.ProviderResolver
 	validator *capabilities.Validator
 	pipeline  *hooks.Pipeline
 	logger    ports.Logger
+	clock     ports.Clock
 }
 
 // NewPaymentLinkService constructs a PaymentLinkService with dependency injection.
-func NewPaymentLinkService(resolver *ports.ProviderRegistry, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger) *PaymentLinkService {
+func NewPaymentLinkService(resolver ports.ProviderResolver, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger, clock ports.Clock) *PaymentLinkService {
+	if logger == nil {
+		panic("logger is required (cannot be nil)")
+	}
 	wrappedLogger := logging.NewCallerLogger(logger, 2)
 
 	return &PaymentLinkService{
@@ -29,6 +32,7 @@ func NewPaymentLinkService(resolver *ports.ProviderRegistry, validator *capabili
 		validator: validator,
 		pipeline:  pipeline,
 		logger:    wrappedLogger,
+		clock:     clock,
 	}
 }
 
@@ -38,10 +42,7 @@ func (s *PaymentLinkService) CreatePaymentLink(ctx context.Context, req *domain.
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	provider, ok := ctx.Value("provider").(domain.Provider)
-	if !ok {
-		return nil, errors.New("provider not found in context")
-	}
+	provider := req.Provider
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapPaymentLinkCreate)
 	if capErr != nil {
@@ -57,6 +58,7 @@ func (s *PaymentLinkService) CreatePaymentLink(ctx context.Context, req *domain.
 		Provider:    provider,
 		RequestType: "CreatePaymentLink",
 		RequestData: req,
+		StartTime:   s.clock.Now(),
 	}
 
 	ctx, hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
@@ -88,10 +90,7 @@ func (s *PaymentLinkService) GetPaymentLink(ctx context.Context, req *domain.Get
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	provider, ok := ctx.Value("provider").(domain.Provider)
-	if !ok {
-		return nil, errors.New("provider not found in context")
-	}
+	provider := req.Provider
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapPaymentLinkFetch)
 	if capErr != nil {
@@ -107,6 +106,7 @@ func (s *PaymentLinkService) GetPaymentLink(ctx context.Context, req *domain.Get
 		Provider:    provider,
 		RequestType: "GetPaymentLink",
 		RequestData: req,
+		StartTime:   s.clock.Now(),
 	}
 
 	ctx, hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
@@ -138,10 +138,7 @@ func (s *PaymentLinkService) CancelPaymentLink(ctx context.Context, req *domain.
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	provider, ok := ctx.Value("provider").(domain.Provider)
-	if !ok {
-		return nil, errors.New("provider not found in context")
-	}
+	provider := req.Provider
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapPaymentLinkCancel)
 	if capErr != nil {
@@ -157,6 +154,7 @@ func (s *PaymentLinkService) CancelPaymentLink(ctx context.Context, req *domain.
 		Provider:    provider,
 		RequestType: "CancelPaymentLink",
 		RequestData: req,
+		StartTime:   s.clock.Now(),
 	}
 
 	ctx, hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)

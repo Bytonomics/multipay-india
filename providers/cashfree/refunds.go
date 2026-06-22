@@ -38,7 +38,8 @@ func createRefund(ctx context.Context, adapter *Adapter, req *domain.CreateRefun
 
 	// Call Cashfree SDK to create refund
 	apiVersion := "2022-09-01"
-	cfRefund, _, err := cf.PGOrderCreateRefund(
+	cfRefund, _, err := cf.PGOrderCreateRefundWithContext(
+		ctx,
 		stringPtr(apiVersion),
 		req.OrderID,
 		cfReq,
@@ -81,7 +82,8 @@ func getRefund(ctx context.Context, adapter *Adapter, req *domain.GetRefundReque
 
 	// Call Cashfree SDK to fetch refund
 	apiVersion := "2022-09-01"
-	cfRefund, _, err := cf.PGOrderFetchRefund(
+	cfRefund, _, err := cf.PGOrderFetchRefundWithContext(
+		ctx,
 		stringPtr(apiVersion),
 		req.OrderID,
 		req.RefundID,
@@ -123,7 +125,8 @@ func listRefunds(ctx context.Context, adapter *Adapter, req *domain.ListRefundsR
 
 	// Call Cashfree SDK to fetch refunds for the order
 	apiVersion := "2022-09-01"
-	cfRefunds, _, err := cf.PGOrderFetchRefunds(
+	cfRefunds, _, err := cf.PGOrderFetchRefundsWithContext(
+		ctx,
 		stringPtr(apiVersion),
 		req.OrderID,
 		nil, // xRequestId
@@ -143,7 +146,7 @@ func listRefunds(ctx context.Context, adapter *Adapter, req *domain.ListRefundsR
 	}
 
 	// Map response to canonical types
-	result := make([]*domain.Refund, 0)
+	result := make([]*domain.Refund, 0, len(cfRefunds))
 	for i := range cfRefunds {
 		cfRefund := &cfRefunds[i]
 		refund := MapRefundEntityToCanonical(cfRefund)

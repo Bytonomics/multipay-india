@@ -31,7 +31,8 @@ func getInstrument(ctx context.Context, adapter *Adapter, req *domain.GetInstrum
 
 	// Call Cashfree SDK to fetch instrument
 	apiVersion := "2022-09-01"
-	cfInstrument, _, err := cf.PGCustomerFetchInstrument(
+	cfInstrument, _, err := cf.PGCustomerFetchInstrumentWithContext(
+		ctx,
 		stringPtr(apiVersion),
 		req.CustomerID,
 		req.InstrumentID,
@@ -73,7 +74,8 @@ func listInstruments(ctx context.Context, adapter *Adapter, req *domain.ListInst
 
 	// Call Cashfree SDK to fetch instruments for the customer
 	apiVersion := "2022-09-01"
-	cfInstruments, _, err := cf.PGCustomerFetchInstruments(
+	cfInstruments, _, err := cf.PGCustomerFetchInstrumentsWithContext(
+		ctx,
 		stringPtr(apiVersion),
 		req.CustomerID,
 		nil, // xRequestId
@@ -94,7 +96,7 @@ func listInstruments(ctx context.Context, adapter *Adapter, req *domain.ListInst
 	}
 
 	// Map response to canonical types
-	result := make([]*domain.Instrument, 0)
+	result := make([]*domain.Instrument, 0, len(cfInstruments))
 	for i := range cfInstruments {
 		cfInstrument := &cfInstruments[i]
 		instrument := MapInstrumentEntityToCanonical(cfInstrument)
@@ -127,7 +129,8 @@ func deleteInstrument(ctx context.Context, adapter *Adapter, req *domain.DeleteI
 
 	// Call Cashfree SDK to delete instrument
 	apiVersion := "2022-09-01"
-	_, _, err := cf.PGCustomerDeleteInstrument(
+	_, _, err := cf.PGCustomerDeleteInstrumentWithContext(
+		ctx,
 		stringPtr(apiVersion),
 		req.CustomerID,
 		req.InstrumentID,

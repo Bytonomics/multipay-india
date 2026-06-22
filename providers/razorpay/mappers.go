@@ -1,8 +1,12 @@
 package razorpay
 
 import (
+	"encoding/json"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/Bytonomics/multipay-adapter/domain"
 )
 
 // getString safely extracts a string value from a map.
@@ -107,4 +111,38 @@ func getTime(m map[string]interface{}, key string) *time.Time {
 	}
 
 	return nil
+}
+
+// rawMapResponse converts a map to a RawProviderResponse (JSON bytes).
+func rawMapResponse(m map[string]interface{}) domain.RawProviderResponse {
+	data, err := json.Marshal(m)
+	if err != nil {
+		// If marshaling fails, return empty response
+		return domain.RawProviderResponse{}
+	}
+	return domain.RawProviderResponse(data)
+}
+
+// getBool safely extracts a bool value from a map.
+// Returns false if the key doesn't exist or the value is not a bool.
+func getBool(m map[string]interface{}, key string) bool {
+	v, ok := m[key]
+	if !ok || v == nil {
+		return false
+	}
+	b, ok := v.(bool)
+	if !ok {
+		return false
+	}
+	return b
+}
+
+// isNotFoundError checks if an error indicates a "not found" condition.
+// This is specific to Razorpay's error response pattern.
+func isNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errMsg := strings.ToLower(err.Error())
+	return strings.Contains(errMsg, "not found")
 }

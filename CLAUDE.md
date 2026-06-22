@@ -1,0 +1,271 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What This Project Is
+
+MultiPay Adapter (`github.com/Bytonomics/multipay-adapter`) is a Go library that provides a single, consistent API
+for integrating multiple Indian payment providers (Cashfree PG and Razorpay). Applications use one API regardless of
+which provider is active, can switch providers without code changes, and handle webhooks with built-in deduplication
+and signature verification.
+
+The library is a **dependency** (imported by other Go projects), not a standalone service.
+
+---
+
+## Build, Test, and Lint Commands
+
+**Never run `go` commands directly. Always use Makefile targets.**
+
+```bash
+make help                    # Show all targets with descriptions
+make check                   # Full pre-commit sequence: format -> build-check -> lint -> test-run
+make build                   # Compile library (go build ./...)
+make build-check             # Verify production + unit + integration code compiles
+make test-run                # Run all unit tests (verbose, output to test-outputs/)
+make test-run RUN=TestMyFunc # Run a single test by name
+make lint                    # Run all linters (golangci-lint with NilAway, goimports, gci)
+make format                  # Auto-format code (gofmt, goimports, gci)
+make unit-test-coverage      # Unit tests with coverage + race detector (pre-commit hook)
+make coverage-html           # Generate HTML coverage report
+make mod-tidy                # Tidy go.mod and go.sum
+make clean                   # Remove build artifacts and test cache
+```
+
+### Pre-commit Hooks
+
+Pre-commit runs 4 hooks in order: gitleaks (secrets) -> build-check -> lint -> unit-test-coverage.
+
+---
+
+## Architecture
+
+### Hexagonal Architecture with Hook Pipeline
+
+```mermaid
+graph TD
+    Caller[Application Code] --> MPC[MultiPayClient]
+    MPC --> OS[OrderService]
+    MPC --> PS[PaymentService]
+    MPC --> RS[RefundService]
+    MPC --> IS[InstrumentService]
+    MPC --> PLS[PaymentLinkService]
+    MPC --> WS[WebhookService]
+    MPC --> CS[CapabilityService]
+
+    subgraph "Orchestration Layer - 7 services"
+        OS --> HP[Hook Pipeline]
+        OS --> CV[Capability Validator]
+        OS --> PR[ProviderResolver]
+        PS --> HP
+        RS --> HP
+        IS --> HP
+        PLS --> HP
+    end
+
+    subgraph "Ports - interfaces"
+        PR --> ProvReg[ProviderRegistry]
+    end
+
+    subgraph "Adapters - implementations"
+        ProvReg --> CFA[CashfreeAdapter]
+        ProvReg --> RZA[RazorpayAdapter]
+    end
+
+    CFA --> CFSDK[cashfree_pg SDK]
+    RZA --> RZSDK[razorpay-go SDK]
+```
+
+### Package Dependency Flow
+
+```
+client/          -> Entry point. Creates MultiPayClient, wires all dependencies.
+                    Only package users import directly.
+
+orchestration/   -> Business logic services (OrderService, PaymentService, etc.)
+                    Depends on: ports/, capabilities/, hooks/, domain/
+
+hooks/           -> Hook pipeline (Before/After/OnError execution with panic recovery)
+                    Built-in: AuditHook, MetricsHook
+                    Depends on: ports/, domain/
+
+capabilities/    -> SupportMatrix (immutable capability lookup), Validator
+                    Depends on: domain/
+
+routing/         -> WebhookHandler (http.Handler), EndpointMatcher, EndpointRegistry
+                    Depends on: ports/, domain/
+
+ports/           -> All interfaces: ProviderAdapter, ProviderResolver, Hook, WebhookStore, Logger, Clock
+                    Depends on: domain/, capabilities/
+
+domain/          -> Zero dependencies. Canonical types, enums, sentinel errors.
+
+providers/       -> Concrete adapter implementations (cashfree/, razorpay/)
+                    Each wraps its official SDK and maps responses to domain types.
+```
+
+### Request Flow Through Orchestration Services
+
+Every service method follows this exact sequence:
+
+```mermaid
+sequenceDiagram
+    participant C as Caller
+    participant S as Service
+    participant V as CapabilityValidator
+    participant R as ProviderResolver
+    participant HP as HookPipeline
+    participant A as ProviderAdapter
+
+    C->>S: method(ctx, req)
+    S->>S: nil check on request
+    S->>V: RequireCapability(provider, cap)
+    V-->>S: nil or CapabilityError
+    S->>R: Resolve(provider)
+    R-->>S: adapter
+    S->>HP: ExecuteBefore(ctx, hookCtx)
+    HP-->>S: modified ctx
+    S->>A: operation(ctx, req)
+    alt success
+        S->>HP: ExecuteAfter(ctx, hookCtx)
+        S-->>C: result, nil
+    else error
+        S->>HP: ExecuteOnError(ctx, hookCtx, err)
+        S-->>C: nil, wrapped error
+    end
+```
+
+### Webhook Processing Flow (8 Steps)
+
+```mermaid
+sequenceDiagram
+    participant PG as Payment Gateway
+    participant WH as WebhookHandler
+    participant EM as EndpointMatcher
+    participant WS as WebhookStore
+    participant A as ProviderAdapter
+    participant H as EventHandler
+
+    PG->>WH: POST /webhooks/{provider}/{accountID}
+    WH->>EM: Match(path) -> provider, accountID
+    WH->>WH: Read body
+    WH->>WS: StoreRawPayload(body)
+    WH->>WS: IsDuplicate(SHA256 of body)
+    alt duplicate
+        WH-->>PG: 200 DUPLICATE_ACK
+    else new event
+        WH->>A: VerifySignature(body, headers)
+        WH->>A: ParseEvent(body, headers)
+        WH->>H: handler(ctx, event)
+        WH->>WS: MarkProcessed(dedupeKey)
+        WH-->>PG: 200 ACK
+    end
+```
+
+---
+
+## Key Design Decisions
+
+### Provider Interface Composition
+
+`ProviderAdapter` is a composed interface embedding 7 sub-interfaces:
+
+```
+ProviderAdapter = OrderProvider + PaymentProvider + RefundProvider +
+                  InstrumentProvider + PaymentLinkProvider +
+                  WebhookConsumerProvider + MetadataMapper +
+                  ProviderName() + ProviderCapabilities()
+```
+
+Each sub-interface is defined separately in `ports/providers.go` so consumers can depend on only what they need.
+
+### Cashfree SDK Thread-Safety Workaround
+
+The Cashfree SDK uses **package-level global variables** (not thread-safe). The adapter uses a package-level
+`sync.Mutex` -- every SDK call locks the mutex, sets globals, calls the SDK, then unlocks. This is a known
+limitation of the upstream SDK.
+
+### Capability Matrix Is Static
+
+`SupportMatrix` is built once at client creation from hardcoded capability maps (verified against vendor SDK
+documentation). It is **immutable** after construction -- no runtime mutations. The matrix includes explicit
+`false` entries for capabilities a provider does NOT support, making the full picture visible.
+
+### Hook Execution Order
+
+- **Before:** FIFO (first registered, first executed). Context threads through all hooks.
+- **After:** LIFO (last registered, first executed). Short-circuits on error.
+- **OnError:** LIFO. All hooks execute even if some fail (no short-circuit). Errors logged, not propagated.
+- All phases have **panic recovery** via `runtime/debug.Stack()`.
+
+---
+
+## Critical Rules
+
+### Logger is Mandatory, Never Optional
+
+All services and handlers that accept `ports.Logger` **MUST** enforce non-nil at construction time with a panic:
+
+```go
+if logger == nil {
+    panic("logger is required (cannot be nil)")
+}
+wrappedLogger := logging.NewCallerLogger(logger, 2)
+```
+
+Never check `if s.logger != nil` in method bodies. Logger is always assumed non-nil after construction.
+
+**Applied to:** All orchestration services, `WebhookHandler`, `AuditHook`, `MetricsHook`.
+
+### Error Handling
+
+- Wrap all errors with `%w` to preserve call stacks
+- Use sentinel errors from `domain/errors.go` (`ErrOrderNotFound`, `ErrProviderError`, etc.)
+- Custom error types (`CapabilityError`, `ProviderAPIError`, `WebhookError`, `HookPanicError`) all implement `Unwrap()` returning the appropriate sentinel
+- Check errors via `errors.Is()` for sentinels, `errors.As()` for typed errors
+- Log OnError hook failures but don't propagate them
+
+### Import Order
+
+Enforced by gci: `stdlib -> external -> github.com/Bytonomics`
+
+---
+
+## Linter Configuration
+
+The project uses a **custom golangci-lint binary** with NilAway (Uber's nil panic detector). Key linters enabled:
+
+| Tier | Linters |
+|------|---------|
+| Nil detection | `nilaway`, `nilerr`, `nilnesserr`, `nilnil` |
+| Bug detection | `errorlint`, `bodyclose`, `errchkjson`, `exhaustive`, `gosec`, `gocritic` |
+| Performance | `prealloc`, `perfsprint`, `unconvert` |
+| Context/Spans | `contextcheck`, `noctx`, `spancheck` |
+| Error wrapping | `wrapcheck` |
+
+**`fatcontext` is intentionally disabled** -- it causes auto-fix to convert `=` to `:=`, introducing variable shadowing in `hooks/pipeline.go`.
+
+**`govet` has `shadow` enabled** -- variable shadowing is a lint error.
+
+---
+
+## Adding a New Provider
+
+1. Create `providers/<name>/adapter.go` implementing `ports.ProviderAdapter`
+2. Create operation files: `orders.go`, `payments.go`, `refunds.go`, `instruments.go`, `payment_links.go`, `webhooks.go`
+3. Create `mappers.go` for SDK type -> domain type conversion
+4. Create `metadata.go` implementing `ports.MetadataMapper`
+5. Add capability entries to `capabilities/matrix.go` in `NewSupportMatrix()`
+6. Register in `client/client.go` via `ClientConfig.Providers`
+
+### Adding a New Orchestration Service Method
+
+Follow the exact pattern in `orchestration/orders.go:CreateOrder`:
+1. Nil check on request
+2. Capability validation via `s.validator.RequireCapability()`
+3. Provider resolution via `s.resolver.Resolve()`
+4. Build `HookContext` with `RequestType`, `RequestData`, `StartTime`
+5. Execute before hooks
+6. Call adapter method
+7. On error: set `hookCtx.Error`, execute OnError hooks, return wrapped error
+8. On success: set `hookCtx.ResponseData`, execute after hooks, return result

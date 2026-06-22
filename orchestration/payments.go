@@ -14,14 +14,18 @@ import (
 // PaymentService orchestrates payment operations across multiple payment providers.
 // It handles validation, capability checking, and hook execution.
 type PaymentService struct {
-	resolver  *ports.ProviderRegistry
+	resolver  ports.ProviderResolver
 	validator *capabilities.Validator
 	pipeline  *hooks.Pipeline
 	logger    ports.Logger
+	clock     ports.Clock
 }
 
 // NewPaymentService constructs a PaymentService with required dependencies.
-func NewPaymentService(resolver *ports.ProviderRegistry, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger) *PaymentService {
+func NewPaymentService(resolver ports.ProviderResolver, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger, clock ports.Clock) *PaymentService {
+	if logger == nil {
+		panic("logger is required (cannot be nil)")
+	}
 	wrappedLogger := logging.NewCallerLogger(logger, 2)
 
 	return &PaymentService{
@@ -29,14 +33,17 @@ func NewPaymentService(resolver *ports.ProviderRegistry, validator *capabilities
 		validator: validator,
 		pipeline:  pipeline,
 		logger:    wrappedLogger,
+		clock:     clock,
 	}
 }
 
 // GetPayment validates input, checks capability, and retrieves a specific payment.
-func (s *PaymentService) GetPayment(ctx context.Context, provider domain.Provider, req *domain.GetPaymentRequest) (*domain.Payment, error) {
+func (s *PaymentService) GetPayment(ctx context.Context, req *domain.GetPaymentRequest) (*domain.Payment, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
+
+	provider := req.Provider
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapPaymentFetch)
 	if capErr != nil {
@@ -52,6 +59,7 @@ func (s *PaymentService) GetPayment(ctx context.Context, provider domain.Provide
 		Provider:    provider,
 		RequestType: "GetPayment",
 		RequestData: req,
+		StartTime:   s.clock.Now(),
 	}
 
 	ctx, hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
@@ -78,10 +86,12 @@ func (s *PaymentService) GetPayment(ctx context.Context, provider domain.Provide
 }
 
 // ListPayments validates input, checks capability, and retrieves all payments for an order.
-func (s *PaymentService) ListPayments(ctx context.Context, provider domain.Provider, req *domain.ListPaymentsRequest) ([]*domain.Payment, error) {
+func (s *PaymentService) ListPayments(ctx context.Context, req *domain.ListPaymentsRequest) ([]*domain.Payment, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
+
+	provider := req.Provider
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapPaymentList)
 	if capErr != nil {
@@ -97,6 +107,7 @@ func (s *PaymentService) ListPayments(ctx context.Context, provider domain.Provi
 		Provider:    provider,
 		RequestType: "ListPayments",
 		RequestData: req,
+		StartTime:   s.clock.Now(),
 	}
 
 	ctx, hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
@@ -124,10 +135,12 @@ func (s *PaymentService) ListPayments(ctx context.Context, provider domain.Provi
 
 // CapturePayment validates input, checks capability, and captures an authorized payment.
 // This operation is capability-gated and only available on providers that support it (e.g., Razorpay).
-func (s *PaymentService) CapturePayment(ctx context.Context, provider domain.Provider, req *domain.CapturePaymentRequest) (*domain.Payment, error) {
+func (s *PaymentService) CapturePayment(ctx context.Context, req *domain.CapturePaymentRequest) (*domain.Payment, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
+
+	provider := req.Provider
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapPaymentCapture)
 	if capErr != nil {
@@ -138,6 +151,7 @@ func (s *PaymentService) CapturePayment(ctx context.Context, provider domain.Pro
 		Provider:    provider,
 		RequestType: "CapturePayment",
 		RequestData: req,
+		StartTime:   s.clock.Now(),
 	}
 
 	ctx, err := s.pipeline.ExecuteBefore(ctx, hookCtx)

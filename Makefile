@@ -166,6 +166,7 @@ setup-custom-lint: ## Force rebuild custom-gcl (use when you want fresh binary)
 .PHONY: setup-safe setup-custom-lint
 build-custom-lint: setup-safe
 
+# NOTE: fatcontext linter is disabled because it causes auto-fix to convert = to := (variable shadowing in hooks/pipeline.go:41)
 format: setup-safe ## Format code with gofmt, goimports, and gci
 	@echo "Formatting code..."
 	@./tools/golangci-lint/custom-gcl run --fix \
@@ -179,7 +180,6 @@ format: setup-safe ## Format code with gofmt, goimports, and gci
 	@gci write --skip-generated -s standard -s default -s "prefix(github.com/Bytonomics)" .
 	@echo "✅ Format complete"
 	@echo ""
-	@echo "NOTE: fatcontext linter is disabled because it causes auto-fix to convert = to := (variable shadowing in hooks/pipeline.go:41)"
 
 lint: lint-go ## Run Go linters
 	@echo "✅ Go lint passed"

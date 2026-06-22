@@ -25,8 +25,8 @@ func (a *Adapter) GetInstrument(ctx context.Context, req *domain.GetInstrumentRe
 	responseMap, err := a.client.Token.Fetch(req.CustomerID, req.InstrumentID, nil, nil)
 	if err != nil {
 		// Check if token not found
-		if err.Error() == "Token not found" {
-			return nil, domain.ErrInstrumentNotFound
+		if isNotFoundError(err) {
+			return nil, fmt.Errorf("instrument %s not found: %w", req.InstrumentID, domain.ErrInstrumentNotFound)
 		}
 		return nil, fmt.Errorf("failed to fetch instrument: %w", err)
 	}
@@ -36,7 +36,10 @@ func (a *Adapter) GetInstrument(ctx context.Context, req *domain.GetInstrumentRe
 		InstrumentID:   getString(responseMap, "id"),
 		CustomerID:     getString(responseMap, "customer_id"),
 		InstrumentType: getString(responseMap, "method"), // Razorpay uses "method" field for instrument type
+		DisplayValue:   getString(responseMap, "display_value"),
+		Status:         getString(responseMap, "status"),
 		CreatedAt:      getTime(responseMap, "created_at"),
+		Raw:            rawMapResponse(responseMap),
 	}
 
 	return instrument, nil
@@ -60,7 +63,7 @@ func (a *Adapter) ListInstruments(ctx context.Context, req *domain.ListInstrumen
 	tokensData, err := a.client.Token.All(req.CustomerID, params, nil)
 	if err != nil {
 		// Check if customer not found
-		if err.Error() == "Customer not found" {
+		if isNotFoundError(err) {
 			return nil, domain.ErrInvalidRequest
 		}
 		return nil, fmt.Errorf("failed to list instruments: %w", err)
@@ -85,7 +88,10 @@ func (a *Adapter) ListInstruments(ctx context.Context, req *domain.ListInstrumen
 			InstrumentID:   getString(itemMap, "id"),
 			CustomerID:     getString(itemMap, "customer_id"),
 			InstrumentType: getString(itemMap, "method"), // Razorpay uses "method" field for instrument type
+			DisplayValue:   getString(itemMap, "display_value"),
+			Status:         getString(itemMap, "status"),
 			CreatedAt:      getTime(itemMap, "created_at"),
+			Raw:            rawMapResponse(itemMap),
 		}
 
 		instruments = append(instruments, instrument)
@@ -112,8 +118,8 @@ func (a *Adapter) DeleteInstrument(ctx context.Context, req *domain.DeleteInstru
 	responseMap, err := a.client.Token.Delete(req.CustomerID, req.InstrumentID, nil, nil)
 	if err != nil {
 		// Check if token not found
-		if err.Error() == "Token not found" {
-			return nil, domain.ErrInstrumentNotFound
+		if isNotFoundError(err) {
+			return nil, fmt.Errorf("instrument %s not found: %w", req.InstrumentID, domain.ErrInstrumentNotFound)
 		}
 		return nil, fmt.Errorf("failed to delete instrument: %w", err)
 	}
@@ -123,7 +129,10 @@ func (a *Adapter) DeleteInstrument(ctx context.Context, req *domain.DeleteInstru
 		InstrumentID:   getString(responseMap, "id"),
 		CustomerID:     getString(responseMap, "customer_id"),
 		InstrumentType: getString(responseMap, "method"), // Razorpay uses "method" field for instrument type
+		DisplayValue:   getString(responseMap, "display_value"),
+		Status:         getString(responseMap, "status"),
 		CreatedAt:      getTime(responseMap, "created_at"),
+		Raw:            rawMapResponse(responseMap),
 	}
 
 	return instrument, nil

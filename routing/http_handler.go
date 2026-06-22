@@ -5,10 +5,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 
+	"github.com/Bytonomics/multipay-adapter/domain"
 	"github.com/Bytonomics/multipay-adapter/logging"
 	"github.com/Bytonomics/multipay-adapter/ports"
 )
@@ -33,6 +35,9 @@ func NewWebhookHandler(
 	resolver *ports.ProviderRegistry,
 	logger ports.Logger,
 ) *WebhookHandler {
+	if logger == nil {
+		panic("logger is required (cannot be nil)")
+	}
 	// Wrap the logger to automatically capture caller information
 	wrappedLogger := logging.NewCallerLogger(logger, 2)
 
@@ -75,6 +80,13 @@ func (h *WebhookHandler) RegisterEventHandler(eventType string, handler WebhookE
 func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	if r.Method != http.MethodPost {
+		if err := respondError(ctx, h.logger, w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "only POST is accepted"); err != nil {
+			h.logger.Error(ctx, "failed to send method not allowed response", "error", err.Error())
+		}
+		return
+	}
+
 	// 1. Match endpoint to extract provider and accountID from path
 	provider, accountID, ok := h.matcher.Match(r.URL.Path)
 	if !ok {
@@ -89,9 +101,7 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		if respErr := respondError(ctx, h.logger, w, http.StatusBadRequest, "READ_BODY_FAILED", "Failed to read request body"); respErr != nil {
-			if h.logger != nil {
-				h.logger.Error(ctx, "failed to send error response after body read failure", "error", respErr.Error())
-			}
+			h.logger.Error(ctx, "failed to send error response after body read failure", "error", respErr.Error())
 		}
 		return
 	}
@@ -104,9 +114,7 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if storeErr := h.store.StoreRawPayload(ctx, provider, accountID, body); storeErr != nil {
 			// Log but don't fail - storage is best-effort
 			if respErr := respondError(ctx, h.logger, w, http.StatusInternalServerError, "STORAGE_ERROR", "Failed to store webhook payload"); respErr != nil {
-				if h.logger != nil {
-					h.logger.Error(ctx, "failed to send storage error response", "error", respErr.Error())
-				}
+				h.logger.Error(ctx, "failed to send storage error response", "error", respErr.Error())
 			}
 			return
 		}
@@ -116,9 +124,7 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if dedupErr != nil {
 			// Log but don't fail - dedup check is best-effort
 			if respErr := respondError(ctx, h.logger, w, http.StatusInternalServerError, "DEDUP_ERROR", "Failed to check for duplicates"); respErr != nil {
-				if h.logger != nil {
-					h.logger.Error(ctx, "failed to send dedup error response", "error", respErr.Error())
-				}
+				h.logger.Error(ctx, "failed to send dedup error response", "error", respErr.Error())
 			}
 			return
 		}
@@ -126,9 +132,7 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if isDuplicate {
 			// Duplicate webhook - return 200 ACK immediately (idempotent)
 			if err := respondSuccess(ctx, h.logger, w, "DUPLICATE_ACK", "Duplicate webhook, acknowledged"); err != nil {
-				if h.logger != nil {
-					h.logger.Error(ctx, "failed to send duplicate ack response", "error", err.Error())
-				}
+				h.logger.Error(ctx, "failed to send duplicate ack response", "error", err.Error())
 			}
 			return
 		}
@@ -138,9 +142,7 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	adapter, resolveErr := h.resolver.Resolve(ctx, provider)
 	if resolveErr != nil {
 		if respErr := respondError(ctx, h.logger, w, http.StatusBadRequest, "PROVIDER_NOT_FOUND", fmt.Sprintf("Provider %s not found", provider)); respErr != nil {
-			if h.logger != nil {
-				h.logger.Error(ctx, "failed to send provider not found response", "error", respErr.Error())
-			}
+			h.logger.Error(ctx, "failed to send provider not found response", "error", respErr.Error())
 		}
 		return
 	}
@@ -155,9 +157,13 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// 6. Verify signature
 	if verifyErr := adapter.VerifySignature(ctx, body, headers); verifyErr != nil {
-		if respErr := respondError(ctx, h.logger, w, http.StatusBadRequest, "SIGNATURE_INVALID", "Webhook signature verification failed"); respErr != nil {
-			if h.logger != nil {
-				h.logger.Error(ctx, "failed to send signature invalid response", "error", respErr.Error())
+		if errors.Is(verifyErr, domain.ErrWebhookVerificationFailed) {
+			if err := respondError(ctx, h.logger, w, http.StatusBadRequest, "SIGNATURE_INVALID", "Webhook signature verification failed"); err != nil {
+				h.logger.Error(ctx, "failed to send signature invalid response", "error", err.Error())
+			}
+		} else {
+			if err := respondError(ctx, h.logger, w, http.StatusInternalServerError, "VERIFICATION_ERROR", "Webhook verification error"); err != nil {
+				h.logger.Error(ctx, "failed to send verification error response", "error", err.Error())
 			}
 		}
 		return
@@ -167,9 +173,7 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	event, parseErr := adapter.ParseEvent(ctx, body, headers)
 	if parseErr != nil {
 		if respErr := respondError(ctx, h.logger, w, http.StatusBadRequest, "PARSE_ERROR", "Failed to parse webhook event"); respErr != nil {
-			if h.logger != nil {
-				h.logger.Error(ctx, "failed to send parse error response", "error", respErr.Error())
-			}
+			h.logger.Error(ctx, "failed to send parse error response", "error", respErr.Error())
 		}
 		return
 	}
@@ -180,9 +184,7 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		// No handler registered for this event type - acknowledge gracefully (202 Accepted)
 		if err := respondAccepted(ctx, h.logger, w); err != nil {
-			if h.logger != nil {
-				h.logger.Error(ctx, "failed to send accepted response for unregistered event type", "error", err.Error(), "eventType", eventTypeStr)
-			}
+			h.logger.Error(ctx, "failed to send accepted response for unregistered event type", "error", err.Error(), "eventType", eventTypeStr)
 		}
 		return
 	}
@@ -190,9 +192,7 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Execute handler
 	if err := handler(ctx, event); err != nil {
 		if respErr := respondError(ctx, h.logger, w, http.StatusInternalServerError, "HANDLER_ERROR", "Failed to process webhook event"); respErr != nil {
-			if h.logger != nil {
-				h.logger.Error(ctx, "failed to send handler error response", "error", respErr.Error())
-			}
+			h.logger.Error(ctx, "failed to send handler error response", "error", respErr.Error())
 		}
 		return
 	}
@@ -203,17 +203,13 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if markErr := h.store.MarkProcessed(ctx, provider, accountID, dedupeKey); markErr != nil {
 			// Log marking error but don't fail - the event was already processed successfully
 			// Returning 200 to prevent retries since processing completed
-			if h.logger != nil {
-				h.logger.Error(ctx, "failed to mark webhook as processed", "error", markErr.Error(), "provider", provider, "accountID", accountID)
-			}
+			h.logger.Error(ctx, "failed to mark webhook as processed", "error", markErr.Error(), "provider", provider, "accountID", accountID)
 		}
 	}
 
 	// Success
 	if err := respondSuccess(ctx, h.logger, w, "ACK", "Webhook processed successfully"); err != nil {
-		if h.logger != nil {
-			h.logger.Error(ctx, "failed to send success response", "error", err.Error())
-		}
+		h.logger.Error(ctx, "failed to send success response", "error", err.Error())
 	}
 }
 
@@ -234,9 +230,8 @@ func respondError(ctx context.Context, logger ports.Logger, w http.ResponseWrite
 		"code":    errCode,
 		"message": message,
 	}); err != nil {
-		if logger != nil {
-			logger.Error(ctx, "failed to encode error response in respondError", "error", err.Error(), "statusCode", statusCode, "errCode", errCode)
-		}
+		logger.Error(ctx, "failed to encode error response in respondError", "error", err.Error(), "statusCode", statusCode, "errCode", errCode)
+
 		return fmt.Errorf("encode error response: %w", err)
 	}
 	return nil
@@ -252,9 +247,8 @@ func respondSuccess(ctx context.Context, logger ports.Logger, w http.ResponseWri
 		"code":    code,
 		"message": message,
 	}); err != nil {
-		if logger != nil {
-			logger.Error(ctx, "failed to encode success response in respondSuccess", "error", err.Error(), "code", code)
-		}
+		logger.Error(ctx, "failed to encode success response in respondSuccess", "error", err.Error(), "code", code)
+
 		return fmt.Errorf("encode success response: %w", err)
 	}
 	return nil
@@ -270,9 +264,7 @@ func respondAccepted(ctx context.Context, logger ports.Logger, w http.ResponseWr
 		"code":    "ACCEPTED",
 		"message": "Event accepted but not yet processed",
 	}); err != nil {
-		if logger != nil {
-			logger.Error(ctx, "failed to encode accepted response in respondAccepted", "error", err.Error())
-		}
+		logger.Error(ctx, "failed to encode accepted response in respondAccepted", "error", err.Error())
 		return fmt.Errorf("encode accepted response: %w", err)
 	}
 	return nil

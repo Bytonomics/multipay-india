@@ -38,7 +38,8 @@ func createPaymentLink(ctx context.Context, adapter *Adapter, req *domain.Create
 
 	// Call Cashfree SDK
 	apiVersion := "2022-09-01"
-	cfLink, _, err := cf.PGCreateLink(
+	cfLink, _, err := cf.PGCreateLinkWithContext(
+		ctx,
 		stringPtr(apiVersion),
 		cfReq,
 		nil, // xRequestId
@@ -76,7 +77,8 @@ func getPaymentLink(ctx context.Context, adapter *Adapter, req *domain.GetPaymen
 
 	// Call Cashfree SDK to fetch payment link
 	apiVersion := "2022-09-01"
-	cfLink, _, err := cf.PGFetchLink(
+	cfLink, _, err := cf.PGFetchLinkWithContext(
+		ctx,
 		stringPtr(apiVersion),
 		req.LinkID,
 		nil, // xRequestId
@@ -118,7 +120,8 @@ func cancelPaymentLink(ctx context.Context, adapter *Adapter, req *domain.Cancel
 
 	// Call Cashfree SDK to cancel payment link
 	apiVersion := "2022-09-01"
-	cfLink, _, err := cf.PGCancelLink(
+	cfLink, _, err := cf.PGCancelLinkWithContext(
+		ctx,
 		stringPtr(apiVersion),
 		req.LinkID,
 		nil, // xRequestId

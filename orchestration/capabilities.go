@@ -45,6 +45,7 @@ func (s *CapabilityService) AllCapabilities(ctx context.Context, provider domain
 		// Core shared capabilities
 		capabilities.CapOrderCreate,
 		capabilities.CapOrderFetch,
+		capabilities.CapOrderListPayments,
 		capabilities.CapPaymentFetch,
 		capabilities.CapPaymentList,
 		capabilities.CapPaymentPay,
@@ -57,12 +58,14 @@ func (s *CapabilityService) AllCapabilities(ctx context.Context, provider domain
 		capabilities.CapPaymentLinkCreate,
 		capabilities.CapPaymentLinkFetch,
 		capabilities.CapPaymentLinkCancel,
+		capabilities.CapWebhookConsume,
 
 		// Cashfree-specific capabilities
 		capabilities.CapInstrumentCryptogram,
 		capabilities.CapOfferCreate,
 		capabilities.CapOfferFetch,
 		capabilities.CapEligibilityFetch,
+		capabilities.CapPaymentLinkListOrders,
 
 		// Razorpay-specific capabilities
 		capabilities.CapOrderUpdate,
@@ -89,6 +92,18 @@ func (s *CapabilityService) AllCapabilities(ctx context.Context, provider domain
 		capabilities.CapPaymentLinkList,
 		capabilities.CapUPICreate,
 		capabilities.CapVPAValidate,
+
+		// Settlement capabilities
+		capabilities.CapSettlementOrderFetch,
+		capabilities.CapSettlementList,
+		capabilities.CapSettlementReconFetch,
+		capabilities.CapReconFetch,
+		capabilities.CapSettlementAll,
+		capabilities.CapSettlementFetch,
+		capabilities.CapSettlementReports,
+		capabilities.CapSettlementOnDemandCreate,
+		capabilities.CapSettlementOnDemandFetch,
+		capabilities.CapSettlementOnDemandList,
 	}
 
 	// Filter to only those supported by this provider

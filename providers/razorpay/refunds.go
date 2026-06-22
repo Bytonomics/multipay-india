@@ -46,10 +46,16 @@ func (a *Adapter) CreateRefund(ctx context.Context, req *domain.CreateRefundRequ
 	// Map Razorpay response to canonical domain type
 	refund := &domain.Refund{
 		ProviderRefundID: getString(responseMap, "id"),
+		PaymentID:        getString(responseMap, "payment_id"),
 		OrderID:          getString(responseMap, "payment_id"), // Razorpay returns payment_id, map to OrderID for domain
 		AmountMinor:      domain.AmountMinor(getInt64(responseMap, "amount")),
+		Currency:         domain.Currency(getString(responseMap, "currency")),
+		Reason:           getString(responseMap, "notes"),
+		ARN:              getString(responseMap, "arn"),
 		Status:           mapRefundStatus(getString(responseMap, "status")),
 		CreatedAt:        getTime(responseMap, "created_at"),
+		ProcessedAt:      getTime(responseMap, "receipt_time"),
+		Raw:              rawMapResponse(responseMap),
 	}
 
 	return refund, nil
@@ -69,8 +75,8 @@ func (a *Adapter) GetRefund(ctx context.Context, req *domain.GetRefundRequest) (
 	responseMap, err := a.client.Refund.Fetch(req.RefundID, nil, nil)
 	if err != nil {
 		// Check if refund not found
-		if err.Error() == "Refund not found" {
-			return nil, domain.ErrRefundNotFound
+		if isNotFoundError(err) {
+			return nil, fmt.Errorf("refund %s not found: %w", req.RefundID, domain.ErrRefundNotFound)
 		}
 		return nil, fmt.Errorf("failed to fetch refund: %w", err)
 	}
@@ -78,10 +84,16 @@ func (a *Adapter) GetRefund(ctx context.Context, req *domain.GetRefundRequest) (
 	// Map Razorpay response to canonical domain type
 	refund := &domain.Refund{
 		ProviderRefundID: getString(responseMap, "id"),
+		PaymentID:        getString(responseMap, "payment_id"),
 		OrderID:          getString(responseMap, "payment_id"), // Razorpay returns payment_id, map to OrderID for domain
 		AmountMinor:      domain.AmountMinor(getInt64(responseMap, "amount")),
+		Currency:         domain.Currency(getString(responseMap, "currency")),
+		Reason:           getString(responseMap, "notes"),
+		ARN:              getString(responseMap, "arn"),
 		Status:           mapRefundStatus(getString(responseMap, "status")),
 		CreatedAt:        getTime(responseMap, "created_at"),
+		ProcessedAt:      getTime(responseMap, "receipt_time"),
+		Raw:              rawMapResponse(responseMap),
 	}
 
 	return refund, nil
@@ -107,8 +119,8 @@ func (a *Adapter) ListRefunds(ctx context.Context, req *domain.ListRefundsReques
 	refundsData, err := a.client.Refund.All(params, nil)
 	if err != nil {
 		// Check if payment not found
-		if err.Error() == "Payment not found" {
-			return nil, domain.ErrPaymentNotFound
+		if isNotFoundError(err) {
+			return nil, fmt.Errorf("payment %s not found: %w", req.OrderID, domain.ErrPaymentNotFound)
 		}
 		return nil, fmt.Errorf("failed to list refunds: %w", err)
 	}
@@ -130,10 +142,16 @@ func (a *Adapter) ListRefunds(ctx context.Context, req *domain.ListRefundsReques
 
 		refund := &domain.Refund{
 			ProviderRefundID: getString(itemMap, "id"),
+			PaymentID:        getString(itemMap, "payment_id"),
 			OrderID:          getString(itemMap, "payment_id"), // Razorpay returns payment_id, map to OrderID for domain
 			AmountMinor:      domain.AmountMinor(getInt64(itemMap, "amount")),
+			Currency:         domain.Currency(getString(itemMap, "currency")),
+			Reason:           getString(itemMap, "notes"),
+			ARN:              getString(itemMap, "arn"),
 			Status:           mapRefundStatus(getString(itemMap, "status")),
 			CreatedAt:        getTime(itemMap, "created_at"),
+			ProcessedAt:      getTime(itemMap, "receipt_time"),
+			Raw:              rawMapResponse(itemMap),
 		}
 
 		refunds = append(refunds, refund)
