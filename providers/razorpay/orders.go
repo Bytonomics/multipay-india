@@ -42,6 +42,16 @@ func (a *Adapter) CreateOrder(ctx context.Context, req *domain.CreateOrderReques
 		Status:          mapOrderStatus(getString(responseMap, "status")),
 		CreatedAt:       getTime(responseMap, "created_at"),
 		Raw:             rawMapResponse(responseMap),
+		ProviderDetails: &domain.OrderProviderDetail{
+			Razorpay: &domain.RazorpayOrderDetail{
+				Entity:     getString(responseMap, "entity"),
+				Receipt:    getString(responseMap, "receipt"),
+				OfferID:    getString(responseMap, "offer_id"),
+				AmountPaid: getInt64(responseMap, "amount_paid"),
+				AmountDue:  getInt64(responseMap, "amount_due"),
+				Attempts:   getInt64(responseMap, "attempts"),
+			},
+		},
 	}
 
 	return order, nil
@@ -76,6 +86,16 @@ func (a *Adapter) GetOrder(ctx context.Context, req *domain.GetOrderRequest) (*d
 		Status:          mapOrderStatus(getString(responseMap, "status")),
 		CreatedAt:       getTime(responseMap, "created_at"),
 		Raw:             rawMapResponse(responseMap),
+		ProviderDetails: &domain.OrderProviderDetail{
+			Razorpay: &domain.RazorpayOrderDetail{
+				Entity:     getString(responseMap, "entity"),
+				Receipt:    getString(responseMap, "receipt"),
+				OfferID:    getString(responseMap, "offer_id"),
+				AmountPaid: getInt64(responseMap, "amount_paid"),
+				AmountDue:  getInt64(responseMap, "amount_due"),
+				Attempts:   getInt64(responseMap, "attempts"),
+			},
+		},
 	}
 
 	return order, nil
@@ -128,9 +148,44 @@ func (a *Adapter) ListOrderPayments(ctx context.Context, req *domain.ListOrderPa
 			ProviderPaymentID: getString(itemMap, "id"),
 			OrderID:           getString(itemMap, "order_id"),
 			AmountMinor:       domain.AmountMinor(getInt64(itemMap, "amount")),
+			Currency:          domain.Currency(getString(itemMap, "currency")),
 			Status:            mapPaymentStatus(getString(itemMap, "status")),
 			PaymentMethod:     getString(itemMap, "method"),
+			IsCaptured:        getBool(itemMap, "captured"),
+			BankReference:     getString(itemMap, "bank_account"),
+			ErrorCode:         getString(itemMap, "error_code"),
+			ErrorMessage:      getString(itemMap, "error_description"),
 			PaymentTime:       getTime(itemMap, "created_at"),
+			Raw:               rawMapResponse(itemMap),
+			ProviderDetails: &domain.PaymentProviderDetail{
+				Razorpay: &domain.RazorpayPaymentDetail{
+					Entity:         getString(itemMap, "entity"),
+					Description:    getString(itemMap, "description"),
+					Email:          getString(itemMap, "email"),
+					Contact:        getString(itemMap, "contact"),
+					Fee:            getInt64(itemMap, "fee"),
+					Tax:            getInt64(itemMap, "tax"),
+					AmountRefunded: getInt64(itemMap, "amount_refunded"),
+					RefundStatus:   getString(itemMap, "refund_status"),
+					International:  getBool(itemMap, "international"),
+					CardID:         getString(itemMap, "card_id"),
+					Bank:           getString(itemMap, "bank"),
+					VPA:            getString(itemMap, "vpa"),
+					Wallet:         getString(itemMap, "wallet"),
+					ErrorSource:    getString(itemMap, "error_source"),
+					ErrorStep:      getString(itemMap, "error_step"),
+					ErrorReason:    getString(itemMap, "error_reason"),
+				},
+			},
+		}
+
+		// Populate acquirer_data if present
+		if acqData := getMap(itemMap, "acquirer_data"); len(acqData) > 0 {
+			payment.ProviderDetails.Razorpay.AcquirerData = &domain.RazorpayAcquirerData{
+				BankTransactionID: getString(acqData, "bank_transaction_id"),
+				AuthCode:          getString(acqData, "auth_code"),
+				RRN:               getString(acqData, "rrn"),
+			}
 		}
 
 		payments = append(payments, payment)

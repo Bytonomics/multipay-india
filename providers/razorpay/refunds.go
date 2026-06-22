@@ -56,6 +56,23 @@ func (a *Adapter) CreateRefund(ctx context.Context, req *domain.CreateRefundRequ
 		CreatedAt:        getTime(responseMap, "created_at"),
 		ProcessedAt:      getTime(responseMap, "receipt_time"),
 		Raw:              rawMapResponse(responseMap),
+		ProviderDetails: &domain.RefundProviderDetail{
+			Razorpay: &domain.RazorpayRefundDetail{
+				Entity:         getString(responseMap, "entity"),
+				Receipt:        getString(responseMap, "receipt"),
+				SpeedRequested: getString(responseMap, "speed_requested"),
+				SpeedProcessed: getString(responseMap, "speed_processed"),
+				BatchID:        getString(responseMap, "batch_id"),
+			},
+		},
+	}
+
+	if acqData := getMap(responseMap, "acquirer_data"); len(acqData) > 0 {
+		refund.ProviderDetails.Razorpay.AcquirerData = &domain.RazorpayAcquirerData{
+			BankTransactionID: getString(acqData, "bank_transaction_id"),
+			AuthCode:          getString(acqData, "auth_code"),
+			RRN:               getString(acqData, "rrn"),
+		}
 	}
 
 	return refund, nil
@@ -94,6 +111,23 @@ func (a *Adapter) GetRefund(ctx context.Context, req *domain.GetRefundRequest) (
 		CreatedAt:        getTime(responseMap, "created_at"),
 		ProcessedAt:      getTime(responseMap, "receipt_time"),
 		Raw:              rawMapResponse(responseMap),
+		ProviderDetails: &domain.RefundProviderDetail{
+			Razorpay: &domain.RazorpayRefundDetail{
+				Entity:         getString(responseMap, "entity"),
+				Receipt:        getString(responseMap, "receipt"),
+				SpeedRequested: getString(responseMap, "speed_requested"),
+				SpeedProcessed: getString(responseMap, "speed_processed"),
+				BatchID:        getString(responseMap, "batch_id"),
+			},
+		},
+	}
+
+	if acqData := getMap(responseMap, "acquirer_data"); len(acqData) > 0 {
+		refund.ProviderDetails.Razorpay.AcquirerData = &domain.RazorpayAcquirerData{
+			BankTransactionID: getString(acqData, "bank_transaction_id"),
+			AuthCode:          getString(acqData, "auth_code"),
+			RRN:               getString(acqData, "rrn"),
+		}
 	}
 
 	return refund, nil
@@ -152,6 +186,23 @@ func (a *Adapter) ListRefunds(ctx context.Context, req *domain.ListRefundsReques
 			CreatedAt:        getTime(itemMap, "created_at"),
 			ProcessedAt:      getTime(itemMap, "receipt_time"),
 			Raw:              rawMapResponse(itemMap),
+			ProviderDetails: &domain.RefundProviderDetail{
+				Razorpay: &domain.RazorpayRefundDetail{
+					Entity:         getString(itemMap, "entity"),
+					Receipt:        getString(itemMap, "receipt"),
+					SpeedRequested: getString(itemMap, "speed_requested"),
+					SpeedProcessed: getString(itemMap, "speed_processed"),
+					BatchID:        getString(itemMap, "batch_id"),
+				},
+			},
+		}
+
+		if acqData := getMap(itemMap, "acquirer_data"); len(acqData) > 0 {
+			refund.ProviderDetails.Razorpay.AcquirerData = &domain.RazorpayAcquirerData{
+				BankTransactionID: getString(acqData, "bank_transaction_id"),
+				AuthCode:          getString(acqData, "auth_code"),
+				RRN:               getString(acqData, "rrn"),
+			}
 		}
 
 		refunds = append(refunds, refund)

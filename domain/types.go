@@ -33,17 +33,18 @@ type CreateOrderRequest struct {
 }
 
 type Order struct {
-	ProviderOrderID string              `json:"provider_order_id"`
-	OrderID         string              `json:"order_id"`
-	Status          OrderStatus         `json:"status"`
-	AmountMinor     AmountMinor         `json:"amount_minor"`
-	Currency        Currency            `json:"currency"`
-	SessionID       string              `json:"session_id,omitempty"`
-	ExpiryTime      *time.Time          `json:"expiry_time,omitempty"`
-	CreatedAt       *time.Time          `json:"created_at,omitempty"`
-	Customer        *CustomerInfo       `json:"customer,omitempty"`
-	Metadata        Metadata            `json:"metadata,omitempty"`
-	Raw             RawProviderResponse `json:"raw,omitempty"`
+	ProviderOrderID string               `json:"provider_order_id"`
+	OrderID         string               `json:"order_id"`
+	Status          OrderStatus          `json:"status"`
+	AmountMinor     AmountMinor          `json:"amount_minor"`
+	Currency        Currency             `json:"currency"`
+	SessionID       string               `json:"session_id,omitempty"`
+	ExpiryTime      *time.Time           `json:"expiry_time,omitempty"`
+	CreatedAt       *time.Time           `json:"created_at,omitempty"`
+	Customer        *CustomerInfo        `json:"customer,omitempty"`
+	Metadata        Metadata             `json:"metadata,omitempty"`
+	ProviderDetails *OrderProviderDetail `json:"provider_details,omitempty"`
+	Raw             RawProviderResponse  `json:"raw,omitempty"`
 }
 
 type GetOrderRequest struct {
@@ -57,20 +58,21 @@ type ListOrderPaymentsRequest struct {
 // --- Payment types ---
 
 type Payment struct {
-	ProviderPaymentID string              `json:"provider_payment_id"`
-	OrderID           string              `json:"order_id,omitempty"`
-	Status            PaymentStatus       `json:"status"`
-	AmountMinor       AmountMinor         `json:"amount_minor"`
-	Currency          Currency            `json:"currency,omitempty"`
-	PaymentGroup      string              `json:"payment_group,omitempty"`
-	PaymentMethod     string              `json:"payment_method,omitempty"`
-	PaymentTime       *time.Time          `json:"payment_time,omitempty"`
-	CompletionTime    *time.Time          `json:"completion_time,omitempty"`
-	IsCaptured        bool                `json:"is_captured"`
-	BankReference     string              `json:"bank_reference,omitempty"`
-	ErrorCode         string              `json:"error_code,omitempty"`
-	ErrorMessage      string              `json:"error_message,omitempty"`
-	Raw               RawProviderResponse `json:"raw,omitempty"`
+	ProviderPaymentID string                 `json:"provider_payment_id"`
+	OrderID           string                 `json:"order_id,omitempty"`
+	Status            PaymentStatus          `json:"status"`
+	AmountMinor       AmountMinor            `json:"amount_minor"`
+	Currency          Currency               `json:"currency,omitempty"`
+	PaymentGroup      string                 `json:"payment_group,omitempty"`
+	PaymentMethod     string                 `json:"payment_method,omitempty"`
+	PaymentTime       *time.Time             `json:"payment_time,omitempty"`
+	CompletionTime    *time.Time             `json:"completion_time,omitempty"`
+	IsCaptured        bool                   `json:"is_captured"`
+	BankReference     string                 `json:"bank_reference,omitempty"`
+	ErrorCode         string                 `json:"error_code,omitempty"`
+	ErrorMessage      string                 `json:"error_message,omitempty"`
+	ProviderDetails   *PaymentProviderDetail `json:"provider_details,omitempty"`
+	Raw               RawProviderResponse    `json:"raw,omitempty"`
 }
 
 type GetPaymentRequest struct {
@@ -101,18 +103,19 @@ type CreateRefundRequest struct {
 }
 
 type Refund struct {
-	ProviderRefundID string              `json:"provider_refund_id"`
-	RefundID         string              `json:"refund_id,omitempty"`
-	OrderID          string              `json:"order_id,omitempty"`
-	PaymentID        string              `json:"payment_id,omitempty"`
-	Status           RefundStatus        `json:"status"`
-	AmountMinor      AmountMinor         `json:"amount_minor"`
-	Currency         Currency            `json:"currency,omitempty"`
-	Reason           string              `json:"reason,omitempty"`
-	ARN              string              `json:"arn,omitempty"`
-	CreatedAt        *time.Time          `json:"created_at,omitempty"`
-	ProcessedAt      *time.Time          `json:"processed_at,omitempty"`
-	Raw              RawProviderResponse `json:"raw,omitempty"`
+	ProviderRefundID string                `json:"provider_refund_id"`
+	RefundID         string                `json:"refund_id,omitempty"`
+	OrderID          string                `json:"order_id,omitempty"`
+	PaymentID        string                `json:"payment_id,omitempty"`
+	Status           RefundStatus          `json:"status"`
+	AmountMinor      AmountMinor           `json:"amount_minor"`
+	Currency         Currency              `json:"currency,omitempty"`
+	Reason           string                `json:"reason,omitempty"`
+	ARN              string                `json:"arn,omitempty"`
+	CreatedAt        *time.Time            `json:"created_at,omitempty"`
+	ProcessedAt      *time.Time            `json:"processed_at,omitempty"`
+	ProviderDetails  *RefundProviderDetail `json:"provider_details,omitempty"`
+	Raw              RawProviderResponse   `json:"raw,omitempty"`
 }
 
 type GetRefundRequest struct {
@@ -127,13 +130,14 @@ type ListRefundsRequest struct {
 // --- Instrument types ---
 
 type Instrument struct {
-	CustomerID     string              `json:"customer_id"`
-	InstrumentID   string              `json:"instrument_id"`
-	InstrumentType string              `json:"instrument_type,omitempty"`
-	DisplayValue   string              `json:"display_value,omitempty"`
-	Status         string              `json:"status,omitempty"`
-	CreatedAt      *time.Time          `json:"created_at,omitempty"`
-	Raw            RawProviderResponse `json:"raw,omitempty"`
+	CustomerID      string                    `json:"customer_id"`
+	InstrumentID    string                    `json:"instrument_id"`
+	InstrumentType  string                    `json:"instrument_type,omitempty"`
+	DisplayValue    string                    `json:"display_value,omitempty"`
+	Status          string                    `json:"status,omitempty"`
+	CreatedAt       *time.Time                `json:"created_at,omitempty"`
+	ProviderDetails *InstrumentProviderDetail `json:"provider_details,omitempty"`
+	Raw             RawProviderResponse       `json:"raw,omitempty"`
 }
 
 type GetInstrumentRequest struct {

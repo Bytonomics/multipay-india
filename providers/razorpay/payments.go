@@ -41,6 +41,35 @@ func (a *Adapter) GetPayment(ctx context.Context, req *domain.GetPaymentRequest)
 		ErrorMessage:      getString(responseMap, "error_description"),
 		PaymentTime:       getTime(responseMap, "created_at"),
 		Raw:               rawMapResponse(responseMap),
+		ProviderDetails: &domain.PaymentProviderDetail{
+			Razorpay: &domain.RazorpayPaymentDetail{
+				Entity:         getString(responseMap, "entity"),
+				Description:    getString(responseMap, "description"),
+				Email:          getString(responseMap, "email"),
+				Contact:        getString(responseMap, "contact"),
+				Fee:            getInt64(responseMap, "fee"),
+				Tax:            getInt64(responseMap, "tax"),
+				AmountRefunded: getInt64(responseMap, "amount_refunded"),
+				RefundStatus:   getString(responseMap, "refund_status"),
+				International:  getBool(responseMap, "international"),
+				CardID:         getString(responseMap, "card_id"),
+				Bank:           getString(responseMap, "bank"),
+				VPA:            getString(responseMap, "vpa"),
+				Wallet:         getString(responseMap, "wallet"),
+				ErrorSource:    getString(responseMap, "error_source"),
+				ErrorStep:      getString(responseMap, "error_step"),
+				ErrorReason:    getString(responseMap, "error_reason"),
+			},
+		},
+	}
+
+	// Populate acquirer_data if present
+	if acqData := getMap(responseMap, "acquirer_data"); len(acqData) > 0 {
+		payment.ProviderDetails.Razorpay.AcquirerData = &domain.RazorpayAcquirerData{
+			BankTransactionID: getString(acqData, "bank_transaction_id"),
+			AuthCode:          getString(acqData, "auth_code"),
+			RRN:               getString(acqData, "rrn"),
+		}
 	}
 
 	return payment, nil
@@ -99,6 +128,35 @@ func (a *Adapter) ListPayments(ctx context.Context, req *domain.ListPaymentsRequ
 			ErrorMessage:      getString(itemMap, "error_description"),
 			PaymentTime:       getTime(itemMap, "created_at"),
 			Raw:               rawMapResponse(itemMap),
+			ProviderDetails: &domain.PaymentProviderDetail{
+				Razorpay: &domain.RazorpayPaymentDetail{
+					Entity:         getString(itemMap, "entity"),
+					Description:    getString(itemMap, "description"),
+					Email:          getString(itemMap, "email"),
+					Contact:        getString(itemMap, "contact"),
+					Fee:            getInt64(itemMap, "fee"),
+					Tax:            getInt64(itemMap, "tax"),
+					AmountRefunded: getInt64(itemMap, "amount_refunded"),
+					RefundStatus:   getString(itemMap, "refund_status"),
+					International:  getBool(itemMap, "international"),
+					CardID:         getString(itemMap, "card_id"),
+					Bank:           getString(itemMap, "bank"),
+					VPA:            getString(itemMap, "vpa"),
+					Wallet:         getString(itemMap, "wallet"),
+					ErrorSource:    getString(itemMap, "error_source"),
+					ErrorStep:      getString(itemMap, "error_step"),
+					ErrorReason:    getString(itemMap, "error_reason"),
+				},
+			},
+		}
+
+		// Populate acquirer_data if present
+		if acqData := getMap(itemMap, "acquirer_data"); len(acqData) > 0 {
+			payment.ProviderDetails.Razorpay.AcquirerData = &domain.RazorpayAcquirerData{
+				BankTransactionID: getString(acqData, "bank_transaction_id"),
+				AuthCode:          getString(acqData, "auth_code"),
+				RRN:               getString(acqData, "rrn"),
+			}
 		}
 
 		payments = append(payments, payment)
@@ -143,6 +201,35 @@ func (a *Adapter) CapturePayment(ctx context.Context, req *domain.CapturePayment
 		ErrorMessage:      getString(responseMap, "error_description"),
 		PaymentTime:       getTime(responseMap, "created_at"),
 		Raw:               rawMapResponse(responseMap),
+		ProviderDetails: &domain.PaymentProviderDetail{
+			Razorpay: &domain.RazorpayPaymentDetail{
+				Entity:         getString(responseMap, "entity"),
+				Description:    getString(responseMap, "description"),
+				Email:          getString(responseMap, "email"),
+				Contact:        getString(responseMap, "contact"),
+				Fee:            getInt64(responseMap, "fee"),
+				Tax:            getInt64(responseMap, "tax"),
+				AmountRefunded: getInt64(responseMap, "amount_refunded"),
+				RefundStatus:   getString(responseMap, "refund_status"),
+				International:  getBool(responseMap, "international"),
+				CardID:         getString(responseMap, "card_id"),
+				Bank:           getString(responseMap, "bank"),
+				VPA:            getString(responseMap, "vpa"),
+				Wallet:         getString(responseMap, "wallet"),
+				ErrorSource:    getString(responseMap, "error_source"),
+				ErrorStep:      getString(responseMap, "error_step"),
+				ErrorReason:    getString(responseMap, "error_reason"),
+			},
+		},
+	}
+
+	// Populate acquirer_data if present
+	if acqData := getMap(responseMap, "acquirer_data"); len(acqData) > 0 {
+		payment.ProviderDetails.Razorpay.AcquirerData = &domain.RazorpayAcquirerData{
+			BankTransactionID: getString(acqData, "bank_transaction_id"),
+			AuthCode:          getString(acqData, "auth_code"),
+			RRN:               getString(acqData, "rrn"),
+		}
 	}
 
 	return payment, nil

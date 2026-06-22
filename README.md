@@ -559,6 +559,73 @@ Webhooks are automatically deduplicated using a combination of provider, transac
 
 This ensures idempotency: if a provider resends the same webhook, your handler is called exactly once.
 
+## Accessing Provider-Specific Details
+
+While the library provides a consistent canonical API across providers, each provider returns unique fields and metadata that may be important for your application. These provider-specific details are captured in strongly-typed structs and accessible through the `ProviderDetails` field on response objects.
+
+### ProviderDetails Fields
+
+All response types (Order, Payment, Refund, Instrument, PaymentLink) include a `ProviderDetails` field containing provider-specific data:
+
+```go
+order, err := client.Orders().CreateOrder(ctx, &domain.CreateOrderRequest{
+    AmountMinor: 10000,
+    Currency:    "INR",
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+// Access Cashfree-specific order details
+if order.ProviderDetails != nil && order.ProviderDetails.Cashfree != nil {
+    cf := order.ProviderDetails.Cashfree
+    log.Printf("Cashfree Order ID: %s\n", cf.CfOrderID)
+    log.Printf("Order Entity: %s\n", cf.Entity)
+    if cf.OrderMeta != nil {
+        log.Printf("Return URL: %s\n", cf.OrderMeta.ReturnURL)
+    }
+}
+
+// Access Razorpay-specific order details
+if order.ProviderDetails != nil && order.ProviderDetails.Razorpay != nil {
+    rz := order.ProviderDetails.Razorpay
+    log.Printf("Razorpay Receipt: %s\n", rz.Receipt)
+    log.Printf("Offer ID: %s\n", rz.OfferID)
+    log.Printf("Amount Paid: %d\n", rz.AmountPaid)
+}
+```
+
+### Provider-Specific Fields by Type
+
+**Order Details:**
+- **Cashfree**: Order ID, Entity type, Order note, Vendor splits, Return/Notify URLs, Payment methods
+- **Razorpay**: Receipt ID, Offer ID, Amount paid, Amount due, Attempt count
+
+**Payment Details:**
+- **Cashfree**: Payment ID, Order amount/currency, Payment message, Auth ID, Error details
+- **Razorpay**: Description, Email, Contact, Fees, Tax, Refund status, International flag, Card/VPA/Wallet info, Acquirer data
+
+**Refund Details:**
+- **Cashfree**: Refund ID, Payment ID, Refund charge/type/mode, Status, Refund speed, Vendor splits, Forex charges
+- **Razorpay**: Receipt, Speed (requested/processed), Batch ID, Acquirer data
+
+**Instrument Details:**
+- **Cashfree**: Instrument UID, Card network, Bank name, Card type
+- **Razorpay**: Token, Max payment amount, Expiry timestamp, Compliance flag
+
+**Payment Link Details:**
+- **Cashfree**: Link ID, Partial payments, Min partial amount, Auto reminders, QR code, Vendor splits
+- **Razorpay**: Description, Callback URL/Method, Reminder enabled, Payment count, Min partial amount
+
+### Why Provider Details Matter
+
+Provider-specific details are useful for:
+- **Compliance Reporting**: Access settlement and reconciliation data specific to each provider
+- **Advanced Features**: Use provider-specific fields like Cashfree's vendor splits or Razorpay's offers
+- **Debugging**: Access error codes and provider-specific error details
+- **Analytics**: Track provider-specific metrics like payment attempts or refund speeds
+- **Custom UI**: Display provider-specific information to customers or admins
+
 ## Error Handling
 
 ### Sentinel Errors

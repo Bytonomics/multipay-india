@@ -70,6 +70,17 @@ func (a *Adapter) CreatePaymentLink(ctx context.Context, req *domain.CreatePayme
 		Status:         domain.PaymentLinkStatus(getString(responseMap, "status")),
 		CreatedAt:      getTime(responseMap, "created_at"),
 		Raw:            rawMapResponse(responseMap),
+		ProviderDetails: &domain.PaymentLinkProviderDetail{
+			Razorpay: &domain.RazorpayPaymentLinkDetail{
+				Entity:          getString(responseMap, "entity"),
+				Description:     getString(responseMap, "description"),
+				CallbackURL:     getString(responseMap, "callback_url"),
+				CallbackMethod:  getString(responseMap, "callback_method"),
+				ReminderEnable:  getBool(responseMap, "reminder_enable"),
+				PaymentsCount:   getInt64(responseMap, "payments_count"),
+				FirstMinPartial: getInt64(responseMap, "first_min_partial_amount"),
+			},
+		},
 	}
 
 	// Handle optional ExpiryTime field
@@ -113,6 +124,17 @@ func (a *Adapter) GetPaymentLink(ctx context.Context, req *domain.GetPaymentLink
 		Status:         domain.PaymentLinkStatus(getString(responseMap, "status")),
 		CreatedAt:      getTime(responseMap, "created_at"),
 		Raw:            rawMapResponse(responseMap),
+		ProviderDetails: &domain.PaymentLinkProviderDetail{
+			Razorpay: &domain.RazorpayPaymentLinkDetail{
+				Entity:          getString(responseMap, "entity"),
+				Description:     getString(responseMap, "description"),
+				CallbackURL:     getString(responseMap, "callback_url"),
+				CallbackMethod:  getString(responseMap, "callback_method"),
+				ReminderEnable:  getBool(responseMap, "reminder_enable"),
+				PaymentsCount:   getInt64(responseMap, "payments_count"),
+				FirstMinPartial: getInt64(responseMap, "first_min_partial_amount"),
+			},
+		},
 	}
 
 	// Handle optional ExpiryTime field
@@ -156,6 +178,17 @@ func (a *Adapter) CancelPaymentLink(ctx context.Context, req *domain.CancelPayme
 		Status:         domain.PaymentLinkStatus(getString(responseMap, "status")),
 		CreatedAt:      getTime(responseMap, "created_at"),
 		Raw:            rawMapResponse(responseMap),
+		ProviderDetails: &domain.PaymentLinkProviderDetail{
+			Razorpay: &domain.RazorpayPaymentLinkDetail{
+				Entity:          getString(responseMap, "entity"),
+				Description:     getString(responseMap, "description"),
+				CallbackURL:     getString(responseMap, "callback_url"),
+				CallbackMethod:  getString(responseMap, "callback_method"),
+				ReminderEnable:  getBool(responseMap, "reminder_enable"),
+				PaymentsCount:   getInt64(responseMap, "payments_count"),
+				FirstMinPartial: getInt64(responseMap, "first_min_partial_amount"),
+			},
+		},
 	}
 
 	// Handle optional ExpiryTime field

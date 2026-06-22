@@ -77,6 +77,34 @@ func MapOrderEntityToCanonical(cfOrder *cf.OrderEntity) *domain.Order {
 		Raw:             rawResponse(cfOrder),
 	}
 
+	order.ProviderDetails = &domain.OrderProviderDetail{
+		Cashfree: &domain.CashfreeOrderDetail{
+			CfOrderID: StringPtrToStr(cfOrder.CfOrderId),
+			Entity:    StringPtrToStr(cfOrder.Entity),
+			OrderNote: StringPtrToStr(cfOrder.OrderNote),
+		},
+	}
+	// Populate OrderSplits if present
+	if len(cfOrder.OrderSplits) > 0 {
+		splits := make([]domain.CashfreeVendorSplit, 0, len(cfOrder.OrderSplits))
+		for i := range cfOrder.OrderSplits {
+			s := &cfOrder.OrderSplits[i]
+			splits = append(splits, domain.CashfreeVendorSplit{
+				VendorID:   StringPtrToStr(s.VendorId),
+				Amount:     float64(FloatPtrToFloat64(s.Amount)),
+				Percentage: float64(FloatPtrToFloat64(s.Percentage)),
+			})
+		}
+		order.ProviderDetails.Cashfree.OrderSplits = splits
+	}
+	// Populate OrderMeta if present
+	if cfOrder.OrderMeta != nil {
+		order.ProviderDetails.Cashfree.OrderMeta = &domain.CashfreeOrderMeta{
+			ReturnURL: StringPtrToStr(cfOrder.OrderMeta.ReturnUrl),
+			NotifyURL: StringPtrToStr(cfOrder.OrderMeta.NotifyUrl),
+		}
+	}
+
 	return order
 }
 
@@ -101,6 +129,28 @@ func MapPaymentEntityToCanonical(cfPayment *cf.PaymentEntity) *domain.Payment {
 		ErrorCode:         "",
 		ErrorMessage:      "",
 		Raw:               rawResponse(cfPayment),
+	}
+
+	payment.ProviderDetails = &domain.PaymentProviderDetail{
+		Cashfree: &domain.CashfreePaymentDetail{
+			CfPaymentID:    StringPtrToStr(cfPayment.CfPaymentId),
+			Entity:         StringPtrToStr(cfPayment.Entity),
+			OrderAmount:    float64(FloatPtrToFloat64(cfPayment.OrderAmount)),
+			OrderCurrency:  StringPtrToStr(cfPayment.OrderCurrency),
+			PaymentMessage: StringPtrToStr(cfPayment.PaymentMessage),
+			AuthID:         StringPtrToStr(cfPayment.AuthId),
+		},
+	}
+	if cfPayment.ErrorDetails != nil {
+		payment.ProviderDetails.Cashfree.ErrorDetails = &domain.CashfreePaymentErrorDetails{
+			ErrorCode:           StringPtrToStr(cfPayment.ErrorDetails.ErrorCode),
+			ErrorDescription:    StringPtrToStr(cfPayment.ErrorDetails.ErrorDescription),
+			ErrorReason:         StringPtrToStr(cfPayment.ErrorDetails.ErrorReason),
+			ErrorSource:         StringPtrToStr(cfPayment.ErrorDetails.ErrorSource),
+			ErrorCodeRaw:        StringPtrToStr(cfPayment.ErrorDetails.ErrorCodeRaw),
+			ErrorDescriptionRaw: StringPtrToStr(cfPayment.ErrorDetails.ErrorDescriptionRaw),
+			ErrorSubcodeRaw:     StringPtrToStr(cfPayment.ErrorDetails.ErrorSubcodeRaw),
+		}
 	}
 
 	return payment
@@ -213,6 +263,44 @@ func MapRefundEntityToCanonical(cfRefund *cf.RefundEntity) *domain.Refund {
 		Raw:              rawResponse(cfRefund),
 	}
 
+	refund.ProviderDetails = &domain.RefundProviderDetail{
+		Cashfree: &domain.CashfreeRefundDetail{
+			CfRefundID:        StringPtrToStr(cfRefund.CfRefundId),
+			CfPaymentID:       StringPtrToStr(cfRefund.CfPaymentId),
+			Entity:            StringPtrToStr(cfRefund.Entity),
+			RefundCharge:      float64(FloatPtrToFloat64(cfRefund.RefundCharge)),
+			RefundType:        StringPtrToStr(cfRefund.RefundType),
+			RefundMode:        StringPtrToStr(cfRefund.RefundMode),
+			StatusDescription: StringPtrToStr(cfRefund.StatusDescription),
+			ChargesCurrency:   StringPtrToStr(cfRefund.ChargesCurrency),
+			ForexRate:         float64(FloatPtrToFloat64(cfRefund.ForexConversionRate)),
+			ForexCharge:       float64(FloatPtrToFloat64(cfRefund.ForexConversionHandlingCharge)),
+			ForexTax:          float64(FloatPtrToFloat64(cfRefund.ForexConversionHandlingTax)),
+			ProviderMetadata:  cfRefund.Metadata,
+		},
+	}
+	if cfRefund.RefundSpeed != nil {
+		refund.ProviderDetails.Cashfree.RefundSpeed = &domain.CashfreeRefundSpeed{
+			Requested: StringPtrToStr(cfRefund.RefundSpeed.Requested),
+			Accepted:  StringPtrToStr(cfRefund.RefundSpeed.Accepted),
+			Processed: StringPtrToStr(cfRefund.RefundSpeed.Processed),
+			Message:   StringPtrToStr(cfRefund.RefundSpeed.Message),
+		}
+	}
+	// Populate RefundSplits if present
+	if len(cfRefund.RefundSplits) > 0 {
+		splits := make([]domain.CashfreeVendorSplit, 0, len(cfRefund.RefundSplits))
+		for i := range cfRefund.RefundSplits {
+			s := &cfRefund.RefundSplits[i]
+			splits = append(splits, domain.CashfreeVendorSplit{
+				VendorID:   StringPtrToStr(s.VendorId),
+				Amount:     float64(FloatPtrToFloat64(s.Amount)),
+				Percentage: float64(FloatPtrToFloat64(s.Percentage)),
+			})
+		}
+		refund.ProviderDetails.Cashfree.RefundSplits = splits
+	}
+
 	return refund
 }
 
@@ -262,6 +350,22 @@ func MapInstrumentEntityToCanonical(cfInstrument *cf.InstrumentEntity) *domain.I
 		Raw:            rawResponse(cfInstrument),
 	}
 
+	instrument.ProviderDetails = &domain.InstrumentProviderDetail{
+		Cashfree: &domain.CashfreeInstrumentDetail{
+			AfaReference:  StringPtrToStr(cfInstrument.AfaReference),
+			InstrumentUID: StringPtrToStr(cfInstrument.InstrumentUid),
+		},
+	}
+	if cfInstrument.InstrumentMeta != nil {
+		instrument.ProviderDetails.Cashfree.InstrumentMeta = &domain.CashfreeInstrumentMeta{
+			CardNetwork:  StringPtrToStr(cfInstrument.InstrumentMeta.CardNetwork),
+			CardBankName: StringPtrToStr(cfInstrument.InstrumentMeta.CardBankName),
+			CardCountry:  StringPtrToStr(cfInstrument.InstrumentMeta.CardCountry),
+			CardType:     StringPtrToStr(cfInstrument.InstrumentMeta.CardType),
+			CardSubType:  StringPtrToStr(cfInstrument.InstrumentMeta.CardSubType),
+		}
+	}
+
 	return instrument
 }
 
@@ -290,6 +394,22 @@ func MapInstrumentEntityForAllSavedCardToCanonical(cfInstrument *cf.InstrumentEn
 		Status:         StringPtrToStr(cfInstrument.InstrumentStatus),
 		CreatedAt:      timePtr(TimeFromTimestamp(cfInstrument.CreatedAt)),
 		Raw:            rawResponse(cfInstrument),
+	}
+
+	instrument.ProviderDetails = &domain.InstrumentProviderDetail{
+		Cashfree: &domain.CashfreeInstrumentDetail{
+			AfaReference:  StringPtrToStr(cfInstrument.AfaReference),
+			InstrumentUID: StringPtrToStr(cfInstrument.InstrumentUid),
+		},
+	}
+	if cfInstrument.InstrumentMeta != nil {
+		instrument.ProviderDetails.Cashfree.InstrumentMeta = &domain.CashfreeInstrumentMeta{
+			CardNetwork:  StringPtrToStr(cfInstrument.InstrumentMeta.CardNetwork),
+			CardBankName: StringPtrToStr(cfInstrument.InstrumentMeta.CardBankName),
+			CardCountry:  StringPtrToStr(cfInstrument.InstrumentMeta.CardCountry),
+			CardType:     StringPtrToStr(cfInstrument.InstrumentMeta.CardType),
+			CardSubType:  StringPtrToStr(cfInstrument.InstrumentMeta.CardSubType),
+		}
 	}
 
 	return instrument
@@ -326,6 +446,28 @@ func MapLinkEntityToCanonical(cfLink *cf.LinkEntity) *domain.PaymentLink {
 		ExpiryTime:     timePtr(TimeFromTimestamp(cfLink.LinkExpiryTime)),
 		Metadata:       metadata,
 		Raw:            rawResponse(cfLink),
+	}
+
+	link.ProviderDetails = &domain.PaymentLinkProviderDetail{
+		Cashfree: &domain.CashfreePaymentLinkDetail{
+			CfLinkID:         StringPtrToStr(cfLink.CfLinkId),
+			PartialPayments:  derefBool(cfLink.LinkPartialPayments),
+			MinPartialAmount: float64(FloatPtrToFloat64(cfLink.LinkMinimumPartialAmount)),
+			AutoReminders:    derefBool(cfLink.LinkAutoReminders),
+			LinkQRCode:       StringPtrToStr(cfLink.LinkQrcode),
+		},
+	}
+	if len(cfLink.OrderSplits) > 0 {
+		splits := make([]domain.CashfreeVendorSplit, 0, len(cfLink.OrderSplits))
+		for i := range cfLink.OrderSplits {
+			s := &cfLink.OrderSplits[i]
+			splits = append(splits, domain.CashfreeVendorSplit{
+				VendorID:   StringPtrToStr(s.VendorId),
+				Amount:     float64(FloatPtrToFloat64(s.Amount)),
+				Percentage: float64(FloatPtrToFloat64(s.Percentage)),
+			})
+		}
+		link.ProviderDetails.Cashfree.OrderSplits = splits
 	}
 
 	return link

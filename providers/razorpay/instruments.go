@@ -22,7 +22,7 @@ func (a *Adapter) GetInstrument(ctx context.Context, req *domain.GetInstrumentRe
 
 	// Call Razorpay SDK to fetch token (instrument)
 	// Razorpay Token.Fetch signature: Fetch(customerID string, tokenID string, options map[string]interface{}, headers map[string]string)
-	responseMap, err := a.client.Token.Fetch(req.CustomerID, req.InstrumentID, nil, nil)
+	responseMap, err := a.client.Token.Fetch(req.CustomerID, req.InstrumentID, make(map[string]interface{}), make(map[string]string))
 	if err != nil {
 		// Check if token not found
 		if isNotFoundError(err) {
@@ -40,6 +40,15 @@ func (a *Adapter) GetInstrument(ctx context.Context, req *domain.GetInstrumentRe
 		Status:         getString(responseMap, "status"),
 		CreatedAt:      getTime(responseMap, "created_at"),
 		Raw:            rawMapResponse(responseMap),
+		ProviderDetails: &domain.InstrumentProviderDetail{
+			Razorpay: &domain.RazorpayInstrumentDetail{
+				Entity:           getString(responseMap, "entity"),
+				Token:            getString(responseMap, "token"),
+				MaxPaymentAmount: getInt64(responseMap, "max_payment_amount"),
+				ExpiredAt:        getInt64(responseMap, "expired_at"),
+				Compliant:        getBool(responseMap, "compliant"),
+			},
+		},
 	}
 
 	return instrument, nil
@@ -92,6 +101,15 @@ func (a *Adapter) ListInstruments(ctx context.Context, req *domain.ListInstrumen
 			Status:         getString(itemMap, "status"),
 			CreatedAt:      getTime(itemMap, "created_at"),
 			Raw:            rawMapResponse(itemMap),
+			ProviderDetails: &domain.InstrumentProviderDetail{
+				Razorpay: &domain.RazorpayInstrumentDetail{
+					Entity:           getString(itemMap, "entity"),
+					Token:            getString(itemMap, "token"),
+					MaxPaymentAmount: getInt64(itemMap, "max_payment_amount"),
+					ExpiredAt:        getInt64(itemMap, "expired_at"),
+					Compliant:        getBool(itemMap, "compliant"),
+				},
+			},
 		}
 
 		instruments = append(instruments, instrument)
@@ -115,7 +133,7 @@ func (a *Adapter) DeleteInstrument(ctx context.Context, req *domain.DeleteInstru
 
 	// Call Razorpay SDK to delete token (instrument)
 	// Razorpay Token.Delete signature: Delete(customerID string, tokenID string, options map[string]interface{}, headers map[string]string)
-	responseMap, err := a.client.Token.Delete(req.CustomerID, req.InstrumentID, nil, nil)
+	responseMap, err := a.client.Token.Delete(req.CustomerID, req.InstrumentID, make(map[string]interface{}), make(map[string]string))
 	if err != nil {
 		// Check if token not found
 		if isNotFoundError(err) {
@@ -133,6 +151,15 @@ func (a *Adapter) DeleteInstrument(ctx context.Context, req *domain.DeleteInstru
 		Status:         getString(responseMap, "status"),
 		CreatedAt:      getTime(responseMap, "created_at"),
 		Raw:            rawMapResponse(responseMap),
+		ProviderDetails: &domain.InstrumentProviderDetail{
+			Razorpay: &domain.RazorpayInstrumentDetail{
+				Entity:           getString(responseMap, "entity"),
+				Token:            getString(responseMap, "token"),
+				MaxPaymentAmount: getInt64(responseMap, "max_payment_amount"),
+				ExpiredAt:        getInt64(responseMap, "expired_at"),
+				Compliant:        getBool(responseMap, "compliant"),
+			},
+		},
 	}
 
 	return instrument, nil

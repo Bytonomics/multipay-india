@@ -201,6 +201,171 @@ type ProviderAdapter interface {
 
 All methods accept typed request structs from `domain/` (e.g., `*domain.CreateOrderRequest`) and return typed response structs (e.g., `*domain.Order`). Request structs and client methods do not carry a provider field; provider selection happens once at client construction via `ClientConfig.Provider`. Provider SDK types never leak outside adapters. Both adapters have compile-time interface checks: `var _ ports.ProviderAdapter = (*Adapter)(nil)`.
 
+### 5.1 Provider-Specific Details Capture (Discriminated Union Pattern)
+
+While canonical response types (Order, Payment, Refund, etc.) provide a consistent API surface across providers, each provider returns unique fields and metadata that would be lost in a generic schema. To preserve full queryability of provider-specific data without polluting the canonical types with union fields, we use a **discriminated union pattern** via nested provider-detail structs.
+
+#### Architecture
+
+Five main wrapper types in `domain/provider_details.go` capture provider-specific fields:
+
+```go
+type OrderProviderDetail struct {
+    Cashfree *CashfreeOrderDetail
+    Razorpay *RazorpayOrderDetail
+}
+
+type PaymentProviderDetail struct {
+    Cashfree *CashfreePaymentDetail
+    Razorpay *RazorpayPaymentDetail
+}
+
+type RefundProviderDetail struct {
+    Cashfree *CashfreeRefundDetail
+    Razorpay *RazorpayRefundDetail
+}
+
+type InstrumentProviderDetail struct {
+    Cashfree *CashfreeInstrumentDetail
+    Razorpay *RazorpayInstrumentDetail
+}
+
+type PaymentLinkProviderDetail struct {
+    Cashfree *CashfreePaymentLinkDetail
+    Razorpay *RazorpayPaymentLinkDetail
+}
+```
+
+Each wrapper contains **exactly one non-nil pointer** — either Cashfree or Razorpay — depending on which provider processed the request. The other pointer is `nil`.
+
+#### Integration with Canonical Types
+
+Each canonical response type contains a `ProviderDetails` field:
+
+```go
+type Order struct {
+    ProviderOrderID  string
+    OrderID          string
+    Status           OrderStatus
+    AmountMinor      AmountMinor
+    Currency         Currency
+    Metadata         Metadata
+    ProviderDetails  *OrderProviderDetail  // NEW: provider-specific fields
+    Raw              RawProviderResponse
+}
+
+type Payment struct {
+    ProviderPaymentID string
+    OrderID          string
+    Status           PaymentStatus
+    AmountMinor      AmountMinor
+    Currency         Currency
+    PaymentMethod    string
+    ProviderDetails  *PaymentProviderDetail  // NEW
+    Raw              RawProviderResponse
+}
+
+// Similar for Refund, Instrument, PaymentLink
+```
+
+The `ProviderDetails` field is **optional** (`*`, omitempty in JSON) and is populated by the adapter during mapping.
+
+#### Provider-Specific Fields Captured
+
+**Cashfree Order Details:**
+- `CfOrderID` (*string), `Entity`, `OrderNote`, `OrderSplits` (vendor splits), `OrderMeta` (return URL, notify URL, payment methods)
+
+**Razorpay Order Details:**
+- `Entity`, `Receipt`, `OfferID`, `AmountPaid`, `AmountDue`, `Attempts`
+
+**Cashfree Payment Details:**
+- `CfPaymentID` (*string), `Entity`, `OrderAmount`, `OrderCurrency`, `PaymentMessage`, `AuthID`, `ErrorDetails` (code, description, reason, source)
+
+**Razorpay Payment Details:**
+- 15+ fields: `Entity`, `Description`, `Email`, `Contact`, `Fee`, `Tax`, `AmountRefunded`, `RefundStatus`, `International`, `CardID`, `Bank`, `VPA`, `Wallet`, `ErrorSource/Step/Reason`, plus `AcquirerData` (bank txn ID, auth code, RRN)
+
+**Cashfree Refund Details:**
+- `CfRefundID`, `CfPaymentID`, `Entity`, `RefundCharge`, `RefundType/Mode`, `StatusDescription`, `RefundSpeed`, `RefundSplits`, forex charges/tax, `ProviderMetadata` (arbitrary key-value)
+
+**Razorpay Refund Details:**
+- `Entity`, `Receipt`, `SpeedRequested/Processed`, `BatchID`, `AcquirerData`
+
+**Similar patterns** for Instrument and PaymentLink details.
+
+#### Mapping Flow
+
+In each adapter's mapper functions (e.g., `providers/cashfree/mappers.go`):
+
+```go
+func MapOrderEntityToCanonical(ctx context.Context, entity *cashfree_pg.OrderEntity, ...) *domain.Order {
+    return &domain.Order{
+        ID:     entity.OrderId,
+        Status: mapOrderStatus(entity.OrderStatus),
+        // ... canonical fields ...
+        ProviderDetails: &domain.OrderProviderDetail{
+            Cashfree: &domain.CashfreeOrderDetail{
+                CfOrderID:   entity.CfOrderId,
+                Entity:      StringPtrToStr(entity.Entity),
+                OrderNote:   StringPtrToStr(entity.OrderNote),
+                OrderSplits: mapCashfreeVendorSplits(entity.OrderSplits),
+                OrderMeta:   mapCashfreeOrderMeta(entity.OrderMeta),
+            },
+            Razorpay: nil,
+        },
+        Raw: rawBody,
+    }
+}
+```
+
+For Razorpay (untyped SDK), helpers extract fields from `map[string]interface{}`:
+
+```go
+func GetOrder(ctx context.Context, resp map[string]interface{}, ...) *domain.Order {
+    return &domain.Order{
+        // ... canonical fields ...
+        ProviderDetails: &domain.OrderProviderDetail{
+            Cashfree: nil,
+            Razorpay: &domain.RazorpayOrderDetail{
+                Entity:      getString(resp, "entity"),
+                Receipt:     getString(resp, "receipt"),
+                OfferID:     getString(resp, "offer_id"),
+                AmountPaid:  getInt64(resp, "amount_paid"),
+                AmountDue:   getInt64(resp, "amount_due"),
+                Attempts:    getInt64(resp, "attempts"),
+            },
+        },
+        Raw: rawBody,
+    }
+}
+```
+
+#### Benefits
+
+1. **No Data Loss**: All provider-specific fields are captured in strongly-typed structs, not lost or merged into generic maps
+2. **Queryability**: Applications can access `order.ProviderDetails.Cashfree.CfOrderID` or `order.ProviderDetails.Razorpay.Receipt` directly
+3. **Type Safety**: No runtime type assertions needed; fields are declared with their correct Go types
+4. **Backwards Compatibility**: The `ProviderDetails` field is optional; existing code that ignores it continues to work
+5. **Clean Separation**: Provider-specific details don't pollute the canonical Order/Payment/Refund types; canonical types remain provider-neutral
+6. **Exhaustive Capture**: Every non-standard field returned by the provider is captured; nothing is dropped
+
+#### Testing
+
+Mock adapters can return populated `ProviderDetails` for testing provider-specific logic:
+
+```go
+mockOrder := &domain.Order{
+    ID:     "order_123",
+    Status: domain.OrderStatusCreated,
+    ProviderDetails: &domain.OrderProviderDetail{
+        Cashfree: &domain.CashfreeOrderDetail{
+            CfOrderID: newString("cf_order_abc"),
+            Entity:    "order",
+        },
+        Razorpay: nil,
+    },
+}
+```
+
 ### 6. Configuration and Multi-Account Support
 
 - **ClientConfig**: Contains the bound `Provider` (`ports.ProviderAdapter`), optional hooks, webhook store, logger, and clock
