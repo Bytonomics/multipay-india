@@ -3,19 +3,12 @@ package cashfree
 import (
 	"context"
 	"fmt"
-	"sync"
 
-	cf "github.com/cashfree/cashfree_pg"
+	cf "github.com/cashfree/cashfree-pg/v6"
 
 	"github.com/Bytonomics/multipay-adapter/capabilities"
 	"github.com/Bytonomics/multipay-adapter/domain"
 	"github.com/Bytonomics/multipay-adapter/ports"
-)
-
-// Package-level mutex to guard all Cashfree SDK calls.
-// Cashfree SDK uses global variables which are not thread-safe for concurrent clients.
-var (
-	cfMutex sync.Mutex
 )
 
 // Config contains configuration for the Cashfree adapter.
@@ -38,7 +31,8 @@ type Config struct {
 
 // Adapter implements the ProviderAdapter interface for Cashfree payments.
 type Adapter struct {
-	config *Config
+	config   *Config
+	cfClient *cf.Cashfree
 }
 
 // Compile-time assertion that Adapter implements ProviderAdapter interface.
@@ -63,8 +57,22 @@ func NewAdapter(config *Config) (*Adapter, error) {
 		return nil, fmt.Errorf("environment is invalid: %w", domain.ErrInvalidRequest)
 	}
 
+	// Build instance-based Cashfree client (v6 pattern)
+	cfEnv := cf.SANDBOX
+	if config.Environment == domain.EnvironmentProduction {
+		cfEnv = cf.PRODUCTION
+	}
+
+	cfClient := &cf.Cashfree{
+		XClientId:             &config.ClientID,
+		XClientSecret:         &config.ClientSecret,
+		XEnvironment:          &cfEnv,
+		XEnableErrorAnalytics: ptrBool(false), // disable Sentry side effects
+	}
+
 	return &Adapter{
-		config: config,
+		config:   config,
+		cfClient: cfClient,
 	}, nil
 }
 
@@ -106,37 +114,6 @@ func (a *Adapter) ProviderCapabilities() []capabilities.Capability {
 		capabilities.CapSettlementReconFetch,
 		capabilities.CapReconFetch,
 	}
-}
-
-// lockCashfreeSDK acquires the package-level mutex and sets up Cashfree SDK globals.
-// This must be paired with unlockCashfreeSDK() in a defer statement.
-func (a *Adapter) lockCashfreeSDK() {
-	cfMutex.Lock()
-
-	// Set global SDK configuration variables
-	clientID := a.config.ClientID
-	clientSecret := a.config.ClientSecret
-
-	cf.XClientId = &clientID
-	cf.XClientSecret = &clientSecret
-	cf.XEnvironment = cf.SANDBOX
-	if a.config.Environment == domain.EnvironmentProduction {
-		cf.XEnvironment = cf.PRODUCTION
-	}
-
-	// Disable Sentry to suppress error reporting side effects
-	cf.XEnableErrorAnalytics = false
-}
-
-// unlockCashfreeSDK releases the package-level mutex and restores SDK globals to safe defaults.
-func (a *Adapter) unlockCashfreeSDK() {
-	defer cfMutex.Unlock()
-
-	// Restore globals to safe defaults
-	cf.XClientId = nil
-	cf.XClientSecret = nil
-	cf.XEnvironment = cf.SANDBOX
-	cf.XEnableErrorAnalytics = false
 }
 
 // CreateOrder creates a new order on the Cashfree payment gateway.
@@ -267,4 +244,9 @@ func (a *Adapter) MapPaymentLinkMetadata(_ context.Context, metadata domain.Meta
 		result[k] = v
 	}
 	return result, nil
+}
+
+// ptrBool is a helper to create a pointer to a bool.
+func ptrBool(b bool) *bool {
+	return &b
 }

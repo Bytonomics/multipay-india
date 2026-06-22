@@ -2,9 +2,8 @@ package cashfree
 
 import (
 	"fmt"
-	"strconv"
 
-	cf "github.com/cashfree/cashfree_pg"
+	cf "github.com/cashfree/cashfree-pg/v6"
 
 	"github.com/Bytonomics/multipay-adapter/domain"
 )
@@ -26,14 +25,12 @@ func MapOrderMetadata(cfOrder *cf.OrderEntity) *domain.Metadata {
 
 	// Store CfOrderId (Cashfree's internal order identifier)
 	if cfOrder.CfOrderId != nil {
-		metadata["cf_order_id"] = strconv.FormatInt(*cfOrder.CfOrderId, 10)
+		metadata["cf_order_id"] = *cfOrder.CfOrderId
 	}
 
 	// Store OrderNote (additional notes for the order)
-	if cfOrder.OrderNote.IsSet() {
-		if noteValue := cfOrder.OrderNote.Get(); noteValue != nil {
-			metadata["order_note"] = *noteValue
-		}
+	if cfOrder.OrderNote != nil {
+		metadata["order_note"] = *cfOrder.OrderNote
 	}
 
 	// Store OrderStatus (ACTIVE, PAID, EXPIRED, CANCELLED)
@@ -48,12 +45,12 @@ func MapOrderMetadata(cfOrder *cf.OrderEntity) *domain.Metadata {
 
 	// Store creation timestamp (Cashfree format)
 	if cfOrder.CreatedAt != nil {
-		metadata["created_at"] = cfOrder.CreatedAt.String()
+		metadata["created_at"] = *cfOrder.CreatedAt
 	}
 
 	// Store order expiry time if set
 	if cfOrder.OrderExpiryTime != nil {
-		metadata["order_expiry_time"] = cfOrder.OrderExpiryTime.String()
+		metadata["order_expiry_time"] = *cfOrder.OrderExpiryTime
 	}
 
 	// Store Entity type (typically "order")
@@ -63,8 +60,8 @@ func MapOrderMetadata(cfOrder *cf.OrderEntity) *domain.Metadata {
 
 	// Store custom order tags as serialized key-value pairs
 	// Tags are stored with "tag_" prefix for easy identification
-	if len(cfOrder.OrderTags) > 0 {
-		for key, value := range cfOrder.OrderTags {
+	if cfOrder.OrderTags != nil && len(*cfOrder.OrderTags) > 0 {
+		for key, value := range *cfOrder.OrderTags {
 			metadata["tag_"+key] = value
 		}
 	}
@@ -95,7 +92,7 @@ func MapRefundMetadata(cfRefund *cf.RefundEntity) *domain.Metadata {
 
 	// Store CfPaymentId (Cashfree's internal payment identifier for this refund)
 	if cfRefund.CfPaymentId != nil {
-		metadata["cf_payment_id"] = strconv.FormatInt(*cfRefund.CfPaymentId, 10)
+		metadata["cf_payment_id"] = *cfRefund.CfPaymentId
 	}
 
 	// Store OrderId

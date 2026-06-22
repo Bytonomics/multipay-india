@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	cf "github.com/cashfree/cashfree_pg"
+	cf "github.com/cashfree/cashfree-pg/v6"
 
 	"github.com/Bytonomics/multipay-adapter/domain"
 )
@@ -23,26 +23,20 @@ func createOrder(ctx context.Context, adapter *Adapter, req *domain.CreateOrderR
 		return nil, fmt.Errorf("amount must be positive: %w", domain.ErrInvalidRequest)
 	}
 
-	// Lock the Cashfree SDK and set up globals
-	adapter.lockCashfreeSDK()
-	defer adapter.unlockCashfreeSDK()
-
 	// Build Cashfree CreateOrderRequest
 	cfReq := &cf.CreateOrderRequest{
 		OrderAmount:   AmountMinorToMajor(int64(req.AmountMinor), string(req.Currency)),
 		OrderCurrency: string(req.Currency),
-		CustomerDetails: cf.CustomerDetails{
+		CustomerDetails: &cf.CustomerDetails{
 			CustomerId:    req.Customer.CustomerID,
-			CustomerEmail: *cf.NewNullableString(stringPtr(req.Customer.Email)),
+			CustomerEmail: stringPtr(req.Customer.Email),
 			CustomerPhone: req.Customer.Phone,
 		},
 	}
 
 	// Call Cashfree SDK
-	apiVersion := "2022-09-01"
-	cfOrder, _, err := cf.PGCreateOrderWithContext(
+	cfOrder, _, err := adapter.cfClient.PGCreateOrderWithContext(
 		ctx,
-		stringPtr(apiVersion),
 		cfReq,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
@@ -73,15 +67,9 @@ func getOrder(ctx context.Context, adapter *Adapter, req *domain.GetOrderRequest
 		return nil, fmt.Errorf("OrderID is required: %w", domain.ErrInvalidRequest)
 	}
 
-	// Lock the Cashfree SDK and set up globals
-	adapter.lockCashfreeSDK()
-	defer adapter.unlockCashfreeSDK()
-
 	// Call Cashfree SDK to fetch order
-	apiVersion := "2022-09-01"
-	cfOrder, _, err := cf.PGFetchOrderWithContext(
+	cfOrder, _, err := adapter.cfClient.PGFetchOrderWithContext(
 		ctx,
-		stringPtr(apiVersion),
 		req.OrderID,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
@@ -115,15 +103,9 @@ func listOrderPayments(ctx context.Context, adapter *Adapter, req *domain.ListOr
 		return nil, fmt.Errorf("OrderID is required: %w", domain.ErrInvalidRequest)
 	}
 
-	// Lock the Cashfree SDK and set up globals
-	adapter.lockCashfreeSDK()
-	defer adapter.unlockCashfreeSDK()
-
 	// Call Cashfree SDK to fetch payments for the order
-	apiVersion := "2022-09-01"
-	cfPayments, _, err := cf.PGOrderFetchPaymentsWithContext(
+	cfPayments, _, err := adapter.cfClient.PGOrderFetchPaymentsWithContext(
 		ctx,
-		stringPtr(apiVersion),
 		req.OrderID,
 		nil, // xRequestId
 		nil, // xIdempotencyKey

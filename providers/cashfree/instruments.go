@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	cf "github.com/cashfree/cashfree_pg"
-
 	"github.com/Bytonomics/multipay-adapter/domain"
 )
 
@@ -25,15 +23,9 @@ func getInstrument(ctx context.Context, adapter *Adapter, req *domain.GetInstrum
 		return nil, fmt.Errorf("InstrumentID is required: %w", domain.ErrInvalidRequest)
 	}
 
-	// Lock the Cashfree SDK and set up globals
-	adapter.lockCashfreeSDK()
-	defer adapter.unlockCashfreeSDK()
-
 	// Call Cashfree SDK to fetch instrument
-	apiVersion := "2022-09-01"
-	cfInstrument, _, err := cf.PGCustomerFetchInstrumentWithContext(
+	cfInstrument, _, err := adapter.cfClient.PGCustomerFetchInstrumentWithContext(
 		ctx,
-		stringPtr(apiVersion),
 		req.CustomerID,
 		req.InstrumentID,
 		nil, // xRequestId
@@ -68,15 +60,9 @@ func listInstruments(ctx context.Context, adapter *Adapter, req *domain.ListInst
 		return nil, fmt.Errorf("CustomerID is required: %w", domain.ErrInvalidRequest)
 	}
 
-	// Lock the Cashfree SDK and set up globals
-	adapter.lockCashfreeSDK()
-	defer adapter.unlockCashfreeSDK()
-
 	// Call Cashfree SDK to fetch instruments for the customer
-	apiVersion := "2022-09-01"
-	cfInstruments, _, err := cf.PGCustomerFetchInstrumentsWithContext(
+	cfInstruments, _, err := adapter.cfClient.PGCustomerFetchInstrumentsWithContext(
 		ctx,
-		stringPtr(apiVersion),
 		req.CustomerID,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
@@ -99,7 +85,7 @@ func listInstruments(ctx context.Context, adapter *Adapter, req *domain.ListInst
 	result := make([]*domain.Instrument, 0, len(cfInstruments))
 	for i := range cfInstruments {
 		cfInstrument := &cfInstruments[i]
-		instrument := MapInstrumentEntityToCanonical(cfInstrument)
+		instrument := MapInstrumentEntityForAllSavedCardToCanonical(cfInstrument)
 		if instrument != nil {
 			result = append(result, instrument)
 		}
@@ -123,15 +109,9 @@ func deleteInstrument(ctx context.Context, adapter *Adapter, req *domain.DeleteI
 		return nil, fmt.Errorf("InstrumentID is required: %w", domain.ErrInvalidRequest)
 	}
 
-	// Lock the Cashfree SDK and set up globals
-	adapter.lockCashfreeSDK()
-	defer adapter.unlockCashfreeSDK()
-
 	// Call Cashfree SDK to delete instrument
-	apiVersion := "2022-09-01"
-	_, _, err := cf.PGCustomerDeleteInstrumentWithContext(
+	_, _, err := adapter.cfClient.PGCustomerDeleteInstrumentWithContext(
 		ctx,
-		stringPtr(apiVersion),
 		req.CustomerID,
 		req.InstrumentID,
 		nil, // xRequestId

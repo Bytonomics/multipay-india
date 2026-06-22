@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	cf "github.com/cashfree/cashfree_pg"
-
 	"github.com/Bytonomics/multipay-adapter/domain"
 )
 
@@ -25,15 +23,9 @@ func getPayment(ctx context.Context, adapter *Adapter, req *domain.GetPaymentReq
 		return nil, fmt.Errorf("PaymentID is required: %w", domain.ErrInvalidRequest)
 	}
 
-	// Lock the Cashfree SDK and set up globals
-	adapter.lockCashfreeSDK()
-	defer adapter.unlockCashfreeSDK()
-
 	// Call Cashfree SDK to fetch payment
-	apiVersion := "2022-09-01"
-	cfPayment, _, err := cf.PGOrderFetchPaymentWithContext(
+	cfPayment, _, err := adapter.cfClient.PGOrderFetchPaymentWithContext(
 		ctx,
-		stringPtr(apiVersion),
 		req.OrderID,
 		req.PaymentID,
 		nil, // xRequestId
@@ -68,15 +60,9 @@ func listPayments(ctx context.Context, adapter *Adapter, req *domain.ListPayment
 		return nil, fmt.Errorf("OrderID is required: %w", domain.ErrInvalidRequest)
 	}
 
-	// Lock the Cashfree SDK and set up globals
-	adapter.lockCashfreeSDK()
-	defer adapter.unlockCashfreeSDK()
-
 	// Call Cashfree SDK to fetch payments for the order
-	apiVersion := "2022-09-01"
-	cfPayments, _, err := cf.PGOrderFetchPaymentsWithContext(
+	cfPayments, _, err := adapter.cfClient.PGOrderFetchPaymentsWithContext(
 		ctx,
-		stringPtr(apiVersion),
 		req.OrderID,
 		nil, // xRequestId
 		nil, // xIdempotencyKey

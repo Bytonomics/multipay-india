@@ -172,11 +172,12 @@ ProviderAdapter = OrderProvider + PaymentProvider + RefundProvider +
 
 Each sub-interface is defined separately in `ports/providers.go` so consumers can depend on only what they need.
 
-### Cashfree SDK Thread-Safety Workaround
+### Cashfree SDK Instance-Based Architecture
 
-The Cashfree SDK uses **package-level global variables** (not thread-safe). The adapter uses a package-level
-`sync.Mutex` -- every SDK call locks the mutex, sets globals, calls the SDK, then unlocks. This is a known
-limitation of the upstream SDK.
+Cashfree SDK v6 uses an **instance-based architecture** with a `*Cashfree` struct (no package-level global variables).
+Each adapter instance owns its own independent Cashfree client, ensuring full thread-safety. Multiple `MultiPayClient`
+instances with different Cashfree adapters can coexist in the same process and be safely called concurrently by
+different goroutines. No mutexes or synchronization primitives are needed.
 
 ### Capability Matrix Is Static
 

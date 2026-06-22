@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	cf "github.com/cashfree/cashfree_pg"
+	cf "github.com/cashfree/cashfree-pg/v6"
 
 	"github.com/Bytonomics/multipay-adapter/domain"
 )
@@ -21,10 +21,6 @@ func createRefund(ctx context.Context, adapter *Adapter, req *domain.CreateRefun
 		return nil, fmt.Errorf("OrderID is required: %w", domain.ErrInvalidRequest)
 	}
 
-	// Lock the Cashfree SDK and set up globals
-	adapter.lockCashfreeSDK()
-	defer adapter.unlockCashfreeSDK()
-
 	// Build Cashfree refund request
 	refundAmount := 0.0
 	if req.AmountMinor > 0 {
@@ -37,10 +33,8 @@ func createRefund(ctx context.Context, adapter *Adapter, req *domain.CreateRefun
 	}
 
 	// Call Cashfree SDK to create refund
-	apiVersion := "2022-09-01"
-	cfRefund, _, err := cf.PGOrderCreateRefundWithContext(
+	cfRefund, _, err := adapter.cfClient.PGOrderCreateRefundWithContext(
 		ctx,
-		stringPtr(apiVersion),
 		req.OrderID,
 		cfReq,
 		nil, // xRequestId
@@ -76,15 +70,9 @@ func getRefund(ctx context.Context, adapter *Adapter, req *domain.GetRefundReque
 		return nil, fmt.Errorf("RefundID is required: %w", domain.ErrInvalidRequest)
 	}
 
-	// Lock the Cashfree SDK and set up globals
-	adapter.lockCashfreeSDK()
-	defer adapter.unlockCashfreeSDK()
-
 	// Call Cashfree SDK to fetch refund
-	apiVersion := "2022-09-01"
-	cfRefund, _, err := cf.PGOrderFetchRefundWithContext(
+	cfRefund, _, err := adapter.cfClient.PGOrderFetchRefundWithContext(
 		ctx,
-		stringPtr(apiVersion),
 		req.OrderID,
 		req.RefundID,
 		nil, // xRequestId
@@ -119,15 +107,9 @@ func listRefunds(ctx context.Context, adapter *Adapter, req *domain.ListRefundsR
 		return nil, fmt.Errorf("OrderID is required: %w", domain.ErrInvalidRequest)
 	}
 
-	// Lock the Cashfree SDK and set up globals
-	adapter.lockCashfreeSDK()
-	defer adapter.unlockCashfreeSDK()
-
 	// Call Cashfree SDK to fetch refunds for the order
-	apiVersion := "2022-09-01"
-	cfRefunds, _, err := cf.PGOrderFetchRefundsWithContext(
+	cfRefunds, _, err := adapter.cfClient.PGOrderFetchRefundsWithContext(
 		ctx,
-		stringPtr(apiVersion),
 		req.OrderID,
 		nil, // xRequestId
 		nil, // xIdempotencyKey

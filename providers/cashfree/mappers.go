@@ -3,11 +3,10 @@ package cashfree
 import (
 	"encoding/json"
 	"math"
-	"strconv"
 	"time"
 
 	"github.com/bojanz/currency"
-	cf "github.com/cashfree/cashfree_pg"
+	cf "github.com/cashfree/cashfree-pg/v6"
 
 	"github.com/Bytonomics/multipay-adapter/domain"
 )
@@ -59,17 +58,22 @@ func MapOrderEntityToCanonical(cfOrder *cf.OrderEntity) *domain.Order {
 		return nil
 	}
 
+	metadata := domain.Metadata(nil)
+	if cfOrder.OrderTags != nil {
+		metadata = domain.Metadata(*cfOrder.OrderTags)
+	}
+
 	order := &domain.Order{
-		ProviderOrderID: strconv.FormatInt(derefInt64(cfOrder.CfOrderId), 10),
+		ProviderOrderID: StringPtrToStr(cfOrder.CfOrderId),
 		OrderID:         StringPtrToStr(cfOrder.OrderId),
 		Status:          mapOrderStatus(cfOrder.OrderStatus),
 		AmountMinor:     domain.AmountMinor(AmountMajorToMinor(FloatPtrToFloat64(cfOrder.OrderAmount), StringPtrToStr(cfOrder.OrderCurrency))),
 		Currency:        domain.Currency(StringPtrToStr(cfOrder.OrderCurrency)),
 		SessionID:       StringPtrToStr(cfOrder.PaymentSessionId),
-		ExpiryTime:      cfOrder.OrderExpiryTime,
-		CreatedAt:       cfOrder.CreatedAt,
+		ExpiryTime:      timePtr(TimeFromTimestamp(cfOrder.OrderExpiryTime)),
+		CreatedAt:       timePtr(TimeFromTimestamp(cfOrder.CreatedAt)),
 		Customer:        nil,
-		Metadata:        domain.Metadata(cfOrder.OrderTags),
+		Metadata:        metadata,
 		Raw:             rawResponse(cfOrder),
 	}
 
@@ -82,19 +86,14 @@ func MapPaymentEntityToCanonical(cfPayment *cf.PaymentEntity) *domain.Payment {
 		return nil
 	}
 
-	paymentID := ""
-	if cfPayment.CfPaymentId != nil {
-		paymentID = strconv.FormatInt(*cfPayment.CfPaymentId, 10)
-	}
-
 	payment := &domain.Payment{
-		ProviderPaymentID: paymentID,
+		ProviderPaymentID: StringPtrToStr(cfPayment.CfPaymentId),
 		OrderID:           StringPtrToStr(cfPayment.OrderId),
 		Status:            mapPaymentStatus(cfPayment.PaymentStatus),
 		AmountMinor:       domain.AmountMinor(AmountMajorToMinor(FloatPtrToFloat64(cfPayment.PaymentAmount), StringPtrToStr(cfPayment.PaymentCurrency))),
 		Currency:          domain.Currency(StringPtrToStr(cfPayment.PaymentCurrency)),
 		PaymentGroup:      StringPtrToStr(cfPayment.PaymentGroup),
-		PaymentMethod:     "", // PaymentMethod is complex; extract as needed
+		PaymentMethod:     "",
 		PaymentTime:       timePtr(TimeFromTimestamp(cfPayment.PaymentTime)),
 		CompletionTime:    timePtr(TimeFromTimestamp(cfPayment.PaymentCompletionTime)),
 		IsCaptured:        derefBool(cfPayment.IsCaptured),
@@ -200,10 +199,10 @@ func MapRefundEntityToCanonical(cfRefund *cf.RefundEntity) *domain.Refund {
 	}
 
 	refund := &domain.Refund{
-		ProviderRefundID: refundID,
+		ProviderRefundID: StringPtrToStr(cfRefund.CfRefundId),
 		RefundID:         refundID,
 		OrderID:          StringPtrToStr(cfRefund.OrderId),
-		PaymentID:        strconv.FormatInt(derefInt64(cfRefund.CfPaymentId), 10),
+		PaymentID:        StringPtrToStr(cfRefund.CfPaymentId),
 		Status:           mapRefundStatus(cfRefund.RefundStatus),
 		AmountMinor:      domain.AmountMinor(AmountMajorToMinor(FloatPtrToFloat64(cfRefund.RefundAmount), StringPtrToStr(cfRefund.RefundCurrency))),
 		Currency:         domain.Currency(StringPtrToStr(cfRefund.RefundCurrency)),
@@ -266,6 +265,36 @@ func MapInstrumentEntityToCanonical(cfInstrument *cf.InstrumentEntity) *domain.I
 	return instrument
 }
 
+// MapInstrumentEntityForAllSavedCardToCanonical maps a Cashfree InstrumentEntityForAllSavedCard
+// (returned from list operations) to the canonical domain.Instrument type.
+func MapInstrumentEntityForAllSavedCardToCanonical(cfInstrument *cf.InstrumentEntityForAllSavedCard) *domain.Instrument {
+	if cfInstrument == nil {
+		return nil
+	}
+
+	instrumentID := ""
+	if cfInstrument.InstrumentId != nil {
+		instrumentID = *cfInstrument.InstrumentId
+	}
+
+	instrumentType := ""
+	if cfInstrument.InstrumentType != nil {
+		instrumentType = *cfInstrument.InstrumentType
+	}
+
+	instrument := &domain.Instrument{
+		CustomerID:     StringPtrToStr(cfInstrument.CustomerId),
+		InstrumentID:   instrumentID,
+		InstrumentType: instrumentType,
+		DisplayValue:   StringPtrToStr(cfInstrument.InstrumentDisplay),
+		Status:         StringPtrToStr(cfInstrument.InstrumentStatus),
+		CreatedAt:      timePtr(TimeFromTimestamp(cfInstrument.CreatedAt)),
+		Raw:            rawResponse(cfInstrument),
+	}
+
+	return instrument
+}
+
 // MapLinkEntityToCanonical maps a Cashfree LinkEntity (payment link) to the canonical domain.PaymentLink type.
 func MapLinkEntityToCanonical(cfLink *cf.LinkEntity) *domain.PaymentLink {
 	if cfLink == nil {
@@ -278,8 +307,13 @@ func MapLinkEntityToCanonical(cfLink *cf.LinkEntity) *domain.PaymentLink {
 		linkStatus = domain.PaymentLinkStatus(*cfLink.LinkStatus)
 	}
 
+	metadata := domain.Metadata(nil)
+	if cfLink.LinkNotes != nil {
+		metadata = domain.Metadata(*cfLink.LinkNotes)
+	}
+
 	link := &domain.PaymentLink{
-		ProviderLinkID: strconv.FormatInt(derefInt64(cfLink.CfLinkId), 10),
+		ProviderLinkID: StringPtrToStr(cfLink.CfLinkId),
 		LinkID:         StringPtrToStr(cfLink.LinkId),
 		Status:         linkStatus,
 		AmountMinor:    domain.AmountMinor(AmountMajorToMinor(FloatPtrToFloat64(cfLink.LinkAmount), StringPtrToStr(cfLink.LinkCurrency))),
@@ -290,19 +324,11 @@ func MapLinkEntityToCanonical(cfLink *cf.LinkEntity) *domain.PaymentLink {
 		Customer:       nil, // Customer info not directly available from LinkEntity
 		CreatedAt:      timePtr(TimeFromTimestamp(cfLink.LinkCreatedAt)),
 		ExpiryTime:     timePtr(TimeFromTimestamp(cfLink.LinkExpiryTime)),
-		Metadata:       nil,
+		Metadata:       metadata,
 		Raw:            rawResponse(cfLink),
 	}
 
 	return link
-}
-
-// derefInt64 safely dereferences an int64 pointer or returns 0.
-func derefInt64(i *int64) int64 {
-	if i == nil {
-		return 0
-	}
-	return *i
 }
 
 // derefBool safely dereferences a bool pointer or returns false.

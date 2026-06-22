@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	cf "github.com/cashfree/cashfree_pg"
+	cf "github.com/cashfree/cashfree-pg/v6"
 
 	"github.com/Bytonomics/multipay-adapter/domain"
 )
@@ -25,22 +25,16 @@ func createPaymentLink(ctx context.Context, adapter *Adapter, req *domain.Create
 		return nil, fmt.Errorf("currency is required: %w", domain.ErrInvalidRequest)
 	}
 
-	// Lock the Cashfree SDK and set up globals
-	adapter.lockCashfreeSDK()
-	defer adapter.unlockCashfreeSDK()
-
 	// Build Cashfree CreateLinkRequest
 	cfReq := &cf.CreateLinkRequest{
 		LinkAmount:   AmountMinorToMajor(int64(req.AmountMinor), string(req.Currency)),
 		LinkCurrency: string(req.Currency),
-		LinkPurpose:  req.Purpose,
+		LinkPurpose:  stringPtr(req.Purpose),
 	}
 
 	// Call Cashfree SDK
-	apiVersion := "2022-09-01"
-	cfLink, _, err := cf.PGCreateLinkWithContext(
+	cfLink, _, err := adapter.cfClient.PGCreateLinkWithContext(
 		ctx,
-		stringPtr(apiVersion),
 		cfReq,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
@@ -71,15 +65,9 @@ func getPaymentLink(ctx context.Context, adapter *Adapter, req *domain.GetPaymen
 		return nil, fmt.Errorf("LinkID is required: %w", domain.ErrInvalidRequest)
 	}
 
-	// Lock the Cashfree SDK and set up globals
-	adapter.lockCashfreeSDK()
-	defer adapter.unlockCashfreeSDK()
-
 	// Call Cashfree SDK to fetch payment link
-	apiVersion := "2022-09-01"
-	cfLink, _, err := cf.PGFetchLinkWithContext(
+	cfLink, _, err := adapter.cfClient.PGFetchLinkWithContext(
 		ctx,
-		stringPtr(apiVersion),
 		req.LinkID,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
@@ -114,15 +102,9 @@ func cancelPaymentLink(ctx context.Context, adapter *Adapter, req *domain.Cancel
 		return nil, fmt.Errorf("LinkID is required: %w", domain.ErrInvalidRequest)
 	}
 
-	// Lock the Cashfree SDK and set up globals
-	adapter.lockCashfreeSDK()
-	defer adapter.unlockCashfreeSDK()
-
 	// Call Cashfree SDK to cancel payment link
-	apiVersion := "2022-09-01"
-	cfLink, _, err := cf.PGCancelLinkWithContext(
+	cfLink, _, err := adapter.cfClient.PGCancelLinkWithContext(
 		ctx,
-		stringPtr(apiVersion),
 		req.LinkID,
 		nil, // xRequestId
 		nil, // xIdempotencyKey

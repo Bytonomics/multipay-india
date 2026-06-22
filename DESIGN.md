@@ -205,7 +205,7 @@ All methods accept typed request structs from `domain/` (e.g., `*domain.CreateOr
 
 - **ClientConfig**: Contains the bound `Provider` (`ports.ProviderAdapter`), optional hooks, webhook store, logger, and clock
 - **Multi-Instance**: Multiple `MultiPayClient` instances can coexist in one process with different provider/account bindings
-- **Thread-Safe**: No package-level mutable state (except Cashfree SDK mutex — a workaround for the upstream SDK's global vars)
+- **Thread-Safe**: No package-level mutable state. Each `MultiPayClient` owns its dependencies independently; Cashfree SDK v6 uses instance-based architecture with no globals
 - **Webhook Segregation**: Separate endpoints per provider+account via `routing.EndpointRegistry`
 
 ### 7. Testing and Mocking
@@ -283,11 +283,11 @@ All components are fully thread-safe:
 
 - **MultiPayClient**: Can be shared across goroutines
 - **Services**: All methods are safe to call concurrently
-- **Adapters**: All methods are safe to call concurrently
+- **Adapters**: All methods are safe to call concurrently — each adapter maintains its own independent instance of the provider client (Cashfree SDK v6 uses instance-based architecture)
 - **Hooks**: Hook handlers are called serially within a single request, but multiple requests are handled concurrently
 - **Webhook Handler**: Safe to call from multiple HTTP handler goroutines
 
-There are no global variables or shared mutable state. Each MultiPayClient owns its dependencies, and dependencies do not share state.
+There are no global variables or shared mutable state. Each MultiPayClient owns its dependencies, and dependencies do not share state. Cashfree SDK v6 uses an instance-based `*Cashfree` struct (no package-level globals), eliminating the need for mutexes.
 
 ## Observability
 
@@ -305,7 +305,7 @@ Logger is mandatory (panics on nil at construction). All log methods accept `con
 
 1. **Webhook Signature Verification**: HMAC-SHA256 verification per provider (Cashfree uses `X-Cashfree-Signature`, Razorpay uses `X-Razorpay-Signature`); constant-time comparison via `crypto/subtle`
 2. **Credential Isolation**: Provider credentials are never logged; `CallerLogger` only adds caller location, not request data
-3. **Cashfree SDK Global Guard**: Package-level `sync.Mutex` prevents concurrent credential corruption (Cashfree SDK uses global vars)
+3. **Provider Client Architecture**: Cashfree SDK v6 uses instance-based `*Cashfree` struct (no package-level globals); each adapter instance owns its client, ensuring thread-safe concurrent calls without mutexes
 4. **POST-Only Webhooks**: `WebhookHandler.ServeHTTP` rejects non-POST requests with 405
 5. **Signature vs Other Errors**: Webhook handler differentiates `ErrWebhookVerificationFailed` (400) from other errors (500) via `errors.Is()`
 
