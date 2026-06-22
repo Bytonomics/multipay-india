@@ -28,7 +28,7 @@ func createRefund(ctx context.Context, adapter *Adapter, req *domain.CreateRefun
 	// Build Cashfree refund request
 	refundAmount := 0.0
 	if req.AmountMinor > 0 {
-		refundAmount = AmountMinorToCashfree(int64(req.AmountMinor))
+		refundAmount = AmountMinorToMajor(int64(req.AmountMinor), string(req.Currency))
 	}
 
 	cfReq := &cf.OrderCreateRefundRequest{

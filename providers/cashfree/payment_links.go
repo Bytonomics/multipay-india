@@ -31,7 +31,7 @@ func createPaymentLink(ctx context.Context, adapter *Adapter, req *domain.Create
 
 	// Build Cashfree CreateLinkRequest
 	cfReq := &cf.CreateLinkRequest{
-		LinkAmount:   AmountMinorToCashfree(int64(req.AmountMinor)),
+		LinkAmount:   AmountMinorToMajor(int64(req.AmountMinor), string(req.Currency)),
 		LinkCurrency: string(req.Currency),
 		LinkPurpose:  req.Purpose,
 	}

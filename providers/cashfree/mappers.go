@@ -6,23 +6,50 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/bojanz/currency"
 	cf "github.com/cashfree/cashfree_pg"
 
 	"github.com/Bytonomics/multipay-adapter/domain"
 )
 
-// AmountMinorToCashfree converts an amount from paisa (int64) to rupees (float64).
-// Paisa is the minor currency unit in India; 100 paisa = 1 rupee.
-// Example: 50000 paisa → 500.00 rupees
-func AmountMinorToCashfree(minorAmount int64) float64 {
-	return float64(minorAmount) / 100.0
+// AmountMinorToMajor converts minor units (paisa/cents/fils) to major units (rupees/dollars/dinars)
+// using the ISO 4217 minor unit exponent for the given currency.
+// Examples:
+//
+//	AmountMinorToMajor(50000, "INR") → 500.0  (exponent 2, factor 100)
+//	AmountMinorToMajor(500, "JPY")   → 500.0  (exponent 0, factor 1)
+//	AmountMinorToMajor(500000, "BHD") → 500.0  (exponent 3, factor 1000)
+func AmountMinorToMajor(minorAmount int64, currencyCode string) float64 {
+	digits, ok := currency.GetDigits(currencyCode)
+	if !ok {
+		// Unknown currency — fall back to exponent 2 (most common)
+		digits = 2
+	}
+	if digits == 0 {
+		return float64(minorAmount)
+	}
+	factor := math.Pow(10, float64(digits))
+	return float64(minorAmount) / factor
 }
 
-// AmountCashfreeToMinor converts an amount from rupees (float64) to paisa (int64).
-// Uses math.Round for proper rounding to the nearest paisa.
-// Example: 500.50 rupees → 50050 paisa
-func AmountCashfreeToMinor(rupeesAmount float64) int64 {
-	return int64(math.Round(rupeesAmount * 100.0))
+// AmountMajorToMinor converts major units (rupees/dollars/dinars) to minor units (paisa/cents/fils)
+// using the ISO 4217 minor unit exponent for the given currency.
+// Examples:
+//
+//	AmountMajorToMinor(500.0, "INR")  → 50000  (exponent 2, factor 100)
+//	AmountMajorToMinor(500.0, "JPY")  → 500    (exponent 0, factor 1)
+//	AmountMajorToMinor(500.0, "BHD")  → 500000 (exponent 3, factor 1000)
+func AmountMajorToMinor(majorAmount float64, currencyCode string) int64 {
+	digits, ok := currency.GetDigits(currencyCode)
+	if !ok {
+		// Unknown currency — fall back to exponent 2 (most common)
+		digits = 2
+	}
+	if digits == 0 {
+		return int64(math.Round(majorAmount))
+	}
+	factor := math.Pow(10, float64(digits))
+	return int64(math.Round(majorAmount * factor))
 }
 
 // MapOrderEntityToCanonical maps a Cashfree OrderEntity to the canonical domain.Order type.
@@ -36,7 +63,7 @@ func MapOrderEntityToCanonical(cfOrder *cf.OrderEntity) *domain.Order {
 		ProviderOrderID: strconv.FormatInt(derefInt64(cfOrder.CfOrderId), 10),
 		OrderID:         StringPtrToStr(cfOrder.OrderId),
 		Status:          mapOrderStatus(cfOrder.OrderStatus),
-		AmountMinor:     domain.AmountMinor(AmountCashfreeToMinor(FloatPtrToFloat64(cfOrder.OrderAmount))),
+		AmountMinor:     domain.AmountMinor(AmountMajorToMinor(FloatPtrToFloat64(cfOrder.OrderAmount), StringPtrToStr(cfOrder.OrderCurrency))),
 		Currency:        domain.Currency(StringPtrToStr(cfOrder.OrderCurrency)),
 		SessionID:       StringPtrToStr(cfOrder.PaymentSessionId),
 		ExpiryTime:      cfOrder.OrderExpiryTime,
@@ -64,7 +91,7 @@ func MapPaymentEntityToCanonical(cfPayment *cf.PaymentEntity) *domain.Payment {
 		ProviderPaymentID: paymentID,
 		OrderID:           StringPtrToStr(cfPayment.OrderId),
 		Status:            mapPaymentStatus(cfPayment.PaymentStatus),
-		AmountMinor:       domain.AmountMinor(AmountCashfreeToMinor(FloatPtrToFloat64(cfPayment.PaymentAmount))),
+		AmountMinor:       domain.AmountMinor(AmountMajorToMinor(FloatPtrToFloat64(cfPayment.PaymentAmount), StringPtrToStr(cfPayment.PaymentCurrency))),
 		Currency:          domain.Currency(StringPtrToStr(cfPayment.PaymentCurrency)),
 		PaymentGroup:      StringPtrToStr(cfPayment.PaymentGroup),
 		PaymentMethod:     "", // PaymentMethod is complex; extract as needed
@@ -178,7 +205,7 @@ func MapRefundEntityToCanonical(cfRefund *cf.RefundEntity) *domain.Refund {
 		OrderID:          StringPtrToStr(cfRefund.OrderId),
 		PaymentID:        strconv.FormatInt(derefInt64(cfRefund.CfPaymentId), 10),
 		Status:           mapRefundStatus(cfRefund.RefundStatus),
-		AmountMinor:      domain.AmountMinor(AmountCashfreeToMinor(FloatPtrToFloat64(cfRefund.RefundAmount))),
+		AmountMinor:      domain.AmountMinor(AmountMajorToMinor(FloatPtrToFloat64(cfRefund.RefundAmount), StringPtrToStr(cfRefund.RefundCurrency))),
 		Currency:         domain.Currency(StringPtrToStr(cfRefund.RefundCurrency)),
 		Reason:           StringPtrToStr(cfRefund.RefundNote),
 		ARN:              StringPtrToStr(cfRefund.RefundArn),
@@ -255,8 +282,8 @@ func MapLinkEntityToCanonical(cfLink *cf.LinkEntity) *domain.PaymentLink {
 		ProviderLinkID: strconv.FormatInt(derefInt64(cfLink.CfLinkId), 10),
 		LinkID:         StringPtrToStr(cfLink.LinkId),
 		Status:         linkStatus,
-		AmountMinor:    domain.AmountMinor(AmountCashfreeToMinor(FloatPtrToFloat64(cfLink.LinkAmount))),
-		AmountPaid:     domain.AmountMinor(AmountCashfreeToMinor(FloatPtrToFloat64(cfLink.LinkAmountPaid))),
+		AmountMinor:    domain.AmountMinor(AmountMajorToMinor(FloatPtrToFloat64(cfLink.LinkAmount), StringPtrToStr(cfLink.LinkCurrency))),
+		AmountPaid:     domain.AmountMinor(AmountMajorToMinor(FloatPtrToFloat64(cfLink.LinkAmountPaid), StringPtrToStr(cfLink.LinkCurrency))),
 		Currency:       domain.Currency(StringPtrToStr(cfLink.LinkCurrency)),
 		Purpose:        StringPtrToStr(cfLink.LinkPurpose),
 		LinkURL:        StringPtrToStr(cfLink.LinkUrl),

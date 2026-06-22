@@ -12,9 +12,10 @@
 #
 # Hook execution order:
 #   1. Security (gitleaks)
-#   2. Build check (verify code compiles)
-#   3. Go lint (includes format + golangci-lint with NilAway)
-#   4. Go unit tests with coverage
+#   2. Vendor sync (go mod tidy + go mod vendor)
+#   3. Build check (verify code compiles)
+#   4. Go lint (includes format + golangci-lint with NilAway)
+#   5. Go unit tests with coverage
 
 repos:
   # ============================================
@@ -25,7 +26,20 @@ repos:
     hooks:
       - id: gitleaks
   # ============================================
-  # 2. BUILD CHECK (verify code compiles)
+  # 2. VENDOR SYNC (ensure vendor/ matches go.mod)
+  # ============================================
+  - repo: local
+    hooks:
+      - id: vendor-sync
+        name: Vendor sync
+        description: Runs make vendor (go mod tidy + go mod vendor) to keep vendor/ consistent
+        entry: make vendor
+        language: system
+        types: [go]
+        pass_filenames: false
+
+  # ============================================
+  # 3. BUILD CHECK (verify code compiles)
   # ============================================
   - repo: local
     hooks:
@@ -38,7 +52,7 @@ repos:
         pass_filenames: false
 
   # ============================================
-  # 3. GO LINT (includes format + golangci-lint)
+  # 4. GO LINT (includes format + golangci-lint)
   # ============================================
   - repo: local
     hooks:
@@ -51,7 +65,7 @@ repos:
         pass_filenames: false
 
   # ============================================
-  # 4. GO UNIT TESTS WITH COVERAGE
+  # 5. GO UNIT TESTS WITH COVERAGE
   # ============================================
   - repo: local
     hooks:

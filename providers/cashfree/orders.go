@@ -29,7 +29,7 @@ func createOrder(ctx context.Context, adapter *Adapter, req *domain.CreateOrderR
 
 	// Build Cashfree CreateOrderRequest
 	cfReq := &cf.CreateOrderRequest{
-		OrderAmount:   AmountMinorToCashfree(int64(req.AmountMinor)),
+		OrderAmount:   AmountMinorToMajor(int64(req.AmountMinor), string(req.Currency)),
 		OrderCurrency: string(req.Currency),
 		CustomerDetails: cf.CustomerDetails{
 			CustomerId:    req.Customer.CustomerID,

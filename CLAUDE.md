@@ -217,6 +217,21 @@ Never check `if s.logger != nil` in method bodies. Logger is always assumed non-
 
 **Applied to:** All orchestration services, `WebhookHandler`, `AuditHook`, `MetricsHook`.
 
+### Amounts Are Always Minor Units — Never Major Units
+
+All monetary amounts in the library use `domain.AmountMinor` (`int64`) — the smallest unit of the currency (paisa, cents, fils). The conversion factor depends on the ISO 4217 exponent:
+
+- **Exponent 0** (JPY, KRW, VND): `AmountMinor` = major unit value (no subdivision)
+- **Exponent 2** (INR, USD, EUR, GBP): 100 minor = 1 major (`50000` = ₹500)
+- **Exponent 3** (BHD, KWD, OMR): 1000 minor = 1 major (`500000` = 500 BHD)
+
+**Rules for agents:**
+- NEVER pass a major-unit value (like `500` for ₹500) as `AmountMinor` — that would be ₹5.00
+- NEVER hardcode `/100` or `*100` for currency conversion — use `AmountMinorToMajor`/`AmountMajorToMinor` from `providers/cashfree/mappers.go` which use `bojanz/currency.GetDigits()` for the correct ISO 4217 exponent
+- Razorpay API uses minor units natively — `AmountMinor` is passed directly, no conversion
+- Cashfree API uses major units (float64) — the adapter converts using `AmountMinorToMajor(amount, currencyCode)`
+- When constructing test data, always think in minor units: `AmountMinor: 50000` for ₹500, `AmountMinor: 500` for ¥500
+
 ### Error Handling
 
 - Wrap all errors with `%w` to preserve call stacks

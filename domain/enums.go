@@ -22,18 +22,19 @@ func (p Provider) IsValid() bool {
 	return false
 }
 
-// AmountMinor represents monetary amounts in minor units (paisa/cents).
-// 100 AmountMinor = 1 major currency unit.
+// AmountMinor represents monetary amounts in minor units (paisa/cents/fils).
+// The conversion factor depends on the ISO 4217 currency exponent:
+//   - Exponent 0 (JPY, KRW, VND): 1 minor = 1 major
+//   - Exponent 2 (INR, USD, EUR): 100 minor = 1 major
+//   - Exponent 3 (BHD, KWD, OMR): 1000 minor = 1 major
 type AmountMinor int64
 
-// Currency identifies the transaction currency.
+// Currency represents an ISO 4217 three-letter currency code.
+// All ISO 4217 codes are valid (e.g., "INR", "USD", "EUR", "JPY", "BHD", "KWD").
+// The library uses github.com/bojanz/currency for minor unit lookups.
+// Do NOT restrict to a hardcoded set — both Cashfree (140+) and Razorpay (130+)
+// support a wide range of international currencies.
 type Currency string
-
-const (
-	CurrencyINR Currency = "INR"
-	CurrencyUSD Currency = "USD"
-	CurrencyEUR Currency = "EUR"
-)
 
 // String returns the string representation.
 func (c Currency) String() string {

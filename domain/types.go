@@ -102,6 +102,7 @@ type CreateRefundRequest struct {
 	PaymentID   string      `json:"payment_id,omitempty"`
 	RefundID    string      `json:"refund_id,omitempty"`
 	AmountMinor AmountMinor `json:"amount_minor"`
+	Currency    Currency    `json:"currency"`
 	Reason      string      `json:"reason,omitempty"`
 	Metadata    Metadata    `json:"metadata,omitempty"`
 }

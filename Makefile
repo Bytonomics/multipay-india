@@ -206,7 +206,9 @@ deps: ## Download and tidy Go dependencies
 vendor: ## Vendor dependencies (sync + tidy)
 	@echo "Tidying modules..."
 	go mod tidy
-	@echo "✓ Modules tidied"
+	@echo "Vendoring modules..."
+	go mod vendor
+	@echo "✓ Modules tidied and vendored"
 
 # ============================================
 # CLEANUP

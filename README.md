@@ -30,6 +30,50 @@ go get github.com/Bytonomics/multipay-adapter
 
 **Go Version Requirement**: Go 1.26 or later
 
+## Amounts Are Always in Minor Currency Units
+
+**All amounts in this library use `AmountMinor` (`int64`) — the smallest unit of the currency.**
+
+This is the single most important API contract. Getting it wrong means charging 100x too little or too much.
+
+| Currency | Minor Unit | 1 Major Unit | To charge ₹500 / $500 / ¥500 |
+|----------|-----------|-------------|-------------------------------|
+| INR | paisa | 100 paisa = ₹1 | `AmountMinor: 50000` |
+| USD | cent | 100 cents = $1 | `AmountMinor: 50000` |
+| EUR | cent | 100 cents = €1 | `AmountMinor: 50000` |
+| JPY | yen | 1 yen = ¥1 (no subdivision) | `AmountMinor: 500` |
+| BHD | fils | 1000 fils = 1 BHD | `AmountMinor: 500000` |
+| KWD | fils | 1000 fils = 1 KWD | `AmountMinor: 500000` |
+
+```go
+// CORRECT — charge ₹500.00
+order, err := client.Orders().CreateOrder(ctx, &domain.CreateOrderRequest{
+    AmountMinor: 50000,  // 50000 paisa = ₹500.00
+    Currency:    "INR",
+    // ...
+})
+
+// WRONG — this charges ₹5.00, not ₹500!
+order, err := client.Orders().CreateOrder(ctx, &domain.CreateOrderRequest{
+    AmountMinor: 500,    // 500 paisa = ₹5.00
+    Currency:    "INR",
+    // ...
+})
+
+// CORRECT — charge ¥500 (JPY has no minor unit)
+order, err := client.Orders().CreateOrder(ctx, &domain.CreateOrderRequest{
+    AmountMinor: 500,    // 500 yen = ¥500 (exponent 0)
+    Currency:    "JPY",
+    // ...
+})
+```
+
+The library handles provider-specific conversion internally:
+- **Cashfree** receives amounts in major units (rupees/dollars) — the library converts using ISO 4217 exponents via `bojanz/currency`
+- **Razorpay** receives amounts in minor units (paisa/cents) — no conversion needed
+
+You never need to worry about provider differences. Just pass `AmountMinor` consistently.
+
 ## Quick Start
 
 ### 1. Create Adapters
