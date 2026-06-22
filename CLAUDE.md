@@ -5,9 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What This Project Is
 
 MultiPay Adapter (`github.com/Bytonomics/multipay-adapter`) is a Go library that provides a single, consistent API
-for integrating multiple Indian payment providers (Cashfree PG and Razorpay). Applications use one API regardless of
-which provider is active, can switch providers without code changes, and handle webhooks with built-in deduplication
-and signature verification.
+for integrating Indian payment providers (Cashfree PG and Razorpay). Each client is bound to one provider at
+construction time. Applications use the same API regardless of which provider is configured, and handle webhooks
+with built-in deduplication and signature verification.
 
 The library is a **dependency** (imported by other Go projects), not a standalone service.
 
@@ -56,20 +56,16 @@ graph TD
     subgraph "Orchestration Layer - 7 services"
         OS --> HP[Hook Pipeline]
         OS --> CV[Capability Validator]
-        OS --> PR[ProviderResolver]
+        OS --> PA[Direct ProviderAdapter]
         PS --> HP
         RS --> HP
         IS --> HP
         PLS --> HP
     end
 
-    subgraph "Ports - interfaces"
-        PR --> ProvReg[ProviderRegistry]
-    end
-
     subgraph "Adapters - implementations"
-        ProvReg --> CFA[CashfreeAdapter]
-        ProvReg --> RZA[RazorpayAdapter]
+        PA --> CFA[CashfreeAdapter]
+        PA --> RZA[RazorpayAdapter]
     end
 
     CFA --> CFSDK[cashfree_pg SDK]
@@ -95,7 +91,7 @@ capabilities/    -> SupportMatrix (immutable capability lookup), Validator
 routing/         -> WebhookHandler (http.Handler), EndpointMatcher, EndpointRegistry
                     Depends on: ports/, domain/
 
-ports/           -> All interfaces: ProviderAdapter, ProviderResolver, Hook, WebhookStore, Logger, Clock
+ports/           -> All interfaces: ProviderAdapter, Hook, WebhookStore, Logger, Clock
                     Depends on: domain/, capabilities/
 
 domain/          -> Zero dependencies. Canonical types, enums, sentinel errors.
@@ -113,7 +109,6 @@ sequenceDiagram
     participant C as Caller
     participant S as Service
     participant V as CapabilityValidator
-    participant R as ProviderResolver
     participant HP as HookPipeline
     participant A as ProviderAdapter
 
@@ -121,8 +116,6 @@ sequenceDiagram
     S->>S: nil check on request
     S->>V: RequireCapability(provider, cap)
     V-->>S: nil or CapabilityError
-    S->>R: Resolve(provider)
-    R-->>S: adapter
     S->>HP: ExecuteBefore(ctx, hookCtx)
     HP-->>S: modified ctx
     S->>A: operation(ctx, req)
@@ -244,6 +237,23 @@ All monetary amounts in the library use `domain.AmountMinor` (`int64`) — the s
 
 Enforced by gci: `stdlib -> external -> github.com/Bytonomics`
 
+### Client Construction Contract
+
+`client.ClientConfig` must bind the configured adapter directly:
+
+```go
+mpClient, err := client.NewClient(&client.ClientConfig{
+    Provider: cashfreeAdapter,
+    Logger:   yourLogger,
+})
+```
+
+Rules:
+- `Provider` is the `ports.ProviderAdapter` implementation
+- Provider identity is derived internally via `cfg.Provider.ProviderName()`
+- Request structs and service methods must remain provider-free
+- Use `domain.EnvironmentSandbox` / `domain.EnvironmentProduction` for provider configs
+
 ---
 
 ## Linter Configuration
@@ -300,16 +310,15 @@ When writing code or examples, always use typed constants (`domain.ProviderCashf
 3. Create `mappers.go` for SDK type -> domain type conversion
 4. Create `metadata.go` implementing `ports.MetadataMapper`
 5. Add capability entries to `capabilities/matrix.go` in `NewSupportMatrix()`
-6. Register in `client/client.go` via `ClientConfig.Providers`
+6. Register in `client/client.go` via `ClientConfig.Provider`
 
 ### Adding a New Orchestration Service Method
 
 Follow the exact pattern in `orchestration/orders.go:CreateOrder`:
 1. Nil check on request
 2. Capability validation via `s.validator.RequireCapability()`
-3. Provider resolution via `s.resolver.Resolve()`
-4. Build `HookContext` with `RequestType`, `RequestData`, `StartTime`
-5. Execute before hooks
-6. Call adapter method
-7. On error: set `hookCtx.Error`, execute OnError hooks, return wrapped error
-8. On success: set `hookCtx.ResponseData`, execute after hooks, return result
+3. Build `HookContext` with `RequestType`, `RequestData`, `StartTime`
+4. Execute before hooks
+5. Call adapter method (via `s.adapter`)
+6. On error: set `hookCtx.Error`, execute OnError hooks, return wrapped error
+7. On success: set `hookCtx.ResponseData`, execute after hooks, return result

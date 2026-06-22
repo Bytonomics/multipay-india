@@ -14,7 +14,8 @@ import (
 // OrderService orchestrates order operations across multiple payment providers.
 // It handles validation, capability checking, and hook execution.
 type OrderService struct {
-	resolver  ports.ProviderResolver
+	adapter   ports.ProviderAdapter
+	provider  domain.Provider
 	validator *capabilities.Validator
 	pipeline  *hooks.Pipeline
 	logger    ports.Logger
@@ -22,14 +23,15 @@ type OrderService struct {
 }
 
 // NewOrderService constructs an OrderService with required dependencies.
-func NewOrderService(resolver ports.ProviderResolver, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger, clock ports.Clock) *OrderService {
+func NewOrderService(provider domain.Provider, adapter ports.ProviderAdapter, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger, clock ports.Clock) *OrderService {
 	if logger == nil {
 		panic("logger is required (cannot be nil)")
 	}
 	wrappedLogger := logging.NewCallerLogger(logger, 2)
 
 	return &OrderService{
-		resolver:  resolver,
+		adapter:   adapter,
+		provider:  provider,
 		validator: validator,
 		pipeline:  pipeline,
 		logger:    wrappedLogger,
@@ -43,15 +45,11 @@ func (s *OrderService) CreateOrder(ctx context.Context, req *domain.CreateOrderR
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	provider := req.Provider
+	provider := s.provider
+	adapter := s.adapter
 
 	if err := s.validator.RequireCapability(ctx, provider, capabilities.CapOrderCreate); err != nil {
 		return nil, fmt.Errorf("capability check failed: %w", err)
-	}
-
-	adapter, err := s.resolver.Resolve(ctx, provider)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve adapter: %w", err)
 	}
 
 	hookCtx := &ports.HookContext{
@@ -90,16 +88,12 @@ func (s *OrderService) GetOrder(ctx context.Context, req *domain.GetOrderRequest
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	provider := req.Provider
+	provider := s.provider
+	adapter := s.adapter
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapOrderFetch)
 	if capErr != nil {
 		return nil, fmt.Errorf("capability check failed: %w", capErr)
-	}
-
-	adapter, err := s.resolver.Resolve(ctx, provider)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve adapter: %w", err)
 	}
 
 	hookCtx := &ports.HookContext{
@@ -138,16 +132,12 @@ func (s *OrderService) ListOrderPayments(ctx context.Context, req *domain.ListOr
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	provider := req.Provider
+	provider := s.provider
+	adapter := s.adapter
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapOrderListPayments)
 	if capErr != nil {
 		return nil, fmt.Errorf("capability check failed: %w", capErr)
-	}
-
-	adapter, err := s.resolver.Resolve(ctx, provider)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve adapter: %w", err)
 	}
 
 	hookCtx := &ports.HookContext{

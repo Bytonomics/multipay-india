@@ -3,7 +3,6 @@ package domain
 import "time"
 
 type CreatePaymentLinkRequest struct {
-	Provider       Provider      `json:"provider"`
 	LinkID         string        `json:"link_id,omitempty"`
 	AmountMinor    AmountMinor   `json:"amount_minor"`
 	Currency       Currency      `json:"currency"`
@@ -34,11 +33,9 @@ type PaymentLink struct {
 }
 
 type GetPaymentLinkRequest struct {
-	Provider Provider `json:"provider"`
-	LinkID   string   `json:"link_id"`
+	LinkID string `json:"link_id"`
 }
 
 type CancelPaymentLinkRequest struct {
-	Provider Provider `json:"provider"`
-	LinkID   string   `json:"link_id"`
+	LinkID string `json:"link_id"`
 }

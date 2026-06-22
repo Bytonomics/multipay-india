@@ -13,7 +13,8 @@ import (
 
 // PaymentLinkService orchestrates payment link operations with validation, capability checking, and hooks.
 type PaymentLinkService struct {
-	resolver  ports.ProviderResolver
+	adapter   ports.ProviderAdapter
+	provider  domain.Provider
 	validator *capabilities.Validator
 	pipeline  *hooks.Pipeline
 	logger    ports.Logger
@@ -21,14 +22,15 @@ type PaymentLinkService struct {
 }
 
 // NewPaymentLinkService constructs a PaymentLinkService with dependency injection.
-func NewPaymentLinkService(resolver ports.ProviderResolver, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger, clock ports.Clock) *PaymentLinkService {
+func NewPaymentLinkService(provider domain.Provider, adapter ports.ProviderAdapter, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger, clock ports.Clock) *PaymentLinkService {
 	if logger == nil {
 		panic("logger is required (cannot be nil)")
 	}
 	wrappedLogger := logging.NewCallerLogger(logger, 2)
 
 	return &PaymentLinkService{
-		resolver:  resolver,
+		adapter:   adapter,
+		provider:  provider,
 		validator: validator,
 		pipeline:  pipeline,
 		logger:    wrappedLogger,
@@ -42,16 +44,12 @@ func (s *PaymentLinkService) CreatePaymentLink(ctx context.Context, req *domain.
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	provider := req.Provider
+	provider := s.provider
+	adapter := s.adapter
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapPaymentLinkCreate)
 	if capErr != nil {
 		return nil, fmt.Errorf("capability check failed: %w", capErr)
-	}
-
-	adapter, err := s.resolver.Resolve(ctx, provider)
-	if err != nil {
-		return nil, fmt.Errorf("provider resolution failed: %w", err)
 	}
 
 	hookCtx := &ports.HookContext{
@@ -90,16 +88,12 @@ func (s *PaymentLinkService) GetPaymentLink(ctx context.Context, req *domain.Get
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	provider := req.Provider
+	provider := s.provider
+	adapter := s.adapter
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapPaymentLinkFetch)
 	if capErr != nil {
 		return nil, fmt.Errorf("capability check failed: %w", capErr)
-	}
-
-	adapter, err := s.resolver.Resolve(ctx, provider)
-	if err != nil {
-		return nil, fmt.Errorf("provider resolution failed: %w", err)
 	}
 
 	hookCtx := &ports.HookContext{
@@ -138,16 +132,12 @@ func (s *PaymentLinkService) CancelPaymentLink(ctx context.Context, req *domain.
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	provider := req.Provider
+	provider := s.provider
+	adapter := s.adapter
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapPaymentLinkCancel)
 	if capErr != nil {
 		return nil, fmt.Errorf("capability check failed: %w", capErr)
-	}
-
-	adapter, err := s.resolver.Resolve(ctx, provider)
-	if err != nil {
-		return nil, fmt.Errorf("provider resolution failed: %w", err)
 	}
 
 	hookCtx := &ports.HookContext{

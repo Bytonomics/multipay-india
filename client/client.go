@@ -13,9 +13,9 @@ import (
 
 // MultiPayClient is the main public API for the payment adapter.
 // It provides orchestration services for orders, payments, refunds, instruments,
-// payment links, webhooks, and capability queries across multiple payment providers.
+// payment links, webhooks, and capability queries for a single payment provider.
 //
-// All services share a single ProviderRegistry, SupportMatrix, and HookPipeline
+// All services share a single ProviderAdapter, SupportMatrix, and HookPipeline
 // for consistent behavior across the client.
 type MultiPayClient struct {
 	orders       *orchestration.OrderService
@@ -31,14 +31,14 @@ type MultiPayClient struct {
 //
 // The client wires up all dependencies:
 // - Validates the config
+// - Derives the configured provider identity from the adapter implementation
 // - Creates a capability support matrix from provider declarations
 // - Creates a capability validator for early unsupported-capability detection
-// - Creates and populates a provider registry with all configured adapters
 // - Creates a hook pipeline from configured hooks
 // - Creates all 7 orchestration services with shared dependencies
 // - Optionally creates a webhook endpoint registry for webhook routing
 //
-// Returns an error if the config is invalid or if provider registration fails.
+// Returns an error if the config is invalid.
 func NewClient(cfg *ClientConfig) (*MultiPayClient, error) {
 	if cfg == nil {
 		return nil, errors.New("config cannot be nil")
@@ -48,17 +48,14 @@ func NewClient(cfg *ClientConfig) (*MultiPayClient, error) {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
+	adapter := cfg.Provider
+	provider := adapter.ProviderName()
+
 	// Create capability support matrix (pre-populated with both provider capabilities)
 	supportMatrix := capabilities.NewSupportMatrix()
 
 	// Create capability validator for early validation before adapter dispatch
 	validator := capabilities.NewValidator(supportMatrix)
-
-	// Create provider registry and register all configured adapters
-	registry, err := ports.NewProviderRegistryFromAdapters(cfg.Providers)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create provider registry: %w", err)
-	}
 
 	// Use provided logger or noop logger if not configured
 	logger := cfg.Logger
@@ -74,18 +71,21 @@ func NewClient(cfg *ClientConfig) (*MultiPayClient, error) {
 	pipeline := hooks.NewPipeline(logger, hookList...)
 
 	// Create clock for time-related operations
-	clock := ports.NewRealClock()
+	clock := cfg.Clock
+	if clock == nil {
+		clock = ports.NewRealClock()
+	}
 
-	// Create all 7 orchestration services with shared registry, validator, and pipeline
-	orderService := orchestration.NewOrderService(registry, validator, pipeline, logger, clock)
-	paymentService := orchestration.NewPaymentService(registry, validator, pipeline, logger, clock)
-	refundService := orchestration.NewRefundService(registry, validator, pipeline, logger, clock)
-	instrumentService := orchestration.NewInstrumentService(registry, validator, pipeline, logger, clock)
-	paymentLinkService := orchestration.NewPaymentLinkService(registry, validator, pipeline, logger, clock)
+	// Create all 7 orchestration services with the configured provider, adapter, validator, and pipeline
+	orderService := orchestration.NewOrderService(provider, adapter, validator, pipeline, logger, clock)
+	paymentService := orchestration.NewPaymentService(provider, adapter, validator, pipeline, logger, clock)
+	refundService := orchestration.NewRefundService(provider, adapter, validator, pipeline, logger, clock)
+	instrumentService := orchestration.NewInstrumentService(provider, adapter, validator, pipeline, logger, clock)
+	paymentLinkService := orchestration.NewPaymentLinkService(provider, adapter, validator, pipeline, logger, clock)
 
-	// WebhookService has a different constructor (requires ProviderResolver, Pipeline, Store, EndpointRegistry, Logger)
+	// WebhookService has a different constructor (requires Provider, Adapter, Pipeline, Store, EndpointRegistry, Logger)
 	endpointRegistry := routing.NewEndpointRegistry()
-	webhookService := orchestration.NewWebhookService(registry, pipeline, cfg.WebhookStore, endpointRegistry, logger)
+	webhookService := orchestration.NewWebhookService(provider, adapter, pipeline, cfg.WebhookStore, endpointRegistry, logger)
 
 	// CapabilityService delegates to SupportMatrix
 	capabilityService := orchestration.NewCapabilityService(supportMatrix)

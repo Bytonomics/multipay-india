@@ -21,7 +21,6 @@ type Metadata map[string]string
 // --- Order types ---
 
 type CreateOrderRequest struct {
-	Provider    Provider      `json:"provider"`
 	OrderID     string        `json:"order_id,omitempty"`
 	AmountMinor AmountMinor   `json:"amount_minor"`
 	Currency    Currency      `json:"currency"`
@@ -48,13 +47,11 @@ type Order struct {
 }
 
 type GetOrderRequest struct {
-	Provider Provider `json:"provider"`
-	OrderID  string   `json:"order_id"`
+	OrderID string `json:"order_id"`
 }
 
 type ListOrderPaymentsRequest struct {
-	Provider Provider `json:"provider"`
-	OrderID  string   `json:"order_id"`
+	OrderID string `json:"order_id"`
 }
 
 // --- Payment types ---
@@ -77,18 +74,15 @@ type Payment struct {
 }
 
 type GetPaymentRequest struct {
-	Provider  Provider `json:"provider"`
-	OrderID   string   `json:"order_id,omitempty"`
-	PaymentID string   `json:"payment_id"`
+	OrderID   string `json:"order_id,omitempty"`
+	PaymentID string `json:"payment_id"`
 }
 
 type ListPaymentsRequest struct {
-	Provider Provider `json:"provider"`
-	OrderID  string   `json:"order_id"`
+	OrderID string `json:"order_id"`
 }
 
 type CapturePaymentRequest struct {
-	Provider    Provider    `json:"provider"`
 	PaymentID   string      `json:"payment_id"`
 	AmountMinor AmountMinor `json:"amount_minor"`
 	Currency    Currency    `json:"currency"`
@@ -97,7 +91,6 @@ type CapturePaymentRequest struct {
 // --- Refund types ---
 
 type CreateRefundRequest struct {
-	Provider    Provider    `json:"provider"`
 	OrderID     string      `json:"order_id,omitempty"`
 	PaymentID   string      `json:"payment_id,omitempty"`
 	RefundID    string      `json:"refund_id,omitempty"`
@@ -123,14 +116,12 @@ type Refund struct {
 }
 
 type GetRefundRequest struct {
-	Provider Provider `json:"provider"`
-	OrderID  string   `json:"order_id,omitempty"`
-	RefundID string   `json:"refund_id"`
+	OrderID  string `json:"order_id,omitempty"`
+	RefundID string `json:"refund_id"`
 }
 
 type ListRefundsRequest struct {
-	Provider Provider `json:"provider"`
-	OrderID  string   `json:"order_id"`
+	OrderID string `json:"order_id"`
 }
 
 // --- Instrument types ---
@@ -146,20 +137,17 @@ type Instrument struct {
 }
 
 type GetInstrumentRequest struct {
-	Provider     Provider `json:"provider"`
-	CustomerID   string   `json:"customer_id"`
-	InstrumentID string   `json:"instrument_id"`
+	CustomerID   string `json:"customer_id"`
+	InstrumentID string `json:"instrument_id"`
 }
 
 type ListInstrumentsRequest struct {
-	Provider   Provider `json:"provider"`
-	CustomerID string   `json:"customer_id"`
+	CustomerID string `json:"customer_id"`
 }
 
 type DeleteInstrumentRequest struct {
-	Provider     Provider `json:"provider"`
-	CustomerID   string   `json:"customer_id"`
-	InstrumentID string   `json:"instrument_id"`
+	CustomerID   string `json:"customer_id"`
+	InstrumentID string `json:"instrument_id"`
 }
 
 // --- Webhook types ---

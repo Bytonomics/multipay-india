@@ -17,26 +17,24 @@ graph TD
 
     OrderService --> HookPipeline
     OrderService --> CapabilityValidator
-    OrderService --> ProviderResolver
+    OrderService --> ProviderAdapter["Direct ProviderAdapter"]
 
-    ProviderResolver --> ProviderRegistry
-    ProviderRegistry --> CashfreeAdapter
-    ProviderRegistry --> RazorpayAdapter
+    ProviderAdapter --> CashfreeAdapter
+    ProviderAdapter --> RazorpayAdapter
 
     CashfreeAdapter --> CashfreeSDK["Cashfree PG SDK"]
     RazorpayAdapter --> RazorpaySDK["Razorpay Go SDK"]
 ```
 
-**Explanation**: The MultiPayClient is the main entry point that callers interact with. It wraps 7 orchestration services (Orders, Payments, Refunds, Instruments, Payment Links, Webhooks, and Capabilities) that use a consistent pipeline of hooks, capability validation, and provider resolution to dispatch requests to payment provider adapters (Cashfree or Razorpay). These adapters wrap the official SDKs from each provider.
+**Explanation**: The MultiPayClient is the main entry point that callers interact with. It wraps 7 orchestration services (Orders, Payments, Refunds, Instruments, Payment Links, Webhooks, and Capabilities) bound to a single payment provider adapter (Cashfree or Razorpay) specified at client construction time. Each service uses a consistent pipeline of hooks, capability validation, and direct adapter calls. These adapters wrap the official SDKs from each provider.
 
 ## Hook Pipeline Flow
 
 ```mermaid
 sequenceDiagram
     Caller->>Service: method(ctx, req)
-    Service->>Service: nil check + extract req.Provider
+    Service->>Service: nil check on request
     Service->>CapValidator: RequireCapability(ctx, provider, cap)
-    Service->>Resolver: Resolve(ctx, provider)
     Service->>Pipeline: ExecuteBefore(ctx, hookCtx) → enriched ctx
     Service->>Adapter: method(enriched ctx, req)
     alt success
@@ -50,16 +48,15 @@ sequenceDiagram
 
 **Explanation**: Every service method follows a consistent, predictable flow:
 
-1. **Input Validation**: Request nil check; provider extracted from `req.Provider`
-2. **Capability Check**: The requested provider's capability is verified via `capabilities.Validator`
-3. **Provider Resolution**: The appropriate adapter is resolved from the `ports.ProviderResolver` interface
-4. **Before Hooks (FIFO)**: Registered before-hooks execute and may enrich the context (e.g., trace IDs)
-5. **Provider Call**: The adapter method is invoked with the enriched context
-6. **After Hooks (LIFO)**: On success, after-hooks execute in reverse registration order
-7. **Error Hooks (LIFO)**: On failure, error-hooks execute in reverse order; errors are logged but not propagated
-8. **Return**: Result or wrapped error is returned to caller
+1. **Input Validation**: Request nil check
+2. **Capability Check**: The provider's capability is verified via `capabilities.Validator`
+3. **Before Hooks (FIFO)**: Registered before-hooks execute and may enrich the context (e.g., trace IDs)
+4. **Provider Call**: The adapter method is invoked with the enriched context
+5. **After Hooks (LIFO)**: On success, after-hooks execute in reverse registration order
+6. **Error Hooks (LIFO)**: On failure, error-hooks execute in reverse order; errors are logged but not propagated
+7. **Return**: Result or wrapped error is returned to caller
 
-All services share the same `ProviderResolver`, `Validator`, `Pipeline`, `Logger`, and `Clock` instances, injected at construction via `client.NewClient()`.
+All services share the same `Adapter`, `Validator`, `Pipeline`, `Logger`, and `Clock` instances, injected at construction via `client.NewClient()`.
 
 ## Webhook Routing Flow
 
@@ -102,19 +99,18 @@ flowchart TD
     B -->|nil| C[Return ErrInvalidRequest]
     B -->|ok| D{RequireCapability}
     D -->|unsupported| E[Return CapabilityError]
-    D -->|supported| F[Resolve Provider]
-    F --> G[Execute Before Hooks FIFO]
-    G --> H[Call Adapter]
-    H -->|success| I[Execute After Hooks LIFO]
-    H -->|error| J[Execute Error Hooks LIFO]
-    I --> K[Return Result]
-    J --> L[Return Wrapped Error]
+    D -->|supported| F[Execute Before Hooks FIFO]
+    F --> G[Call Adapter]
+    G -->|success| H[Execute After Hooks LIFO]
+    G -->|error| I[Execute Error Hooks LIFO]
+    H --> J[Return Result]
+    I --> K[Return Wrapped Error]
 ```
 
 **Explanation**: The capability matrix is a critical control point in the request flow:
 
-- **Input Validation**: Request nil check runs first; provider is extracted from `req.Provider`
-- **Capability Check**: Every operation checks if the provider supports the requested capability via `capabilities.Validator`
+- **Input Validation**: Request nil check runs first
+- **Capability Check**: Every operation checks if the bound provider supports the requested capability via `capabilities.Validator`
 - **Fail Fast**: Unsupported capabilities immediately return a `*domain.CapabilityError` (wraps `ErrUnsupportedCapability`), preventing wasted SDK calls
 - **Graceful Degradation**: Callers can catch `CapabilityError` via `errors.As()` and fall back to alternative flows
 - **Hook Ordering**: Before hooks run FIFO; After and OnError hooks run LIFO (middleware stack pattern)
@@ -125,22 +121,19 @@ The `SupportMatrix` is immutable after construction — built from hardcoded map
 
 ```mermaid
 flowchart LR
-    Config["ClientConfig"] --> NewClient
+    Config["ClientConfig\nProvider ports.ProviderAdapter"] --> NewClient
     NewClient --> Logger["Logger / NoopLogger"]
     NewClient --> Clock["Clock / RealClock"]
     NewClient --> SM["SupportMatrix"]
     NewClient --> CV["CapValidator"]
-    NewClient --> PR["ProviderRegistry"]
     NewClient --> HP["HookPipeline"]
     NewClient --> ER["EndpointRegistry"]
     SM --> CV
-    PR --> Services["5 Core Services"]
-    CV --> Services
+    CV --> Services["5 Core Services"]
     HP --> Services
     Logger --> Services
     Clock --> Services
-    PR --> WebhookSvc["WebhookService"]
-    HP --> WebhookSvc
+    HP --> WebhookSvc["WebhookService"]
     ER --> WebhookSvc
     Services --> MPC["MultiPayClient"]
     WebhookSvc --> MPC
@@ -149,17 +142,16 @@ flowchart LR
 
 **Explanation**: The MultiPayClient is constructed from a ClientConfig in a deterministic flow:
 
-1. **Validate Config**: At least one provider adapter required; all providers must be non-nil
+1. **Validate Config**: `Provider` (`ports.ProviderAdapter`) must be non-nil
 2. **Default Logger/Clock**: If `cfg.Logger` is nil, use `ports.NewNoopLogger()`; if `cfg.Clock` is nil, use `ports.NewRealClock()`
 3. **Create Support Matrix**: Static, immutable capability map for both Cashfree and Razorpay
 4. **Create Capability Validator**: Uses the support matrix for early unsupported-capability errors
-5. **Create Provider Registry**: Built from adapter list via `NewProviderRegistryFromAdapters()`
-6. **Create Hook Pipeline**: Wraps configured hooks with panic recovery; accepts logger
-7. **Create Endpoint Registry**: Maps webhook provider+account pairs to routes
-8. **Create 5 Core Services**: OrderService, PaymentService, RefundService, InstrumentService, PaymentLinkService — all share resolver, validator, pipeline, logger, clock
-9. **Create WebhookService**: Takes resolver (for adapter lookup), pipeline, store, endpoint registry, logger
-10. **Create CapabilityService**: Thin wrapper around SupportMatrix
-11. **Return Client**: The fully-constructed MultiPayClient with all 7 service accessors
+5. **Create Hook Pipeline**: Wraps configured hooks with panic recovery; accepts logger
+6. **Create Endpoint Registry**: Maps webhook provider+account pairs to routes
+7. **Create 5 Core Services**: OrderService, PaymentService, RefundService, InstrumentService, PaymentLinkService — all share the configured adapter, validator, pipeline, logger, clock
+8. **Create WebhookService**: Takes the configured adapter, pipeline, store, endpoint registry, logger
+9. **Create CapabilityService**: Thin wrapper around SupportMatrix
+10. **Return Client**: The fully-constructed MultiPayClient with all 7 service accessors
 
 ## Core Design Principles
 
@@ -207,11 +199,11 @@ type ProviderAdapter interface {
 }
 ```
 
-All methods accept typed request structs from `domain/` (e.g., `*domain.CreateOrderRequest`) and return typed response structs (e.g., `*domain.Order`). Provider SDK types never leak outside adapters. Both adapters have compile-time interface checks: `var _ ports.ProviderAdapter = (*Adapter)(nil)`.
+All methods accept typed request structs from `domain/` (e.g., `*domain.CreateOrderRequest`) and return typed response structs (e.g., `*domain.Order`). Request structs and client methods do not carry a provider field; provider selection happens once at client construction via `ClientConfig.Provider`. Provider SDK types never leak outside adapters. Both adapters have compile-time interface checks: `var _ ports.ProviderAdapter = (*Adapter)(nil)`.
 
 ### 6. Configuration and Multi-Account Support
 
-- **ClientConfig**: Contains provider adapters, optional hooks, webhook store, logger, and clock
+- **ClientConfig**: Contains the bound `Provider` (`ports.ProviderAdapter`), optional hooks, webhook store, logger, and clock
 - **Multi-Instance**: Multiple `MultiPayClient` instances can coexist in one process with different provider/account bindings
 - **Thread-Safe**: No package-level mutable state (except Cashfree SDK mutex — a workaround for the upstream SDK's global vars)
 - **Webhook Segregation**: Separate endpoints per provider+account via `routing.EndpointRegistry`

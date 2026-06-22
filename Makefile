@@ -53,22 +53,19 @@ build: ## Build the library (compile check)
 	go build -mod=mod -v ./...
 
 build-check: test-output-dir ## Verify code compiles (without running tests)
+	@echo "Build check running. Read test-outputs/build-check.log for details"
 	@echo "=== Production code ===" | tee test-outputs/build-check.log
 	@FAILED=0; \
+	echo "  multipay-adapter..." | tee -a test-outputs/build-check.log; \
 	if ! bash -c 'set -o pipefail; go build -gcflags="-e" -mod=mod -v ./... 2>&1 | tee -a test-outputs/build-check.log'; then \
-		echo "✗ FAILED: production code" | tee -a test-outputs/build-check.log; FAILED=1; \
+		echo "  ✗ FAILED: production code" | tee -a test-outputs/build-check.log; FAILED=1; \
 	fi; \
 	[ $$FAILED -eq 0 ] || exit 1
 	@echo "=== Unit tests ===" | tee -a test-outputs/build-check.log
 	@FAILED=0; \
+	echo "  multipay-adapter..." | tee -a test-outputs/build-check.log; \
 	if ! bash -c 'go test -c -gcflags="-e" -mod=mod -o /dev/null ./... 2>&1 | (grep -v "no test files" || true) | tee -a test-outputs/build-check.log; exit $${PIPESTATUS[0]}'; then \
-		echo "✗ FAILED: unit tests" | tee -a test-outputs/build-check.log; FAILED=1; \
-	fi; \
-	[ $$FAILED -eq 0 ] || exit 1
-	@echo "=== Integration tests ===" | tee -a test-outputs/build-check.log
-	@FAILED=0; \
-	if ! bash -c 'go test -c -gcflags="-e" -mod=mod -o /dev/null -tags integration ./... 2>&1 | (grep -v "no test files" || true) | tee -a test-outputs/build-check.log; exit $${PIPESTATUS[0]}'; then \
-		echo "✗ FAILED: integration tests" | tee -a test-outputs/build-check.log; FAILED=1; \
+		echo "  ✗ FAILED: unit tests" | tee -a test-outputs/build-check.log; FAILED=1; \
 	fi; \
 	[ $$FAILED -eq 0 ] || exit 1
 	@echo "✓ Build check passed" | tee -a test-outputs/build-check.log

@@ -17,7 +17,8 @@ import (
 )
 
 type WebhookService struct {
-	resolver ports.ProviderResolver
+	adapter  ports.ProviderAdapter
+	provider domain.Provider
 	pipeline *hooks.Pipeline
 	store    ports.WebhookStore
 	registry *routing.EndpointRegistry
@@ -26,7 +27,8 @@ type WebhookService struct {
 }
 
 func NewWebhookService(
-	resolver ports.ProviderResolver,
+	provider domain.Provider,
+	adapter ports.ProviderAdapter,
 	pipeline *hooks.Pipeline,
 	store ports.WebhookStore,
 	registry *routing.EndpointRegistry,
@@ -37,7 +39,8 @@ func NewWebhookService(
 	}
 	wrappedLogger := logging.NewCallerLogger(logger, 2)
 	return &WebhookService{
-		resolver: resolver,
+		adapter:  adapter,
+		provider: provider,
 		pipeline: pipeline,
 		store:    store,
 		registry: registry,
@@ -61,11 +64,11 @@ func (s *WebhookService) RegisterHandler(eventType domain.WebhookEventType, hand
 // 7. Dispatch to registered handler
 // 8. Mark processed
 func (s *WebhookService) HandleEvent(ctx context.Context, provider domain.Provider, accountID string, payload []byte, headers map[string]string) (*domain.WebhookEvent, error) {
-	// Step 1: Resolve adapter for this provider
-	adapter, err := s.resolver.Resolve(ctx, provider)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve provider adapter: %w", err)
+	// Step 1: Validate that the provider matches the configured adapter
+	if provider != s.provider {
+		return nil, fmt.Errorf("webhook provider %s does not match client provider %s: %w", provider, s.provider, domain.ErrProviderNotFound)
 	}
+	adapter := s.adapter
 
 	// Step 2: Store raw payload (ledger-first, best-effort)
 	if s.store != nil {

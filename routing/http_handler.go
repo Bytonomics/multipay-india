@@ -20,8 +20,8 @@ import (
 // event parsing, and handler dispatch.
 type WebhookHandler struct {
 	matcher  *EndpointMatcher
+	adapter  ports.ProviderAdapter
 	store    ports.WebhookStore
-	resolver *ports.ProviderRegistry
 	logger   ports.Logger
 	handlers map[string]WebhookEventHandler
 }
@@ -31,8 +31,8 @@ type WebhookHandler struct {
 // The logger is wrapped with CallerLogger to automatically capture caller information.
 func NewWebhookHandler(
 	matcher *EndpointMatcher,
+	adapter ports.ProviderAdapter,
 	store ports.WebhookStore,
-	resolver *ports.ProviderRegistry,
 	logger ports.Logger,
 ) *WebhookHandler {
 	if logger == nil {
@@ -43,8 +43,8 @@ func NewWebhookHandler(
 
 	return &WebhookHandler{
 		matcher:  matcher,
+		adapter:  adapter,
 		store:    store,
-		resolver: resolver,
 		logger:   wrappedLogger,
 		handlers: make(map[string]WebhookEventHandler),
 	}
@@ -65,7 +65,7 @@ func (h *WebhookHandler) RegisterEventHandler(eventType string, handler WebhookE
 // 2. Read and store raw request body
 // 3. Check for duplicates using SHA256(body) as dedupeKey
 // 4. If duplicate, return 200 ACK immediately
-// 5. Resolve the ProviderAdapter for the provider
+// 5. Validate that the webhook provider matches the configured adapter provider
 // 6. Verify webhook signature using adapter.VerifySignature()
 // 7. Parse event using adapter.ParseEvent()
 // 8. Dispatch to registered WebhookEventHandler and mark as processed
@@ -73,7 +73,7 @@ func (h *WebhookHandler) RegisterEventHandler(eventType string, handler WebhookE
 // HTTP responses follow this pattern:
 // - 200: Success or duplicate (safe to retry)
 // - 202: No handler registered for event type (graceful, no error)
-// - 400: Bad request (invalid path, signature, parse error)
+// - 400: Bad request (invalid path, provider mismatch, signature, parse error)
 // - 500: Handler execution error
 //
 // All responses are JSON with "code" and "message" fields.
@@ -138,11 +138,11 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 5. Resolve adapter for provider
-	adapter, resolveErr := h.resolver.Resolve(ctx, provider)
-	if resolveErr != nil {
-		if respErr := respondError(ctx, h.logger, w, http.StatusBadRequest, "PROVIDER_NOT_FOUND", fmt.Sprintf("Provider %s not found", provider)); respErr != nil {
-			h.logger.Error(ctx, "failed to send provider not found response", "error", respErr.Error())
+	// 5. Use configured adapter (validate provider matches)
+	adapterProvider := h.adapter.ProviderName()
+	if provider != adapterProvider {
+		if respErr := respondError(ctx, h.logger, w, http.StatusBadRequest, "PROVIDER_MISMATCH", fmt.Sprintf("Webhook provider %s does not match configured provider %s", provider, adapterProvider)); respErr != nil {
+			h.logger.Error(ctx, "failed to send provider mismatch response", "error", respErr.Error())
 		}
 		return
 	}
@@ -156,7 +156,7 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 6. Verify signature
-	if verifyErr := adapter.VerifySignature(ctx, body, headers); verifyErr != nil {
+	if verifyErr := h.adapter.VerifySignature(ctx, body, headers); verifyErr != nil {
 		if errors.Is(verifyErr, domain.ErrWebhookVerificationFailed) {
 			if err := respondError(ctx, h.logger, w, http.StatusBadRequest, "SIGNATURE_INVALID", "Webhook signature verification failed"); err != nil {
 				h.logger.Error(ctx, "failed to send signature invalid response", "error", err.Error())
@@ -170,7 +170,7 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 7. Parse event
-	event, parseErr := adapter.ParseEvent(ctx, body, headers)
+	event, parseErr := h.adapter.ParseEvent(ctx, body, headers)
 	if parseErr != nil {
 		if respErr := respondError(ctx, h.logger, w, http.StatusBadRequest, "PARSE_ERROR", "Failed to parse webhook event"); respErr != nil {
 			h.logger.Error(ctx, "failed to send parse error response", "error", respErr.Error())

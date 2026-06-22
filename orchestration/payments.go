@@ -14,7 +14,8 @@ import (
 // PaymentService orchestrates payment operations across multiple payment providers.
 // It handles validation, capability checking, and hook execution.
 type PaymentService struct {
-	resolver  ports.ProviderResolver
+	adapter   ports.ProviderAdapter
+	provider  domain.Provider
 	validator *capabilities.Validator
 	pipeline  *hooks.Pipeline
 	logger    ports.Logger
@@ -22,14 +23,15 @@ type PaymentService struct {
 }
 
 // NewPaymentService constructs a PaymentService with required dependencies.
-func NewPaymentService(resolver ports.ProviderResolver, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger, clock ports.Clock) *PaymentService {
+func NewPaymentService(provider domain.Provider, adapter ports.ProviderAdapter, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger, clock ports.Clock) *PaymentService {
 	if logger == nil {
 		panic("logger is required (cannot be nil)")
 	}
 	wrappedLogger := logging.NewCallerLogger(logger, 2)
 
 	return &PaymentService{
-		resolver:  resolver,
+		adapter:   adapter,
+		provider:  provider,
 		validator: validator,
 		pipeline:  pipeline,
 		logger:    wrappedLogger,
@@ -43,16 +45,12 @@ func (s *PaymentService) GetPayment(ctx context.Context, req *domain.GetPaymentR
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	provider := req.Provider
+	provider := s.provider
+	adapter := s.adapter
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapPaymentFetch)
 	if capErr != nil {
 		return nil, fmt.Errorf("capability check failed: %w", capErr)
-	}
-
-	adapter, err := s.resolver.Resolve(ctx, provider)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve adapter: %w", err)
 	}
 
 	hookCtx := &ports.HookContext{
@@ -91,16 +89,12 @@ func (s *PaymentService) ListPayments(ctx context.Context, req *domain.ListPayme
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	provider := req.Provider
+	provider := s.provider
+	adapter := s.adapter
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapPaymentList)
 	if capErr != nil {
 		return nil, fmt.Errorf("capability check failed: %w", capErr)
-	}
-
-	adapter, err := s.resolver.Resolve(ctx, provider)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve adapter: %w", err)
 	}
 
 	hookCtx := &ports.HookContext{
@@ -134,13 +128,13 @@ func (s *PaymentService) ListPayments(ctx context.Context, req *domain.ListPayme
 }
 
 // CapturePayment validates input, checks capability, and captures an authorized payment.
-// This operation is capability-gated and only available on providers that support it (e.g., Razorpay).
 func (s *PaymentService) CapturePayment(ctx context.Context, req *domain.CapturePaymentRequest) (*domain.Payment, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	provider := req.Provider
+	provider := s.provider
+	adapter := s.adapter
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapPaymentCapture)
 	if capErr != nil {
@@ -154,19 +148,25 @@ func (s *PaymentService) CapturePayment(ctx context.Context, req *domain.Capture
 		StartTime:   s.clock.Now(),
 	}
 
-	ctx, err := s.pipeline.ExecuteBefore(ctx, hookCtx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute before hooks: %w", err)
+	ctx, hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	if hookErr != nil {
+		return nil, fmt.Errorf("failed to execute before hooks: %w", hookErr)
 	}
 
-	// CapturePayment is a method that would be called on the adapter.
-	// Since it's not part of the standard PaymentProvider interface,
-	// providers that support capture would need to implement a specialized interface.
-	// For now, we document this limitation and return an error.
-	// Future: Add CapturePayment to PaymentProvider interface or create specialized interfaces per provider.
-	hookCtx.Error = domain.ErrUnsupportedCapability
-	if hookErr := s.pipeline.ExecuteOnError(ctx, hookCtx, domain.ErrUnsupportedCapability); hookErr != nil {
-		s.logger.Error(ctx, "error in OnError hook for CapturePayment", "error", hookErr.Error())
+	result, err := adapter.CapturePayment(ctx, req)
+	if err != nil {
+		hookCtx.Error = err
+		if onErr := s.pipeline.ExecuteOnError(ctx, hookCtx, err); onErr != nil {
+			s.logger.Error(ctx, "error in OnError hook for CapturePayment", "error", onErr.Error())
+		}
+		return nil, fmt.Errorf("failed to capture payment: %w", err)
 	}
-	return nil, fmt.Errorf("capture payment is not yet implemented in adapter interface: %w", domain.ErrUnsupportedCapability)
+
+	hookCtx.ResponseData = result
+	afterErr := s.pipeline.ExecuteAfter(ctx, hookCtx)
+	if afterErr != nil {
+		return nil, fmt.Errorf("failed to execute after hooks: %w", afterErr)
+	}
+
+	return result, nil
 }

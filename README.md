@@ -1,14 +1,14 @@
 # MultiPay Adapter
 
-A unified Go library for integrating multiple payment providers (Cashfree, Razorpay) with a single, consistent API. Process orders, payments, refunds, and webhooks across any supported provider without provider-specific code.
+A unified Go library for integrating payment providers (Cashfree, Razorpay) with a single, consistent API. Each client is bound to one provider. Process orders, payments, refunds, and webhooks without provider-specific code.
 
 ## Overview
 
 MultiPay Adapter provides a abstraction layer over payment processing providers, allowing you to:
 
-- **Use a single API** for all payment operations across providers
-- **Switch providers** without changing application code
-- **Support multiple providers** simultaneously
+- **Use a single API** for all payment operations regardless of provider
+- **Switch providers** by creating a new client — no application code changes
+- **Run multiple clients** side-by-side for different providers or accounts
 - **Handle webhooks** with built-in deduplication and signature verification
 - **Validate capabilities** before attempting operations
 - **Extend with hooks** for custom observability and business logic
@@ -76,29 +76,38 @@ You never need to worry about provider differences. Just pass `AmountMinor` cons
 
 ## Quick Start
 
-### 1. Create Adapters
+### 1. Create an Adapter
+
+Each client is bound to a single payment provider. Choose one:
 
 ```go
-// Create Cashfree adapter
-cashfreeAdapter := adapters.NewCashfreeAdapter(&adapters.CashfreeConfig{
-    ClientID:    "your-cashfree-client-id",
+// Option A: Cashfree adapter
+cashfreeAdapter, err := providers.NewCashfreeAdapter(&providers.CashfreeConfig{
+    ClientID:     "your-cashfree-client-id",
     ClientSecret: "your-cashfree-secret",
-    Environment: "PROD", // or "SANDBOX"
+    Environment:  domain.EnvironmentProduction, // or domain.EnvironmentSandbox
 })
+if err != nil {
+    log.Fatal(err)
+}
 
-// Create Razorpay adapter
-razorpayAdapter := adapters.NewRazorpayAdapter(&adapters.RazorpayConfig{
-    Key:    "your-razorpay-key",
-    Secret: "your-razorpay-secret",
+// Option B: Razorpay adapter
+razorpayAdapter, err := providers.NewRazorpayAdapter(&providers.RazorpayConfig{
+    Key:         "your-razorpay-key",
+    Secret:      "your-razorpay-secret",
+    Environment: domain.EnvironmentProduction, // or domain.EnvironmentSandbox
 })
+if err != nil {
+    log.Fatal(err)
+}
 ```
 
 ### 2. Create Client
 
 ```go
-client, err := client.NewClient(&client.ClientConfig{
-    Providers: []ports.ProviderAdapter{cashfreeAdapter, razorpayAdapter},
-    Logger:    yourLogger,
+mpClient, err := client.NewClient(&client.ClientConfig{
+    Provider: cashfreeAdapter,
+    Logger:   yourLogger,
 })
 if err != nil {
     log.Fatal(err)
@@ -111,7 +120,6 @@ if err != nil {
 ctx := context.Background()
 
 order, err := client.Orders().CreateOrder(ctx, &domain.CreateOrderRequest{
-    Provider:    domain.ProviderCashfree,
     AmountMinor: 10000,  // 100 paisa = ₹1.00
     Currency:    "INR",
     CustomerInfo: &domain.CustomerInfo{
@@ -127,17 +135,21 @@ if err != nil {
 fmt.Printf("Order created: %s (Status: %s)\n", order.ID, order.Status)
 ```
 
-### 4. Fetch and List Orders
+### 4. Fetch and List Payments
 
 ```go
 // Fetch a single order
-order, err := client.Orders().Fetch(ctx, "order_123")
+order, err := client.Orders().GetOrder(ctx, &domain.GetOrderRequest{
+    OrderID: "order_123",
+})
 if err != nil {
     log.Fatal(err)
 }
 
 // List all payments for an order
-payments, err := client.Orders().ListPayments(ctx, "order_123")
+payments, err := client.Orders().ListOrderPayments(ctx, &domain.ListOrderPaymentsRequest{
+    OrderID: "order_123",
+})
 if err != nil {
     log.Fatal(err)
 }
@@ -149,10 +161,11 @@ fmt.Printf("Payments: %d\n", len(payments))
 ### Cashfree Configuration
 
 ```go
-cashfreeAdapter := adapters.NewCashfreeAdapter(&adapters.CashfreeConfig{
-    ClientID:    os.Getenv("CASHFREE_CLIENT_ID"),
+cashfreeAdapter := providers.NewCashfreeAdapter(&providers.CashfreeConfig{
+    ClientID:     os.Getenv("CASHFREE_CLIENT_ID"),
     ClientSecret: os.Getenv("CASHFREE_CLIENT_SECRET"),
-    Environment: "PROD",  // "PROD" or "SANDBOX"
+    Environment:  domain.EnvironmentProduction,  // or domain.EnvironmentSandbox
+    AccountID:    "prod",  // Optional: identifier for this account
 })
 ```
 
@@ -167,9 +180,12 @@ export CASHFREE_ENVIRONMENT="PROD"
 ### Razorpay Configuration
 
 ```go
-razorpayAdapter := adapters.NewRazorpayAdapter(&adapters.RazorpayConfig{
-    Key:    os.Getenv("RAZORPAY_KEY"),
-    Secret: os.Getenv("RAZORPAY_SECRET"),
+razorpayAdapter := providers.NewRazorpayAdapter(&providers.RazorpayConfig{
+    Key:           os.Getenv("RAZORPAY_KEY"),
+    Secret:        os.Getenv("RAZORPAY_SECRET"),
+    WebhookSecret: os.Getenv("RAZORPAY_WEBHOOK_SECRET"),
+    Environment:   domain.EnvironmentProduction,  // or domain.EnvironmentSandbox
+    AccountID:     "prod",  // Optional: identifier for this account
 })
 ```
 
@@ -180,6 +196,42 @@ export RAZORPAY_KEY="your-razorpay-key"
 export RAZORPAY_SECRET="your-razorpay-secret"
 ```
 
+**Important: API Key Format Validation**
+
+Razorpay uses API keys to determine the environment — there is no separate environment flag like Cashfree:
+- **Sandbox keys** start with `rzp_test_` (e.g., `rzp_test_1DP5u41A123456`)
+- **Live keys** start with `rzp_live_` (e.g., `rzp_live_1DP5u41B654321`)
+
+The adapter validates the API key format against the configured environment at initialization time:
+- If `Environment: domain.EnvironmentSandbox`, the key MUST start with `rzp_test_`
+- If `Environment: domain.EnvironmentProduction`, the key MUST start with `rzp_live_`
+
+Misconfiguration returns an error from `providers.NewRazorpayAdapter(...)`. Error messages intentionally do not include the full key.
+
+```go
+// WRONG: Live key with sandbox environment
+adapter, err := providers.NewRazorpayAdapter(&providers.RazorpayConfig{
+    Key:         "rzp_live_1DP5u41B654321", // Live key
+    Secret:      os.Getenv("RAZORPAY_SECRET"),
+    Environment: domain.EnvironmentSandbox,   // Sandbox env
+})
+if err != nil {
+    // err: razorpay API key must start with "rzp_test_" for environment "SANDBOX"
+}
+
+// CORRECT: Test key with sandbox environment
+adapter, err = providers.NewRazorpayAdapter(&providers.RazorpayConfig{
+    Key:         "rzp_test_1DP5u41A123456",
+    Secret:      os.Getenv("RAZORPAY_SECRET"),
+    Environment: domain.EnvironmentSandbox,
+})
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+This strict validation ensures configuration errors are caught immediately at startup, rather than causing payment failures at runtime.
+
 ## Core Services
 
 ### Orders
@@ -188,21 +240,24 @@ Create and manage payment orders.
 
 ```go
 // Create an order
-order, err := client.Orders().Create(ctx, &multipay.Order{
-    ID:       "order_abc123",
-    Amount:   5000,    // 50.00 INR
-    Currency: "INR",
-    Customer: &multipay.Customer{
+order, err := client.Orders().CreateOrder(ctx, &domain.CreateOrderRequest{
+    AmountMinor: 500000,  // 500000 paisa = ₹5000.00
+    Currency:   "INR",
+    CustomerInfo: &domain.CustomerInfo{
         ID:    "cust_123",
         Email: "user@example.com",
     },
 })
 
 // Fetch an order
-order, err := client.Orders().Fetch(ctx, "order_abc123")
+order, err := client.Orders().GetOrder(ctx, &domain.GetOrderRequest{
+    OrderID: "order_abc123",
+})
 
 // List all payments for an order
-payments, err := client.Orders().ListPayments(ctx, "order_abc123")
+payments, err := client.Orders().ListOrderPayments(ctx, &domain.ListOrderPaymentsRequest{
+    OrderID: "order_abc123",
+})
 ```
 
 ### Payments
@@ -211,17 +266,21 @@ Process and retrieve payment details.
 
 ```go
 // Fetch a payment
-payment, err := client.Payments().Fetch(ctx, "pay_abc123")
-
-// List payments
-payments, err := client.Payments().List(ctx, &multipay.PaymentFilter{
-    Status:    "captured",
-    Limit:     10,
-    Offset:    0,
+payment, err := client.Payments().GetPayment(ctx, &domain.GetPaymentRequest{
+    PaymentID: "pay_abc123",
 })
 
-// Capture a payment (for authorized payments)
-payment, err := client.Payments().Capture(ctx, "pay_abc123", 5000)
+// List payments for an order
+payments, err := client.Payments().ListPayments(ctx, &domain.ListPaymentsRequest{
+    OrderID: "order_abc123",
+    Limit:   10,
+})
+
+// Capture a payment (for authorized payments on Razorpay)
+payment, err := client.Payments().CapturePayment(ctx, &domain.CapturePaymentRequest{
+    PaymentID: "pay_abc123",
+    Amount:    50000,  // Capture specific amount in minor units
+})
 ```
 
 ### Refunds
@@ -230,20 +289,19 @@ Process and manage refunds.
 
 ```go
 // Create a refund
-refund, err := client.Refunds().Create(ctx, &multipay.RefundRequest{
-    PaymentID: "pay_abc123",
-    Amount:    2500,  // Partial refund
-    Notes: map[string]string{
-        "reason": "Customer requested",
-    },
+refund, err := client.Refunds().CreateRefund(ctx, &domain.CreateRefundRequest{
+    PaymentID:   "pay_abc123",
+    AmountMinor: 250000,  // Partial refund in minor units
 })
 
 // Fetch a refund
-refund, err := client.Refunds().Fetch(ctx, "refund_abc123")
+refund, err := client.Refunds().GetRefund(ctx, &domain.GetRefundRequest{
+    RefundID: "refund_abc123",
+})
 
-// List refunds
-refunds, err := client.Refunds().List(ctx, &multipay.RefundFilter{
-    Status: "processed",
+// List refunds for an order
+refunds, err := client.Refunds().ListRefunds(ctx, &domain.ListRefundsRequest{
+    OrderID: "order_abc123",
 })
 ```
 
@@ -253,15 +311,19 @@ Manage payment instruments (cards, wallets, etc.).
 
 ```go
 // Fetch an instrument
-instrument, err := client.Instruments().Fetch(ctx, "inst_abc123")
+instrument, err := client.Instruments().GetInstrument(ctx, &domain.GetInstrumentRequest{
+    InstrumentID: "inst_abc123",
+})
 
-// List instruments
-instruments, err := client.Instruments().List(ctx, &multipay.InstrumentFilter{
-    Type: "card",
+// List instruments for a customer
+instruments, err := client.Instruments().ListInstruments(ctx, &domain.ListInstrumentsRequest{
+    CustomerID: "cust_123",
 })
 
 // Delete an instrument
-err := client.Instruments().Delete(ctx, "inst_abc123")
+err := client.Instruments().DeleteInstrument(ctx, &domain.DeleteInstrumentRequest{
+    InstrumentID: "inst_abc123",
+})
 ```
 
 ### Payment Links
@@ -270,20 +332,24 @@ Create shareable payment links.
 
 ```go
 // Create a payment link
-link, err := client.PaymentLinks().Create(ctx, &multipay.PaymentLinkRequest{
-    Amount:   10000,
-    Currency: "INR",
-    Customer: &multipay.Customer{
+link, err := client.PaymentLinks().CreatePaymentLink(ctx, &domain.CreatePaymentLinkRequest{
+    AmountMinor: 1000000,  // 1000000 paisa = ₹10000.00
+    Currency:   "INR",
+    CustomerInfo: &domain.CustomerInfo{
         Email: "user@example.com",
     },
-    ExpiresAt: time.Now().Add(24 * time.Hour),
+    ExpiryTime: int64(24 * 60 * 60),  // 24 hours in seconds
 })
 
 // Fetch a payment link
-link, err := client.PaymentLinks().Fetch(ctx, "link_abc123")
+link, err := client.PaymentLinks().GetPaymentLink(ctx, &domain.GetPaymentLinkRequest{
+    LinkID: "link_abc123",
+})
 
 // Cancel a payment link
-link, err := client.PaymentLinks().Cancel(ctx, "link_abc123")
+link, err := client.PaymentLinks().CancelPaymentLink(ctx, &domain.CancelPaymentLinkRequest{
+    LinkID: "link_abc123",
+})
 ```
 
 ### Webhooks
@@ -299,16 +365,17 @@ Handle incoming webhooks from payment providers.
 Before attempting an operation, check if the provider supports it:
 
 ```go
-// Check if provider supports refunds
+// Check if provider supports refund creation
 caps := client.Capabilities()
 if !caps.Supports(domain.ProviderCashfree, capabilities.CapRefundCreate) {
     return fmt.Errorf("Cashfree does not support refunds")
 }
 
 // Attempt operation
-refund, err := client.Refunds().Create(ctx, req)
-if ce := &multipay.CapabilityError{}; errors.As(err, &ce) {
+refund, err := client.Refunds().CreateRefund(ctx, req)
+if ce := &domain.CapabilityError{}; errors.As(err, &ce) {
     // Handle unsupported capability gracefully
+    log.Printf("Provider %s doesn't support %s: %s\n", ce.Provider, ce.Capability, ce.Message)
     return fallbackRefundFlow(ctx, order)
 }
 ```
@@ -448,25 +515,35 @@ r.POST("/webhooks/payments", func(c *gin.Context) {
 Register custom handlers for specific webhook events:
 
 ```go
-// Handle payment completion
-client.Webhooks().OnPaymentCreated(func(ctx context.Context, payment *multipay.Payment) error {
-    log.Printf("Payment created: %s (Amount: %d %s)\n", payment.ID, payment.Amount, payment.Currency)
-    // Fulfill order, update database, send email, etc.
-    return nil
-})
+// Create a custom webhook event handler
+customHandler := func(ctx context.Context, event *domain.WebhookEvent) error {
+    switch event.EventType {
+    case domain.EventPaymentCaptured:
+        if event.Payment != nil {
+            log.Printf("Payment successful: %s\n", event.Payment.ProviderPaymentID)
+        }
+        // Update order status, fulfill order, send email, etc.
 
-// Handle refund completion
-client.Webhooks().OnRefundCreated(func(ctx context.Context, refund *multipay.Refund) error {
-    log.Printf("Refund processed: %s\n", refund.ID)
-    // Update order status, notify customer, etc.
-    return nil
-})
+    case domain.EventPaymentFailed:
+        if event.Payment != nil {
+            log.Printf("Payment failed: %s\n", event.Payment.ProviderPaymentID)
+        }
+        // Notify customer, retry or cancel order
 
-// Handle payment failure
-client.Webhooks().OnPaymentFailed(func(ctx context.Context, payment *multipay.Payment) error {
-    log.Printf("Payment failed: %s (%s)\n", payment.ID, payment.FailureReason)
+    case domain.EventRefundCreated:
+        if event.Refund != nil {
+            log.Printf("Refund created: %s\n", event.Refund.ProviderRefundID)
+        }
+        // Update refund status, notify customer
+
+    default:
+        log.Printf("Unhandled webhook event: %s\n", event.EventType)
+    }
     return nil
-})
+}
+
+// Wire the handler into the client's webhook service
+// This is typically done at client initialization
 ```
 
 ### Deduplication and Idempotency
@@ -489,18 +566,20 @@ This ensures idempotency: if a provider resends the same webhook, your handler i
 Common errors are represented as sentinel errors that you can check with `errors.Is()`:
 
 ```go
-import "github.com/Bytonomics/multipay-adapter/multipay"
+import "github.com/Bytonomics/multipay-adapter/domain"
 
-order, err := client.Orders().Fetch(ctx, "nonexistent")
-if errors.Is(err, multipay.ErrOrderNotFound) {
+order, err := client.Orders().GetOrder(ctx, &domain.GetOrderRequest{
+    OrderID: "nonexistent",
+})
+if errors.Is(err, domain.ErrOrderNotFound) {
     log.Println("Order does not exist")
     // Handle missing order
 }
 
-refund, err := client.Refunds().Create(ctx, req)
-if errors.Is(err, multipay.ErrRefundAlreadyProcessed) {
-    log.Println("Refund was already processed")
-    // Skip duplicate refund
+refund, err := client.Refunds().CreateRefund(ctx, req)
+if errors.Is(err, domain.ErrProviderError) {
+    log.Println("Provider returned an error")
+    // Handle provider error
 }
 ```
 
@@ -511,19 +590,19 @@ if errors.Is(err, multipay.ErrRefundAlreadyProcessed) {
 - `ErrRefundNotFound` — Refund does not exist
 - `ErrPaymentLinkNotFound` — Payment link does not exist
 - `ErrInstrumentNotFound` — Instrument (card, wallet) does not exist
-- `ErrRefundAlreadyProcessed` — Refund cannot be re-created
-- `ErrAmountExceedsRemaining` — Refund amount exceeds remaining balance
 - `ErrInvalidRequest` — Request validation failed
+- `ErrProviderError` — Provider returned an API error
+- `ErrUnsupportedCapability` — Provider does not support this operation
 
 ### CapabilityError
 
 Returned when a provider doesn't support an operation:
 
 ```go
-_, err := client.CreateRefund(ctx, req)
-if ce := &multipay.CapabilityError{}; errors.As(err, &ce) {
+_, err := client.Refunds().CreateRefund(ctx, req)
+if ce := &domain.CapabilityError{}; errors.As(err, &ce) {
     log.Printf("Provider %s does not support %s: %s\n",
-        ce.Provider, ce.Capability, ce.Reason)
+        ce.Provider, ce.Capability, ce.Message)
     // Fall back to alternative flow
 }
 ```
@@ -533,10 +612,12 @@ if ce := &multipay.CapabilityError{}; errors.As(err, &ce) {
 Wraps provider-specific errors with context:
 
 ```go
-_, err := client.Payments().Fetch(ctx, "pay_123")
-if pe := &multipay.ProviderAPIError{}; errors.As(err, &pe) {
+_, err := client.Payments().GetPayment(ctx, &domain.GetPaymentRequest{
+    PaymentID: "pay_123",
+})
+if pe := &domain.ProviderAPIError{}; errors.As(err, &pe) {
     log.Printf("Provider %s error (code=%s): %s\n",
-        pe.Provider, pe.Code, pe.Message)
+        pe.Provider, pe.ErrorCode, pe.Message)
     // Handle provider-specific error
 }
 ```
@@ -546,32 +627,37 @@ if pe := &multipay.ProviderAPIError{}; errors.As(err, &pe) {
 Request validation errors from pedantigo:
 
 ```go
-_, err := client.Orders().Create(ctx, &multipay.Order{
-    // Missing required fields
+_, err := client.Orders().CreateOrder(ctx, &domain.CreateOrderRequest{
+    // Missing required fields (AmountMinor, Currency)
 })
-if ve := &pedantigo.ValidationError{}; errors.As(err, &ve) {
-    for field, err := range ve.Errors {
-        log.Printf("Field %s: %s\n", field, err)
-    }
+if ve := &domain.ValidationError{}; errors.As(err, &ve) {
+    log.Printf("Validation failed: %v\n", ve)
+    // Log all validation errors and reject request
 }
 ```
 
 ## Multi-Instance Support
 
-Create separate clients for different regions or providers:
+Create separate clients for different environments or providers:
 
 ```go
 // Production: Cashfree
-prodClient, _ := client.NewClient(&client.ClientConfig{
-    Providers: []ports.ProviderAdapter{prodCashfreeAdapter},
-    Logger:    yourLogger,
+prodClient, err := client.NewClient(&client.ClientConfig{
+    Provider: prodCashfreeAdapter,
+    Logger:   yourLogger,
 })
+if err != nil {
+    log.Fatalf("failed to create production client: %v", err) // invalid config or nil adapter
+}
 
 // Staging: Razorpay
-stagingClient, _ := client.NewClient(&client.ClientConfig{
-    Providers: []ports.ProviderAdapter{stagingRazorpayAdapter},
-    Logger:    yourLogger,
+stagingClient, err := client.NewClient(&client.ClientConfig{
+    Provider: stagingRazorpayAdapter,
+    Logger:   yourLogger,
 })
+if err != nil {
+    log.Fatalf("failed to create staging client: %v", err)
+}
 
 // Route based on environment
 var mpClient *client.MultiPayClient
@@ -589,13 +675,23 @@ All MultiPayClient instances are fully thread-safe and can be safely shared acro
 ```go
 // Safe: Share client across goroutines
 go func() {
-    order, _ := client.Orders().Fetch(ctx, "order_1")
-    // ...
+    order, err := mpClient.Orders().GetOrder(ctx, &domain.GetOrderRequest{
+        OrderID: "order_1",
+    })
+    if err != nil {
+        log.Printf("failed to fetch order: %v", err) // ErrOrderNotFound, ErrProviderError, etc.
+    }
+    _ = order
 }()
 
 go func() {
-    order, _ := client.Orders().Fetch(ctx, "order_2")
-    // ...
+    order, err := mpClient.Orders().GetOrder(ctx, &domain.GetOrderRequest{
+        OrderID: "order_2",
+    })
+    if err != nil {
+        log.Printf("failed to fetch order: %v", err)
+    }
+    _ = order
 }()
 ```
 
@@ -604,25 +700,41 @@ go func() {
 If you have multiple Cashfree accounts, create separate adapters and clients:
 
 ```go
-cashfreeAccount1 := adapters.NewCashfreeAdapter(&adapters.CashfreeConfig{
-    ClientID:     "account1-client-id",
-    ClientSecret: "account1-secret",
+prodAdapter, err := providers.NewCashfreeAdapter(&providers.CashfreeConfig{
+    ClientID:     "prod-client-id",
+    ClientSecret: "prod-secret",
+    Environment:  domain.EnvironmentProduction,
+    AccountID:    "prod",
 })
+if err != nil {
+    log.Fatalf("failed to create prod adapter: %v", err) // invalid credentials or environment
+}
 
-cashfreeAccount2 := adapters.NewCashfreeAdapter(&adapters.CashfreeConfig{
-    ClientID:     "account2-client-id",
-    ClientSecret: "account2-secret",
+sandboxAdapter, err := providers.NewCashfreeAdapter(&providers.CashfreeConfig{
+    ClientID:     "sandbox-client-id",
+    ClientSecret: "sandbox-secret",
+    Environment:  domain.EnvironmentSandbox,
+    AccountID:    "sandbox",
 })
+if err != nil {
+    log.Fatalf("failed to create sandbox adapter: %v", err)
+}
 
-client1, _ := client.NewClient(&client.ClientConfig{
-    Providers: []ports.ProviderAdapter{cashfreeAccount1},
-    Logger:    yourLogger,
+prodClient, err := client.NewClient(&client.ClientConfig{
+    Provider: prodAdapter,
+    Logger:   yourLogger,
 })
+if err != nil {
+    log.Fatalf("failed to create prod client: %v", err)
+}
 
-client2, _ := client.NewClient(&client.ClientConfig{
-    Providers: []ports.ProviderAdapter{cashfreeAccount2},
-    Logger:    yourLogger,
+sandboxClient, err := client.NewClient(&client.ClientConfig{
+    Provider: sandboxAdapter,
+    Logger:   yourLogger,
 })
+if err != nil {
+    log.Fatalf("failed to create sandbox client: %v", err)
+}
 ```
 
 ### Multi-Account Webhook Routing
@@ -675,31 +787,39 @@ Hooks are middleware for payment operations. Here are practical examples of what
 
 ### Custom Hooks
 
-Add custom hooks for observability:
+Custom hooks implement the `ports.Hook` interface and can be supplied via `client.ClientConfig.Hooks`.
 
 ```go
-// Register before-hook
-client.Hooks().RegisterBefore(func(ctx context.Context, hookCtx *multipay.HookContext) error {
-    log.Printf("Starting: %s on %s\n", hookCtx.Method, hookCtx.Provider)
-    hookCtx.StartTime = time.Now()
-    return nil
-})
+type LoggingHook struct{}
 
-// Register after-hook
-client.Hooks().RegisterAfter(func(ctx context.Context, hookCtx *multipay.HookContext) error {
+func (h *LoggingHook) Before(ctx context.Context, hookCtx *ports.HookContext) (context.Context, error) {
+    log.Printf("Starting: %s on %s\n", hookCtx.RequestType, hookCtx.Provider)
+    return ctx, nil
+}
+
+func (h *LoggingHook) After(ctx context.Context, hookCtx *ports.HookContext) error {
     duration := time.Since(hookCtx.StartTime)
-    log.Printf("Completed: %s on %s (duration=%dms, status=%s)\n",
-        hookCtx.Method, hookCtx.Provider, duration.Milliseconds(), hookCtx.Status)
+    log.Printf("Completed: %s on %s (duration=%dms)\n",
+        hookCtx.RequestType, hookCtx.Provider, duration.Milliseconds())
     return nil
-})
+}
 
-// Register error-hook
-client.Hooks().RegisterOnError(func(ctx context.Context, hookCtx *multipay.HookContext, err error) error {
+func (h *LoggingHook) OnError(ctx context.Context, hookCtx *ports.HookContext) error {
     log.Printf("Failed: %s on %s (error=%v)\n",
-        hookCtx.Method, hookCtx.Provider, err)
-    // Send alert, record metrics, etc.
+        hookCtx.RequestType, hookCtx.Provider, hookCtx.Error)
     return nil
+}
+
+customHook := &LoggingHook{}
+
+cashfreeClient, err := client.NewClient(&client.ClientConfig{
+    Provider: cashfreeAdapter,
+    Hooks:    []ports.Hook{customHook},
+    Logger:   yourLogger,
 })
+if err != nil {
+    // handle failure
+}
 ```
 
 ### Hook Context
@@ -708,36 +828,14 @@ Hooks receive a HookContext with details about the operation:
 
 ```go
 type HookContext struct {
-    Method      string                 // "Orders.Create", "Payments.Fetch", etc.
-    Provider    domain.Provider        // domain.ProviderCashfree, domain.ProviderRazorpay
-    Request     interface{}            // Original request
-    Response    interface{}            // Response (nil in before-hook)
-    Status      string                 // "started", "success", "error"
-    Error       error                  // Error (nil if no error)
-    StartTime   time.Time              // When operation started
-    UserContext map[string]interface{} // Custom context from caller
+    Provider     domain.Provider // domain.ProviderCashfree, domain.ProviderRazorpay
+    RequestType  string          // "CreateOrder", "GetPayment", "CreateRefund", etc.
+    RequestData  interface{}     // Original request struct
+    ResponseData interface{}     // Response struct (nil in before/error-hook)
+    Error        error           // Error (nil if no error)
+    StartTime    time.Time       // When operation started
 }
 ```
-
-### Example: OpenTelemetry Integration
-
-```go
-import "go.opentelemetry.io/otel"
-
-client.Hooks().RegisterBefore(func(ctx context.Context, hookCtx *multipay.HookContext) error {
-    tracer := otel.Tracer("multipay")
-    ctx, hookCtx.Span = tracer.Start(ctx, hookCtx.Method)
-    return nil
-})
-
-client.Hooks().RegisterAfter(func(ctx context.Context, hookCtx *multipay.HookContext) error {
-    if hookCtx.Span != nil {
-        hookCtx.Span.End()
-    }
-    return nil
-})
-```
-
 ## Architecture
 
 For detailed architecture information, see [DESIGN.md](./DESIGN.md).
@@ -745,7 +843,7 @@ For detailed architecture information, see [DESIGN.md](./DESIGN.md).
 ### Key Concepts
 
 - **Canonical Types**: All requests/responses use library-defined types; providers return provider-specific types that are immediately mapped to canonical types
-- **Hook Pipeline**: Every operation follows: validate → check capability → resolve provider → execute before-hooks → call adapter → execute after/error-hooks
+- **Hook Pipeline**: Every operation follows: validate → check capability → execute before-hooks → call adapter → execute after/error-hooks
 - **Deduplication**: Webhook payloads are stored and deduplicated to ensure idempotency
 - **Capability Matrix**: Check if a provider supports an operation before attempting it
 - **Thread-Safe**: All components are safe to use concurrently; no global state

@@ -13,7 +13,8 @@ import (
 
 // InstrumentService orchestrates instrument operations with validation, capability checking, and hooks.
 type InstrumentService struct {
-	resolver  ports.ProviderResolver
+	adapter   ports.ProviderAdapter
+	provider  domain.Provider
 	validator *capabilities.Validator
 	pipeline  *hooks.Pipeline
 	logger    ports.Logger
@@ -21,14 +22,15 @@ type InstrumentService struct {
 }
 
 // NewInstrumentService constructs an InstrumentService with dependency injection.
-func NewInstrumentService(resolver ports.ProviderResolver, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger, clock ports.Clock) *InstrumentService {
+func NewInstrumentService(provider domain.Provider, adapter ports.ProviderAdapter, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger, clock ports.Clock) *InstrumentService {
 	if logger == nil {
 		panic("logger is required (cannot be nil)")
 	}
 	wrappedLogger := logging.NewCallerLogger(logger, 2)
 
 	return &InstrumentService{
-		resolver:  resolver,
+		adapter:   adapter,
+		provider:  provider,
 		validator: validator,
 		pipeline:  pipeline,
 		logger:    wrappedLogger,
@@ -42,16 +44,12 @@ func (s *InstrumentService) GetInstrument(ctx context.Context, req *domain.GetIn
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	provider := req.Provider
+	provider := s.provider
+	adapter := s.adapter
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapInstrumentFetch)
 	if capErr != nil {
 		return nil, fmt.Errorf("capability check failed: %w", capErr)
-	}
-
-	adapter, err := s.resolver.Resolve(ctx, provider)
-	if err != nil {
-		return nil, fmt.Errorf("provider resolution failed: %w", err)
 	}
 
 	hookCtx := &ports.HookContext{
@@ -90,16 +88,12 @@ func (s *InstrumentService) ListInstruments(ctx context.Context, req *domain.Lis
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	provider := req.Provider
+	provider := s.provider
+	adapter := s.adapter
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapInstrumentList)
 	if capErr != nil {
 		return nil, fmt.Errorf("capability check failed: %w", capErr)
-	}
-
-	adapter, err := s.resolver.Resolve(ctx, provider)
-	if err != nil {
-		return nil, fmt.Errorf("provider resolution failed: %w", err)
 	}
 
 	hookCtx := &ports.HookContext{
@@ -138,16 +132,12 @@ func (s *InstrumentService) DeleteInstrument(ctx context.Context, req *domain.De
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	provider := req.Provider
+	provider := s.provider
+	adapter := s.adapter
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapInstrumentDelete)
 	if capErr != nil {
 		return nil, fmt.Errorf("capability check failed: %w", capErr)
-	}
-
-	adapter, err := s.resolver.Resolve(ctx, provider)
-	if err != nil {
-		return nil, fmt.Errorf("provider resolution failed: %w", err)
 	}
 
 	hookCtx := &ports.HookContext{

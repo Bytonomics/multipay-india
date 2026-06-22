@@ -3,6 +3,8 @@ package razorpay
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/razorpay/razorpay-go"
 
@@ -14,6 +16,7 @@ import (
 // Config holds the Razorpay API credentials.
 type Config struct {
 	// Key is the Razorpay public key (API key).
+	// Must start with rzp_test_ for sandbox or rzp_live_ for production.
 	Key string
 
 	// Secret is the Razorpay secret key.
@@ -21,6 +24,11 @@ type Config struct {
 
 	// WebhookSecret is the HMAC-SHA256 secret for webhook verification.
 	WebhookSecret string
+
+	// Environment determines whether the adapter operates in sandbox or production mode.
+	// Razorpay doesn't have an environment flag; the API key itself determines the mode.
+	// This field is used to validate that the provided API key matches the intended environment.
+	Environment domain.Environment
 
 	// AccountID is the unique account ID for webhook routing.
 	AccountID string
@@ -38,6 +46,10 @@ var _ ports.ProviderAdapter = (*Adapter)(nil)
 
 // NewAdapter creates a new Razorpay adapter with the given configuration.
 // It initializes the Razorpay SDK client with the provided credentials.
+// Validates that the API key format matches the configured environment:
+//   - Sandbox mode: Key must start with "rzp_test_"
+//   - Production mode: Key must start with "rzp_live_"
+//
 // Returns an error if the configuration is invalid.
 func NewAdapter(cfg *Config) (*Adapter, error) {
 	if cfg == nil {
@@ -49,6 +61,13 @@ func NewAdapter(cfg *Config) (*Adapter, error) {
 	if cfg.Secret == "" {
 		return nil, errors.New("razorpay secret cannot be empty")
 	}
+	if !cfg.Environment.IsValid() {
+		return nil, fmt.Errorf("razorpay environment must be one of %q or %q", domain.EnvironmentSandbox, domain.EnvironmentProduction)
+	}
+
+	if err := validateKeyPrefix(cfg.Key, cfg.Environment); err != nil {
+		return nil, err
+	}
 
 	// Create Razorpay client with key and secret
 	rzClient := razorpay.NewClient(cfg.Key, cfg.Secret)
@@ -59,6 +78,24 @@ func NewAdapter(cfg *Config) (*Adapter, error) {
 	}
 
 	return adapter, nil
+}
+
+func validateKeyPrefix(key string, environment domain.Environment) error {
+	expectedPrefix := ""
+	switch environment {
+	case domain.EnvironmentSandbox:
+		expectedPrefix = "rzp_test_"
+	case domain.EnvironmentProduction:
+		expectedPrefix = "rzp_live_"
+	default:
+		return fmt.Errorf("unsupported razorpay environment %q", environment)
+	}
+
+	if !strings.HasPrefix(key, expectedPrefix) {
+		return fmt.Errorf("razorpay API key must start with %q for environment %q", expectedPrefix, environment)
+	}
+
+	return nil
 }
 
 // ProviderName returns the provider identifier for Razorpay.

@@ -14,7 +14,8 @@ import (
 // RefundService orchestrates refund operations across multiple payment providers.
 // It handles validation, capability checking, and hook execution.
 type RefundService struct {
-	resolver  ports.ProviderResolver
+	adapter   ports.ProviderAdapter
+	provider  domain.Provider
 	validator *capabilities.Validator
 	pipeline  *hooks.Pipeline
 	logger    ports.Logger
@@ -22,14 +23,15 @@ type RefundService struct {
 }
 
 // NewRefundService constructs a RefundService with required dependencies.
-func NewRefundService(resolver ports.ProviderResolver, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger, clock ports.Clock) *RefundService {
+func NewRefundService(provider domain.Provider, adapter ports.ProviderAdapter, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger, clock ports.Clock) *RefundService {
 	if logger == nil {
 		panic("logger is required (cannot be nil)")
 	}
 	wrappedLogger := logging.NewCallerLogger(logger, 2)
 
 	return &RefundService{
-		resolver:  resolver,
+		adapter:   adapter,
+		provider:  provider,
 		validator: validator,
 		pipeline:  pipeline,
 		logger:    wrappedLogger,
@@ -43,16 +45,12 @@ func (s *RefundService) CreateRefund(ctx context.Context, req *domain.CreateRefu
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	provider := req.Provider
+	provider := s.provider
+	adapter := s.adapter
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapRefundCreate)
 	if capErr != nil {
 		return nil, fmt.Errorf("capability check failed: %w", capErr)
-	}
-
-	adapter, err := s.resolver.Resolve(ctx, provider)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve adapter: %w", err)
 	}
 
 	hookCtx := &ports.HookContext{
@@ -91,16 +89,12 @@ func (s *RefundService) GetRefund(ctx context.Context, req *domain.GetRefundRequ
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	provider := req.Provider
+	provider := s.provider
+	adapter := s.adapter
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapRefundFetch)
 	if capErr != nil {
 		return nil, fmt.Errorf("capability check failed: %w", capErr)
-	}
-
-	adapter, err := s.resolver.Resolve(ctx, provider)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve adapter: %w", err)
 	}
 
 	hookCtx := &ports.HookContext{
@@ -139,16 +133,12 @@ func (s *RefundService) ListRefunds(ctx context.Context, req *domain.ListRefunds
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
-	provider := req.Provider
+	provider := s.provider
+	adapter := s.adapter
 
 	capErr := s.validator.RequireCapability(ctx, provider, capabilities.CapRefundList)
 	if capErr != nil {
 		return nil, fmt.Errorf("capability check failed: %w", capErr)
-	}
-
-	adapter, err := s.resolver.Resolve(ctx, provider)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve adapter: %w", err)
 	}
 
 	hookCtx := &ports.HookContext{
