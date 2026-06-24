@@ -10,9 +10,9 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/Bytonomics/multipay-adapter/domain"
-	"github.com/Bytonomics/multipay-adapter/logging"
-	"github.com/Bytonomics/multipay-adapter/ports"
+	"github.com/Bytonomics/multipay-india/multipay-go/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/logging"
+	"github.com/Bytonomics/multipay-india/multipay-go/ports"
 )
 
 // apiResponse is the JSON envelope for all webhook handler responses.

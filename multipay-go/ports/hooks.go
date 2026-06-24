@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/Bytonomics/multipay-adapter/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 )
 
 // HookContext contains metadata for a hook execution.

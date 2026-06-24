@@ -4,11 +4,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/Bytonomics/multipay-adapter/capabilities"
-	"github.com/Bytonomics/multipay-adapter/hooks"
-	"github.com/Bytonomics/multipay-adapter/orchestration"
-	"github.com/Bytonomics/multipay-adapter/ports"
-	"github.com/Bytonomics/multipay-adapter/routing"
+	"github.com/Bytonomics/multipay-india/multipay-go/capabilities"
+	"github.com/Bytonomics/multipay-india/multipay-go/hooks"
+	"github.com/Bytonomics/multipay-india/multipay-go/orchestration"
+	"github.com/Bytonomics/multipay-india/multipay-go/ports"
+	"github.com/Bytonomics/multipay-india/multipay-go/routing"
 )
 
 // MultiPayClient is the main public API for the payment adapter.

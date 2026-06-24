@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Bytonomics/multipay-adapter/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 )
 
 // getInstrument retrieves a specific payment instrument from the Cashfree payment gateway.

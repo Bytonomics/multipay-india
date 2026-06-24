@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"runtime/debug"
 
-	"github.com/Bytonomics/multipay-adapter/ports"
+	"github.com/Bytonomics/multipay-india/multipay-go/ports"
 )
 
 // Pipeline manages execution of Hook instances in FIFO order.

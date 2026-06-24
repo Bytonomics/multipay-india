@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/Bytonomics/multipay-adapter/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 )
 
 const maxEndpoints = 40

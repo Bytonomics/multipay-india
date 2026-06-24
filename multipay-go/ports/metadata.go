@@ -3,7 +3,7 @@ package ports
 import (
 	"context"
 
-	"github.com/Bytonomics/multipay-adapter/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 )
 
 // MetadataMapper translates provider-specific metadata into the adapter's canonical format.

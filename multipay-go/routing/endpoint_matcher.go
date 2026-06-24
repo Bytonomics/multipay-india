@@ -3,7 +3,7 @@ package routing
 import (
 	"strings"
 
-	"github.com/Bytonomics/multipay-adapter/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 )
 
 // EndpointMatcher parses HTTP webhook paths and extracts provider and accountID.

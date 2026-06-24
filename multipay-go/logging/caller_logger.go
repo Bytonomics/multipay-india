@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/Bytonomics/multipay-adapter/ports"
+	"github.com/Bytonomics/multipay-india/multipay-go/ports"
 )
 
 // CallerLogger wraps a ports.Logger and automatically captures caller information

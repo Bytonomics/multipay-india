@@ -3,7 +3,7 @@ package hooks
 import (
 	"context"
 
-	"github.com/Bytonomics/multipay-adapter/ports"
+	"github.com/Bytonomics/multipay-india/multipay-go/ports"
 )
 
 // AuditHook logs all payment operations for audit and compliance purposes.

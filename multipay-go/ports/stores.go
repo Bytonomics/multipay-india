@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/Bytonomics/multipay-adapter/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 )
 
 // Clock provides time-related operations.

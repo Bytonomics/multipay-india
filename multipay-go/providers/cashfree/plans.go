@@ -6,7 +6,7 @@ import (
 
 	cf "github.com/cashfree/cashfree-pg/v6"
 
-	"github.com/Bytonomics/multipay-adapter/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 )
 
 // createPlan creates a new subscription plan on the Cashfree payment gateway.

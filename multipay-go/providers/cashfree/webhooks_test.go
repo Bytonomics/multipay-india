@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Bytonomics/multipay-adapter/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 )
 
 // TestVerifySignature_ValidSignature verifies that a valid HMAC-SHA256 signature is accepted.

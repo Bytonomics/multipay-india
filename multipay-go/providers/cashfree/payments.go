@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Bytonomics/multipay-adapter/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 )
 
 // getPayment retrieves a specific payment for an order from the Cashfree payment gateway.

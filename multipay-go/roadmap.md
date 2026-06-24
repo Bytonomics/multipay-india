@@ -1,6 +1,6 @@
 # MultiPay Adapter — Roadmap
 
-Tasks and planned features for the multipay-adapter library.
+Tasks and planned features for the multipay-india/multipay-go library.
 
 ## Planned Tasks
 

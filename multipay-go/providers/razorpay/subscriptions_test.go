@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/Bytonomics/multipay-adapter/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 )
 
 const invoiceFixtureJSON = `{"id":"inv_1","entity":"invoice","payment_id":"pay_1","amount":100,"currency":"INR","status":"paid","order_id":"order_1","paid_at":1481541600,"created_at":1481541534}`

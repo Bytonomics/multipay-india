@@ -6,11 +6,11 @@ import (
 
 	"github.com/SmrutAI/pedantigo"
 
-	"github.com/Bytonomics/multipay-adapter/capabilities"
-	"github.com/Bytonomics/multipay-adapter/domain"
-	"github.com/Bytonomics/multipay-adapter/hooks"
-	"github.com/Bytonomics/multipay-adapter/logging"
-	"github.com/Bytonomics/multipay-adapter/ports"
+	"github.com/Bytonomics/multipay-india/multipay-go/capabilities"
+	"github.com/Bytonomics/multipay-india/multipay-go/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/hooks"
+	"github.com/Bytonomics/multipay-india/multipay-go/logging"
+	"github.com/Bytonomics/multipay-india/multipay-go/ports"
 )
 
 var (

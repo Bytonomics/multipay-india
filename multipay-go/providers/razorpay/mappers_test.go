@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/Bytonomics/multipay-adapter/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 )
 
 const planFixtureJSON = `{"id":"plan_00000000000001","entity":"plan","interval":1,"period":"weekly","item":{"id":"item_1","name":"Test plan - Weekly","description":"d","amount":69900,"unit_amount":69900,"currency":"INR"},"notes":{"note":"hello"},"created_at":1580219935}`

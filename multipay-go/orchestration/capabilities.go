@@ -3,8 +3,8 @@ package orchestration
 import (
 	"context"
 
-	"github.com/Bytonomics/multipay-adapter/capabilities"
-	"github.com/Bytonomics/multipay-adapter/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/capabilities"
+	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 )
 
 // CapabilityService provides thin wrappers around SupportMatrix for capability queries.

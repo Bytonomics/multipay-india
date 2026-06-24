@@ -1,4 +1,4 @@
-module github.com/Bytonomics/multipay-adapter
+module github.com/Bytonomics/multipay-india/multipay-go
 
 go 1.26
 

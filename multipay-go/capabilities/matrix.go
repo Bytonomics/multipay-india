@@ -1,7 +1,7 @@
 package capabilities
 
 import (
-	"github.com/Bytonomics/multipay-adapter/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 )
 
 // SupportMatrix maintains a static registry of which capabilities are supported by each provider.

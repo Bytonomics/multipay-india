@@ -8,9 +8,9 @@ import (
 
 	"github.com/SmrutAI/pedantigo"
 
-	"github.com/Bytonomics/multipay-adapter/domain"
-	"github.com/Bytonomics/multipay-adapter/hooks"
-	"github.com/Bytonomics/multipay-adapter/ports"
+	"github.com/Bytonomics/multipay-india/multipay-go/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/hooks"
+	"github.com/Bytonomics/multipay-india/multipay-go/ports"
 )
 
 // TestCreatePlanRequest_Validation tests required field validation via JSON Unmarshal.

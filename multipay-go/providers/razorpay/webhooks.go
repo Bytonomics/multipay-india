@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Bytonomics/multipay-adapter/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 )
 
 // webhookEventMap contains the Razorpay event type to domain.WebhookEventType mappings.

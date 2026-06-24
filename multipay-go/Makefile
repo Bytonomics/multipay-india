@@ -34,7 +34,7 @@ CUSTOM_GCL := tools/golangci-lint/custom-gcl
 # ============================================
 
 help: ## Show this help
-	@echo "MultiPay Adapter (github.com/Bytonomics/multipay-adapter) - Makefile targets:"
+	@echo "MultiPay Adapter (github.com/Bytonomics/multipay-india/multipay-go) - Makefile targets:"
 	@echo ""
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}' | sort
@@ -56,14 +56,14 @@ build-check: test-output-dir ## Verify code compiles (without running tests)
 	@echo "Build check running. Read test-outputs/build-check.log for details"
 	@echo "=== Production code ===" | tee test-outputs/build-check.log
 	@FAILED=0; \
-	echo "  multipay-adapter..." | tee -a test-outputs/build-check.log; \
+	echo "  multipay-india/multipay-go..." | tee -a test-outputs/build-check.log; \
 	if ! bash -c 'set -o pipefail; go build -gcflags="-e" -mod=mod -v ./... 2>&1 | tee -a test-outputs/build-check.log'; then \
 		echo "  ✗ FAILED: production code" | tee -a test-outputs/build-check.log; FAILED=1; \
 	fi; \
 	[ $$FAILED -eq 0 ] || exit 1
 	@echo "=== Unit tests ===" | tee -a test-outputs/build-check.log
 	@FAILED=0; \
-	echo "  multipay-adapter..." | tee -a test-outputs/build-check.log; \
+	echo "  multipay-india/multipay-go..." | tee -a test-outputs/build-check.log; \
 	if ! bash -c 'go test -c -gcflags="-e" -mod=mod -o /dev/null ./... 2>&1 | (grep -v "no test files" || true) | tee -a test-outputs/build-check.log; exit $${PIPESTATUS[0]}'; then \
 		echo "  ✗ FAILED: unit tests" | tee -a test-outputs/build-check.log; FAILED=1; \
 	fi; \
@@ -171,7 +171,7 @@ format: setup-safe ## Format code with gofmt, goimports, and gci
 		./... 2>/dev/null || true
 	@echo "Fixing imports with goimports..."
 	@which goimports > /dev/null 2>&1 || (echo "Installing goimports..." && go install golang.org/x/tools/cmd/goimports@latest)
-	@goimports -w -local github.com/Bytonomics/multipay-adapter .
+	@goimports -w -local github.com/Bytonomics/multipay-india/multipay-go .
 	@echo "Fixing import grouping with gci..."
 	@which gci > /dev/null 2>&1 || (echo "Installing gci..." && go install github.com/daixiang0/gci@latest)
 	@gci write --skip-generated -s standard -s default -s "prefix(github.com/Bytonomics)" .

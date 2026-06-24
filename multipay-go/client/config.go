@@ -3,7 +3,7 @@ package client
 import (
 	"errors"
 
-	"github.com/Bytonomics/multipay-adapter/ports"
+	"github.com/Bytonomics/multipay-india/multipay-go/ports"
 )
 
 // ClientConfig holds configuration for the MultiPayClient.

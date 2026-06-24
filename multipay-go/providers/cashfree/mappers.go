@@ -8,7 +8,7 @@ import (
 	"github.com/bojanz/currency"
 	cf "github.com/cashfree/cashfree-pg/v6"
 
-	"github.com/Bytonomics/multipay-adapter/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 )
 
 // AmountMinorToMajor converts minor units (paisa/cents/fils) to major units (rupees/dollars/dinars)

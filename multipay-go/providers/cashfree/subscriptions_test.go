@@ -3,7 +3,7 @@ package cashfree
 import (
 	"testing"
 
-	"github.com/Bytonomics/multipay-adapter/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 )
 
 func TestBuildInlinePlanDetails_AllFields(t *testing.T) {

@@ -108,7 +108,7 @@ linters:
         type: module
         description: Nil panic detection (Uber)
         settings:
-          include-pkgs: "github.com/Bytonomics/multipay-adapter"
+          include-pkgs: "github.com/Bytonomics/multipay-india/multipay-go"
   exclusions:
     presets:
       - std-error-handling

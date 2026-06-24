@@ -6,9 +6,9 @@ import (
 
 	cf "github.com/cashfree/cashfree-pg/v6"
 
-	"github.com/Bytonomics/multipay-adapter/capabilities"
-	"github.com/Bytonomics/multipay-adapter/domain"
-	"github.com/Bytonomics/multipay-adapter/ports"
+	"github.com/Bytonomics/multipay-india/multipay-go/capabilities"
+	"github.com/Bytonomics/multipay-india/multipay-go/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/ports"
 )
 
 // Config contains configuration for the Cashfree adapter.

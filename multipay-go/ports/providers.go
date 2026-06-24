@@ -3,8 +3,8 @@ package ports
 import (
 	"context"
 
-	"github.com/Bytonomics/multipay-adapter/capabilities"
-	"github.com/Bytonomics/multipay-adapter/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/capabilities"
+	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 )
 
 // OrderProvider defines operations for payment orders.

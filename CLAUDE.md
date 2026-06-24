@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Project Is
 
-MultiPay Adapter (`github.com/Bytonomics/multipay-adapter`) is a Go library that provides a single, consistent API
+MultiPay Adapter (`github.com/Bytonomics/multipay-india/multipay-go`) is a Go library that provides a single, consistent API
 for integrating Indian payment providers (Cashfree PG and Razorpay). Each client is bound to one provider at
 construction time. Applications use the same API regardless of which provider is configured, and handle webhooks
 with built-in deduplication and signature verification.

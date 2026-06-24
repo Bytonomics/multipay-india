@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Bytonomics/multipay-adapter/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 )
 
 // rawMapResponse converts a map to a RawProviderResponse (JSON bytes).
