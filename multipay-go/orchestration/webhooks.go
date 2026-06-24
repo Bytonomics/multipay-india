@@ -1,0 +1,192 @@
+package orchestration
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/Bytonomics/multipay-adapter/domain"
+	"github.com/Bytonomics/multipay-adapter/hooks"
+	"github.com/Bytonomics/multipay-adapter/logging"
+	"github.com/Bytonomics/multipay-adapter/ports"
+	"github.com/Bytonomics/multipay-adapter/routing"
+)
+
+type WebhookService struct {
+	adapter  ports.ProviderAdapter
+	provider domain.Provider
+	pipeline *hooks.Pipeline
+	store    ports.WebhookStore
+	registry *routing.EndpointRegistry
+	handlers map[domain.WebhookEventType]domain.WebhookEventHandler
+	logger   ports.Logger
+}
+
+func NewWebhookService(
+	provider domain.Provider,
+	adapter ports.ProviderAdapter,
+	pipeline *hooks.Pipeline,
+	store ports.WebhookStore,
+	registry *routing.EndpointRegistry,
+	logger ports.Logger,
+) *WebhookService {
+	if logger == nil {
+		panic("logger is required (cannot be nil)")
+	}
+	wrappedLogger := logging.NewCallerLogger(logger, 2)
+	return &WebhookService{
+		adapter:  adapter,
+		provider: provider,
+		pipeline: pipeline,
+		store:    store,
+		registry: registry,
+		handlers: make(map[domain.WebhookEventType]domain.WebhookEventHandler),
+		logger:   wrappedLogger,
+	}
+}
+
+// RegisterHandler registers an event handler for a specific webhook event type.
+func (s *WebhookService) RegisterHandler(eventType domain.WebhookEventType, handler domain.WebhookEventHandler) {
+	s.handlers[eventType] = handler
+}
+
+// HandleEvent implements the 8-step webhook handling flow:
+// 1. Resolve adapter from provider
+// 2. Store raw payload (best-effort)
+// 3. Verify signature
+// 4. Parse event
+// 5. Check for duplicate
+// 6. Execute before-hooks
+// 7. Dispatch to registered handler
+// 8. Mark processed
+func (s *WebhookService) HandleEvent(ctx context.Context, provider domain.Provider, accountID string, payload []byte, headers map[string]string) (*domain.WebhookEvent, error) {
+	// Step 1: Validate that the provider matches the configured adapter
+	if provider != s.provider {
+		return nil, fmt.Errorf("webhook provider %s does not match client provider %s: %w", provider, s.provider, domain.ErrProviderNotFound)
+	}
+	adapter := s.adapter
+
+	// Step 2: Store raw payload (ledger-first, best-effort)
+	if s.store != nil {
+		if storeErr := s.store.StoreRawPayload(ctx, provider, accountID, payload); storeErr != nil {
+			s.logger.Error(ctx, "failed to store raw webhook payload", "error", storeErr.Error(), "provider", string(provider))
+		}
+	}
+
+	// Step 3: Verify signature
+	if verifyErr := adapter.VerifySignature(ctx, payload, headers); verifyErr != nil {
+		return nil, fmt.Errorf("webhook signature verification failed: %w", verifyErr)
+	}
+
+	// Step 4: Parse event
+	event, err := adapter.ParseEvent(ctx, payload, headers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse webhook event: %w", err)
+	}
+	if event == nil {
+		return nil, errors.New("webhook event parsing returned nil")
+	}
+
+	// Step 5: Check for duplicate
+	if s.store != nil {
+		isDuplicate, err := s.store.IsDuplicate(ctx, provider, accountID, event.DedupeKey)
+		if err != nil {
+			s.logger.Error(ctx, "failed to check webhook duplicate", "error", err.Error())
+		}
+		if isDuplicate {
+			s.logger.Info(ctx, "webhook event is duplicate, skipping handler dispatch")
+			return event, nil
+		}
+	}
+
+	// Step 6: Execute before-hooks
+	hookCtx := &ports.HookContext{
+		Provider:    provider,
+		RequestType: "WebhookEvent",
+		RequestData: event,
+		StartTime:   time.Now(),
+	}
+	ctx, hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	if hookErr != nil {
+		return nil, fmt.Errorf("webhook before-hook execution failed: %w", hookErr)
+	}
+
+	// Step 7: Dispatch to registered handler
+	if handler, exists := s.handlers[event.EventType]; exists {
+		if err := handler(ctx, event); err != nil {
+			if hookErr := s.pipeline.ExecuteOnError(ctx, hookCtx, err); hookErr != nil {
+				s.logger.Error(ctx, "failed to execute error hook", "error", hookErr.Error())
+			}
+			return nil, fmt.Errorf("webhook event handler failed: %w", err)
+		}
+	} else {
+		s.logger.Debug(ctx, "no handler registered for webhook event type", "eventType", string(event.EventType))
+	}
+
+	// Step 8: Mark processed
+	if s.store != nil {
+		if err := s.store.MarkProcessed(ctx, provider, accountID, event.DedupeKey); err != nil {
+			s.logger.Error(ctx, "failed to mark webhook as processed", "error", err.Error(), "provider", string(provider), "accountID", accountID)
+		}
+	}
+
+	// Execute after-hooks
+	if err := s.pipeline.ExecuteAfter(ctx, hookCtx); err != nil {
+		s.logger.Error(ctx, "failed to execute after-hook", "error", err.Error())
+	}
+
+	return event, nil
+}
+
+// MountHTTP mounts the webhook handler on an HTTP router.
+func (s *WebhookService) MountHTTP(basePath string, mux *http.ServeMux) {
+	matcher := routing.NewEndpointMatcher(basePath)
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+
+		ctx := r.Context()
+
+		// Extract provider and accountID from route using EndpointMatcher
+		provider, accountID, ok := matcher.Match(r.URL.Path)
+		if !ok {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+
+		// Read body
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "failed to read body", http.StatusBadRequest)
+			return
+		}
+
+		// Extract headers
+		headers := make(map[string]string)
+		for key, values := range r.Header {
+			if len(values) > 0 {
+				headers[strings.ToLower(key)] = values[0]
+			}
+		}
+
+		// Handle event
+		_, handleErr := s.HandleEvent(ctx, provider, accountID, body, headers)
+		if handleErr != nil {
+			s.logger.Error(ctx, "webhook processing failed", "error", handleErr.Error())
+			http.Error(w, "webhook processing failed", http.StatusInternalServerError)
+			return
+		}
+
+		// Send success response
+		w.WriteHeader(http.StatusOK)
+		if _, writeErr := w.Write([]byte("OK")); writeErr != nil {
+			s.logger.Error(ctx, "failed to write webhook response", "error", writeErr.Error())
+		}
+	})
+
+	mux.Handle(basePath, handler)
+}
