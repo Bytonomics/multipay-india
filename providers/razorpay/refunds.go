@@ -7,6 +7,45 @@ import (
 	"github.com/Bytonomics/multipay-adapter/domain"
 )
 
+// D17: Typed request structs for Razorpay Refund APIs.
+type razorpayRefundNotes struct {
+	Note string `json:"note,omitempty"`
+}
+
+type razorpayCreateRefundRequest struct {
+	PaymentID string               `json:"payment_id"`
+	Amount    int64                `json:"amount,omitempty"`
+	Notes     *razorpayRefundNotes `json:"notes,omitempty"`
+}
+
+type razorpayListRefundsRequest struct {
+	PaymentID string `json:"payment_id"`
+}
+
+// D17: Typed response struct for Razorpay Refund API responses.
+type razorpayRefundResponse struct {
+	ID             string                `json:"id"`
+	Entity         string                `json:"entity"`
+	PaymentID      string                `json:"payment_id"`
+	Amount         int64                 `json:"amount"`
+	Currency       string                `json:"currency"`
+	Status         string                `json:"status"`
+	CreatedAt      int64                 `json:"created_at"`
+	ReceiptTime    int64                 `json:"receipt_time"`
+	Notes          string                `json:"notes"`
+	ARN            string                `json:"arn"`
+	Receipt        string                `json:"receipt"`
+	SpeedRequested string                `json:"speed_requested"`
+	SpeedProcessed string                `json:"speed_processed"`
+	BatchID        string                `json:"batch_id"`
+	AcquirerData   *razorpayAcquirerData `json:"acquirer_data"`
+}
+
+// D17: Typed response struct for refund list response.
+type razorpayRefundListResponse struct {
+	Items []razorpayRefundResponse `json:"items"`
+}
+
 // CreateRefund creates a new refund for a payment.
 // It takes a CreateRefundRequest with payment ID and optional amount, and returns a canonical Refund domain object.
 func (a *Adapter) CreateRefund(ctx context.Context, req *domain.CreateRefundRequest) (*domain.Refund, error) {
@@ -18,22 +57,16 @@ func (a *Adapter) CreateRefund(ctx context.Context, req *domain.CreateRefundRequ
 	}
 
 	// Build Razorpay refund creation parameters
-	params := make(map[string]interface{})
-
-	// Payment ID is required - In Razorpay, refunds are created against a payment ID
-	// req.OrderID is used as the payment ID; caller must provide correct ID
-	params["payment_id"] = req.OrderID
-
-	// Amount is optional for full refund; if provided, partial refund
-	if req.AmountMinor > 0 {
-		params["amount"] = int64(req.AmountMinor)
+	refundReq := &razorpayCreateRefundRequest{
+		PaymentID: req.OrderID,
+		Amount:    int64(req.AmountMinor), // 0 = full refund; omitempty drops it
 	}
-
-	// Add notes if provided
 	if req.Reason != "" {
-		params["notes"] = map[string]string{
-			"note": req.Reason,
-		}
+		refundReq.Notes = &razorpayRefundNotes{Note: req.Reason}
+	}
+	params, err := encodeRequest(refundReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode create refund request: %w", err)
 	}
 
 	// Call Razorpay SDK to create refund
@@ -43,39 +76,14 @@ func (a *Adapter) CreateRefund(ctx context.Context, req *domain.CreateRefundRequ
 		return nil, fmt.Errorf("failed to create refund: %w", err)
 	}
 
-	// Map Razorpay response to canonical domain type
-	refund := &domain.Refund{
-		ProviderRefundID: getString(responseMap, "id"),
-		PaymentID:        getString(responseMap, "payment_id"),
-		OrderID:          getString(responseMap, "payment_id"), // Razorpay returns payment_id, map to OrderID for domain
-		AmountMinor:      domain.AmountMinor(getInt64(responseMap, "amount")),
-		Currency:         domain.Currency(getString(responseMap, "currency")),
-		Reason:           getString(responseMap, "notes"),
-		ARN:              getString(responseMap, "arn"),
-		Status:           mapRefundStatus(getString(responseMap, "status")),
-		CreatedAt:        getTime(responseMap, "created_at"),
-		ProcessedAt:      getTime(responseMap, "receipt_time"),
-		Raw:              rawMapResponse(responseMap),
-		ProviderDetails: &domain.RefundProviderDetail{
-			Razorpay: &domain.RazorpayRefundDetail{
-				Entity:         getString(responseMap, "entity"),
-				Receipt:        getString(responseMap, "receipt"),
-				SpeedRequested: getString(responseMap, "speed_requested"),
-				SpeedProcessed: getString(responseMap, "speed_processed"),
-				BatchID:        getString(responseMap, "batch_id"),
-			},
-		},
+	// D17: Decode map to typed struct at SDK boundary
+	typed, err := decodeResponse[razorpayRefundResponse](responseMap)
+	if err != nil {
+		return nil, err
 	}
 
-	if acqData := getMap(responseMap, "acquirer_data"); len(acqData) > 0 {
-		refund.ProviderDetails.Razorpay.AcquirerData = &domain.RazorpayAcquirerData{
-			BankTransactionID: getString(acqData, "bank_transaction_id"),
-			AuthCode:          getString(acqData, "auth_code"),
-			RRN:               getString(acqData, "rrn"),
-		}
-	}
-
-	return refund, nil
+	// D17: Map typed struct to canonical domain type
+	return mapRefundFromResponse(typed, responseMap), nil
 }
 
 // GetRefund retrieves an existing refund.
@@ -98,39 +106,14 @@ func (a *Adapter) GetRefund(ctx context.Context, req *domain.GetRefundRequest) (
 		return nil, fmt.Errorf("failed to fetch refund: %w", err)
 	}
 
-	// Map Razorpay response to canonical domain type
-	refund := &domain.Refund{
-		ProviderRefundID: getString(responseMap, "id"),
-		PaymentID:        getString(responseMap, "payment_id"),
-		OrderID:          getString(responseMap, "payment_id"), // Razorpay returns payment_id, map to OrderID for domain
-		AmountMinor:      domain.AmountMinor(getInt64(responseMap, "amount")),
-		Currency:         domain.Currency(getString(responseMap, "currency")),
-		Reason:           getString(responseMap, "notes"),
-		ARN:              getString(responseMap, "arn"),
-		Status:           mapRefundStatus(getString(responseMap, "status")),
-		CreatedAt:        getTime(responseMap, "created_at"),
-		ProcessedAt:      getTime(responseMap, "receipt_time"),
-		Raw:              rawMapResponse(responseMap),
-		ProviderDetails: &domain.RefundProviderDetail{
-			Razorpay: &domain.RazorpayRefundDetail{
-				Entity:         getString(responseMap, "entity"),
-				Receipt:        getString(responseMap, "receipt"),
-				SpeedRequested: getString(responseMap, "speed_requested"),
-				SpeedProcessed: getString(responseMap, "speed_processed"),
-				BatchID:        getString(responseMap, "batch_id"),
-			},
-		},
+	// D17: Decode map to typed struct at SDK boundary
+	typed, err := decodeResponse[razorpayRefundResponse](responseMap)
+	if err != nil {
+		return nil, err
 	}
 
-	if acqData := getMap(responseMap, "acquirer_data"); len(acqData) > 0 {
-		refund.ProviderDetails.Razorpay.AcquirerData = &domain.RazorpayAcquirerData{
-			BankTransactionID: getString(acqData, "bank_transaction_id"),
-			AuthCode:          getString(acqData, "auth_code"),
-			RRN:               getString(acqData, "rrn"),
-		}
-	}
-
-	return refund, nil
+	// D17: Map typed struct to canonical domain type
+	return mapRefundFromResponse(typed, responseMap), nil
 }
 
 // ListRefunds retrieves all refunds for an order.
@@ -144,8 +127,9 @@ func (a *Adapter) ListRefunds(ctx context.Context, req *domain.ListRefundsReques
 	}
 
 	// Build parameters to filter refunds
-	params := map[string]interface{}{
-		"payment_id": req.OrderID,
+	params, err := encodeRequest(&razorpayListRefundsRequest{PaymentID: req.OrderID})
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode list refunds request: %w", err)
 	}
 
 	// Call Razorpay SDK to fetch refunds
@@ -159,56 +143,57 @@ func (a *Adapter) ListRefunds(ctx context.Context, req *domain.ListRefundsReques
 		return nil, fmt.Errorf("failed to list refunds: %w", err)
 	}
 
-	// Handle the response - Razorpay returns a map with "items" key containing refund list
-	itemsList, ok := refundsData["items"].([]interface{})
-	if !ok {
-		// No items found, return empty slice
-		return []*domain.Refund{}, nil
+	// D17: Decode map to typed struct at SDK boundary
+	typed, err := decodeResponse[razorpayRefundListResponse](refundsData)
+	if err != nil {
+		return nil, err
 	}
 
-	// Map each refund response to canonical domain type
-	refunds := make([]*domain.Refund, 0, len(itemsList))
-	for _, item := range itemsList {
-		itemMap, ok := item.(map[string]interface{})
-		if !ok {
-			continue
-		}
-
-		refund := &domain.Refund{
-			ProviderRefundID: getString(itemMap, "id"),
-			PaymentID:        getString(itemMap, "payment_id"),
-			OrderID:          getString(itemMap, "payment_id"), // Razorpay returns payment_id, map to OrderID for domain
-			AmountMinor:      domain.AmountMinor(getInt64(itemMap, "amount")),
-			Currency:         domain.Currency(getString(itemMap, "currency")),
-			Reason:           getString(itemMap, "notes"),
-			ARN:              getString(itemMap, "arn"),
-			Status:           mapRefundStatus(getString(itemMap, "status")),
-			CreatedAt:        getTime(itemMap, "created_at"),
-			ProcessedAt:      getTime(itemMap, "receipt_time"),
-			Raw:              rawMapResponse(itemMap),
-			ProviderDetails: &domain.RefundProviderDetail{
-				Razorpay: &domain.RazorpayRefundDetail{
-					Entity:         getString(itemMap, "entity"),
-					Receipt:        getString(itemMap, "receipt"),
-					SpeedRequested: getString(itemMap, "speed_requested"),
-					SpeedProcessed: getString(itemMap, "speed_processed"),
-					BatchID:        getString(itemMap, "batch_id"),
-				},
-			},
-		}
-
-		if acqData := getMap(itemMap, "acquirer_data"); len(acqData) > 0 {
-			refund.ProviderDetails.Razorpay.AcquirerData = &domain.RazorpayAcquirerData{
-				BankTransactionID: getString(acqData, "bank_transaction_id"),
-				AuthCode:          getString(acqData, "auth_code"),
-				RRN:               getString(acqData, "rrn"),
-			}
-		}
-
+	// D17: Map each typed refund response to canonical domain type
+	refunds := make([]*domain.Refund, 0, len(typed.Items))
+	for i := range typed.Items {
+		refund := mapRefundFromResponse(&typed.Items[i], refundsData)
 		refunds = append(refunds, refund)
 	}
 
 	return refunds, nil
+}
+
+// D17: Typed struct mapper for refund response
+func mapRefundFromResponse(r *razorpayRefundResponse, raw map[string]any) *domain.Refund {
+	refund := &domain.Refund{
+		ProviderRefundID: r.ID,
+		PaymentID:        r.PaymentID,
+		OrderID:          r.PaymentID, // Razorpay returns payment_id, map to OrderID for domain
+		AmountMinor:      domain.AmountMinor(r.Amount),
+		Currency:         domain.Currency(r.Currency),
+		Reason:           r.Notes,
+		ARN:              r.ARN,
+		Status:           mapRefundStatus(r.Status),
+		CreatedAt:        unixPtr(r.CreatedAt),
+		ProcessedAt:      unixPtr(r.ReceiptTime),
+		Raw:              rawMapResponse(raw),
+		ProviderDetails: &domain.RefundProviderDetail{
+			Razorpay: &domain.RazorpayRefundDetail{
+				Entity:         r.Entity,
+				Receipt:        r.Receipt,
+				SpeedRequested: r.SpeedRequested,
+				SpeedProcessed: r.SpeedProcessed,
+				BatchID:        r.BatchID,
+			},
+		},
+	}
+
+	// D17: Map acquirer_data if present
+	if r.AcquirerData != nil {
+		refund.ProviderDetails.Razorpay.AcquirerData = &domain.RazorpayAcquirerData{
+			BankTransactionID: r.AcquirerData.BankTransactionID,
+			AuthCode:          r.AcquirerData.AuthCode,
+			RRN:               r.AcquirerData.RRN,
+		}
+	}
+
+	return refund
 }
 
 // mapRefundStatus converts Razorpay refund status to canonical domain RefundStatus.

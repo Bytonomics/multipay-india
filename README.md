@@ -442,7 +442,90 @@ The following table shows all capabilities supported by Cashfree and Razorpay. U
 
 Use [`client.Capabilities().Supports(provider, capability)`](./golang/multipay-adapter/orchestration/capabilities.go) to check capability availability before attempting operations.
 
+## CallbackURL / ReturnURL Are Browser-Redirects Only
+
+`CallbackURL` and `ReturnURL` are browser-redirect parameters only. When your payment gateway finishes collecting payment, it redirects the user's browser to these URLs so your frontend can display a success/failure page.
+
+**The library does NOT implement a callback-URL handler.** These are not server-side event sources. **Webhooks are the only reliable, server-side mechanism for tracking payment state changes.** Do not rely on callback URLs for order fulfillment, subscription activation, or any state change that must happen server-side.
+
+**Consequence:** If you pass a `CallbackURL` in your order request, that URL must be a frontend page (e.g., `/payment/success`), not a server-side webhook endpoint. Your backend should listen for webhooks to perform server-side operations like updating order status or fulfilling orders.
+
+```go
+// CORRECT: CallbackURL is a frontend page
+order, err := client.Orders().CreateOrder(ctx, &domain.CreateOrderRequest{
+    AmountMinor: 50000,
+    Currency:    "INR",
+    // For Cashfree provider: pass CallbackURL
+    // For Razorpay provider: use order metadata for frontend redirect URL
+    // (Razorpay does not use CallbackURL in the same way)
+})
+
+// Webhook handler processes payment on the server
+customHandler := func(ctx context.Context, event *domain.WebhookEvent) error {
+    if event.EventType == domain.EventPaymentCaptured {
+        // Update order status in your database
+        // Fulfill the order
+        // Activate subscription, etc.
+    }
+    return nil
+}
+```
+
 ## Webhook Setup
+
+### Enabling Webhooks in Your Provider Dashboard
+
+Before webhooks will fire in your application, you must enable the corresponding events in your payment provider's dashboard. This section lists the exact event names to enable so that the library's event constants actually deliver events to your handlers.
+
+#### Razorpay — Events to Enable in Dashboard
+
+Enable these under **Settings → Webhooks** in your Razorpay dashboard:
+
+| Event Name (Razorpay Dashboard) | Library Constant |
+|---|---|
+| `subscription.authenticated` | `EventSubAuthenticated` |
+| `subscription.activated` | `EventSubActivated` |
+| `subscription.charged` | `EventSubCharged` |
+| `subscription.payment_failed` | `EventSubPaymentFailed` |
+| `subscription.pending` | `EventSubOnHold` |
+| `subscription.halted` | `EventSubHalted` |
+| `subscription.paused` | `EventSubPaused` |
+| `subscription.resumed` | `EventSubResumed` |
+| `subscription.cancelled` | `EventSubCancelled` |
+| `subscription.completed` | `EventSubCompleted` |
+| `subscription.updated` | `EventSubUpdated` |
+| `payment.authorized` | `EventPaymentAuthorized` |
+| `payment.captured` | `EventPaymentCaptured` |
+| `payment.failed` | `EventPaymentFailed` |
+| `refund.created` | `EventRefundCreated` |
+| `refund.processed` | `EventRefundProcessed` |
+| `refund.failed` | `EventRefundFailed` |
+
+#### Cashfree — Events to Enable in Dashboard (API Version 2023-08-01)
+
+Enable these under **Developers → Webhooks** in your Cashfree merchant dashboard:
+
+| Event Name (Cashfree Dashboard) | Library Constant(s) |
+|---|---|
+| `SUBSCRIPTION_AUTH_STATUS` | `EventSubAuthenticated` |
+| `SUBSCRIPTION_PAYMENT_SUCCESS` | `EventSubCharged` |
+| `SUBSCRIPTION_PAYMENT_FAILED` | `EventSubPaymentFailed` |
+| `SUBSCRIPTION_STATUS_CHANGED` | `EventSubActivated`, `EventSubOnHold`, `EventSubPaused`, `EventSubCancelled`, `EventSubCompleted`, `EventSubExpired`, `EventSubBankApprovalPending`, `EventSubCardExpired` |
+| `SUBSCRIPTION_REFUND_STATUS` | `EventSubRefund` |
+| `SUBSCRIPTION_CARD_EXPIRY_REMINDER` | `EventSubCardExpiring` |
+| `SUBSCRIPTION_PAYMENT_CANCELLED` | `EventSubPaymentCancelled` |
+| `SUBSCRIPTION_PAYMENT_NOTIFICATION_INITIATED` | `EventSubPreDebitNotice` |
+| `ORDER.PAID` | `EventPaymentCaptured` |
+| `ORDER.EXPIRED` | `EventOrderExpired` |
+| `PAYMENT.AUTHORIZED` | `EventPaymentAuthorized` |
+| `PAYMENT.FAILED` | `EventPaymentFailed` |
+| `REFUND.PROCESSED` | `EventRefundProcessed` |
+| `REFUND.FAILED` | `EventRefundFailed` |
+
+**Important:** If you register an event handler (e.g., `EventSubCharged`) but don't enable the corresponding event in your provider's dashboard, your handler will never be called. Always verify both:
+1. The event is enabled in the provider dashboard
+2. Your webhook endpoint is registered with the correct URL
+3. Your handler is registered for the correct event type
 
 ### How Webhook URLs Work
 

@@ -45,6 +45,12 @@ var (
 
 	// ErrHookPanic is returned when a hook panics during execution
 	ErrHookPanic = errors.New("hook panic")
+
+	// ErrPlanNotFound is returned when a plan with the given ID does not exist
+	ErrPlanNotFound = errors.New("plan not found")
+
+	// ErrSubscriptionNotFound is returned when a subscription with the given ID does not exist
+	ErrSubscriptionNotFound = errors.New("subscription not found")
 )
 
 // CapabilityError represents an error when a provider does not support a capability.

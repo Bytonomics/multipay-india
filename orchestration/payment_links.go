@@ -4,11 +4,19 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/SmrutAI/pedantigo"
+
 	"github.com/Bytonomics/multipay-adapter/capabilities"
 	"github.com/Bytonomics/multipay-adapter/domain"
 	"github.com/Bytonomics/multipay-adapter/hooks"
 	"github.com/Bytonomics/multipay-adapter/logging"
 	"github.com/Bytonomics/multipay-adapter/ports"
+)
+
+var (
+	createPaymentLinkValidator = pedantigo.New[domain.CreatePaymentLinkRequest]()
+	getPaymentLinkValidator    = pedantigo.New[domain.GetPaymentLinkRequest]()
+	cancelPaymentLinkValidator = pedantigo.New[domain.CancelPaymentLinkRequest]()
 )
 
 // PaymentLinkService orchestrates payment link operations with validation, capability checking, and hooks.
@@ -42,6 +50,10 @@ func NewPaymentLinkService(provider domain.Provider, adapter ports.ProviderAdapt
 func (s *PaymentLinkService) CreatePaymentLink(ctx context.Context, req *domain.CreatePaymentLinkRequest) (*domain.PaymentLink, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
+	}
+
+	if err := createPaymentLinkValidator.Validate(req); err != nil {
+		return nil, fmt.Errorf("request validation failed: %w", err)
 	}
 
 	provider := s.provider
@@ -88,6 +100,10 @@ func (s *PaymentLinkService) GetPaymentLink(ctx context.Context, req *domain.Get
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
+	if err := getPaymentLinkValidator.Validate(req); err != nil {
+		return nil, fmt.Errorf("request validation failed: %w", err)
+	}
+
 	provider := s.provider
 	adapter := s.adapter
 
@@ -130,6 +146,10 @@ func (s *PaymentLinkService) GetPaymentLink(ctx context.Context, req *domain.Get
 func (s *PaymentLinkService) CancelPaymentLink(ctx context.Context, req *domain.CancelPaymentLinkRequest) (*domain.PaymentLink, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
+	}
+
+	if err := cancelPaymentLinkValidator.Validate(req); err != nil {
+		return nil, fmt.Errorf("request validation failed: %w", err)
 	}
 
 	provider := s.provider

@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 )
 
@@ -10,10 +11,10 @@ import (
 type RawProviderResponse json.RawMessage
 
 type CustomerInfo struct {
-	CustomerID string `json:"customer_id"`
+	CustomerID string `json:"customer_id" pedantigo:"required,minLength=1,maxLength=250"`
 	Name       string `json:"name,omitempty"`
-	Email      string `json:"email,omitempty"`
-	Phone      string `json:"phone"`
+	Email      string `json:"email,omitempty" pedantigo:"omitempty,email"`
+	Phone      string `json:"phone" pedantigo:"required,minLength=5,maxLength=20"`
 }
 
 type Metadata map[string]string
@@ -21,14 +22,14 @@ type Metadata map[string]string
 // --- Order types ---
 
 type CreateOrderRequest struct {
-	OrderID     string        `json:"order_id,omitempty"`
-	AmountMinor AmountMinor   `json:"amount_minor"`
-	Currency    Currency      `json:"currency"`
-	Customer    *CustomerInfo `json:"customer"`
-	ReturnURL   string        `json:"return_url,omitempty"`
-	NotifyURL   string        `json:"notify_url,omitempty"`
+	OrderID     string        `json:"order_id,omitempty" pedantigo:"omitempty,maxLength=250"`
+	AmountMinor AmountMinor   `json:"amount_minor" pedantigo:"required,gt=0"`
+	Currency    Currency      `json:"currency" pedantigo:"required,iso4217"`
+	Customer    *CustomerInfo `json:"customer" pedantigo:"required"`
+	ReturnURL   string        `json:"return_url,omitempty" pedantigo:"omitempty,url"`
+	NotifyURL   string        `json:"notify_url,omitempty" pedantigo:"omitempty,url"`
 	ExpiryTime  *time.Time    `json:"expiry_time,omitempty"`
-	Note        string        `json:"note,omitempty"`
+	Note        string        `json:"note,omitempty" pedantigo:"omitempty,maxLength=500"`
 	Metadata    Metadata      `json:"metadata,omitempty"`
 }
 
@@ -48,11 +49,11 @@ type Order struct {
 }
 
 type GetOrderRequest struct {
-	OrderID string `json:"order_id"`
+	OrderID string `json:"order_id" pedantigo:"required,minLength=1"`
 }
 
 type ListOrderPaymentsRequest struct {
-	OrderID string `json:"order_id"`
+	OrderID string `json:"order_id" pedantigo:"required,minLength=1"`
 }
 
 // --- Payment types ---
@@ -76,30 +77,39 @@ type Payment struct {
 }
 
 type GetPaymentRequest struct {
-	OrderID   string `json:"order_id,omitempty"`
-	PaymentID string `json:"payment_id"`
+	OrderID   string `json:"order_id,omitempty" pedantigo:"omitempty,minLength=1"`
+	PaymentID string `json:"payment_id" pedantigo:"required,minLength=1"`
 }
 
 type ListPaymentsRequest struct {
-	OrderID string `json:"order_id"`
+	OrderID string `json:"order_id" pedantigo:"required,minLength=1"`
 }
 
 type CapturePaymentRequest struct {
-	PaymentID   string      `json:"payment_id"`
-	AmountMinor AmountMinor `json:"amount_minor"`
-	Currency    Currency    `json:"currency"`
+	PaymentID   string      `json:"payment_id" pedantigo:"required,minLength=1"`
+	AmountMinor AmountMinor `json:"amount_minor" pedantigo:"required,gt=0"`
+	Currency    Currency    `json:"currency" pedantigo:"required,iso4217"`
 }
 
 // --- Refund types ---
 
 type CreateRefundRequest struct {
-	OrderID     string      `json:"order_id,omitempty"`
-	PaymentID   string      `json:"payment_id,omitempty"`
-	RefundID    string      `json:"refund_id,omitempty"`
-	AmountMinor AmountMinor `json:"amount_minor"`
-	Currency    Currency    `json:"currency"`
-	Reason      string      `json:"reason,omitempty"`
+	OrderID     string      `json:"order_id,omitempty" pedantigo:"omitempty,minLength=1"`
+	PaymentID   string      `json:"payment_id,omitempty" pedantigo:"omitempty,minLength=1"`
+	RefundID    string      `json:"refund_id,omitempty" pedantigo:"omitempty,maxLength=250"`
+	AmountMinor AmountMinor `json:"amount_minor" pedantigo:"required,gt=0"`
+	Currency    Currency    `json:"currency" pedantigo:"required,iso4217"`
+	Reason      string      `json:"reason,omitempty" pedantigo:"omitempty,maxLength=500"`
 	Metadata    Metadata    `json:"metadata,omitempty"`
+}
+
+// Validate enforces the cross-field rule: at least one of OrderID or PaymentID must be provided.
+// Cashfree refunds are identified by OrderID; Razorpay refunds are identified by PaymentID.
+func (r *CreateRefundRequest) Validate() error {
+	if r.OrderID == "" && r.PaymentID == "" {
+		return errors.New("at least one of order_id or payment_id is required")
+	}
+	return nil
 }
 
 type Refund struct {
@@ -119,12 +129,12 @@ type Refund struct {
 }
 
 type GetRefundRequest struct {
-	OrderID  string `json:"order_id,omitempty"`
-	RefundID string `json:"refund_id"`
+	OrderID  string `json:"order_id,omitempty" pedantigo:"omitempty,minLength=1"`
+	RefundID string `json:"refund_id" pedantigo:"required,minLength=1"`
 }
 
 type ListRefundsRequest struct {
-	OrderID string `json:"order_id"`
+	OrderID string `json:"order_id" pedantigo:"required,minLength=1"`
 }
 
 // --- Instrument types ---
@@ -141,36 +151,41 @@ type Instrument struct {
 }
 
 type GetInstrumentRequest struct {
-	CustomerID   string `json:"customer_id"`
-	InstrumentID string `json:"instrument_id"`
+	CustomerID   string `json:"customer_id" pedantigo:"required,minLength=1"`
+	InstrumentID string `json:"instrument_id" pedantigo:"required,minLength=1"`
 }
 
 type ListInstrumentsRequest struct {
-	CustomerID string `json:"customer_id"`
+	CustomerID string `json:"customer_id" pedantigo:"required,minLength=1"`
 }
 
 type DeleteInstrumentRequest struct {
-	CustomerID   string `json:"customer_id"`
-	InstrumentID string `json:"instrument_id"`
+	CustomerID   string `json:"customer_id" pedantigo:"required,minLength=1"`
+	InstrumentID string `json:"instrument_id" pedantigo:"required,minLength=1"`
 }
 
 // --- Webhook types ---
 
 type WebhookEvent struct {
-	Provider   Provider         `json:"provider"`
-	AccountID  string           `json:"account_id,omitempty"`
-	EventType  WebhookEventType `json:"event_type"`
-	EventTime  *time.Time       `json:"event_time,omitempty"`
-	Order      *Order           `json:"order,omitempty"`
-	Payment    *Payment         `json:"payment,omitempty"`
-	Refund     *Refund          `json:"refund,omitempty"`
-	RawPayload []byte           `json:"raw_payload,omitempty"`
-	DedupeKey  string           `json:"dedupe_key"`
-}
+	Provider     Provider         `json:"provider"`
+	AccountID    string           `json:"account_id,omitempty"`
+	EventType    WebhookEventType `json:"event_type"`
+	EventTime    *time.Time       `json:"event_time,omitempty"`
+	Order        *Order           `json:"order,omitempty"`
+	Payment      *Payment         `json:"payment,omitempty"`
+	Refund       *Refund          `json:"refund,omitempty"`
+	Subscription *Subscription    `json:"subscription,omitempty"`
+	RawPayload   []byte           `json:"raw_payload,omitempty"`
+	DedupeKey    string           `json:"dedupe_key"`
 
-type WebhookMountOptions struct {
-	BasePath string
-	Handlers map[WebhookEventType]WebhookEventHandler
+	// D11: raw-passthrough — never hide vendor data from callers
+	WebhookURL         string            `json:"webhook_url,omitempty"`
+	RawVendorEventType string            `json:"raw_vendor_event_type,omitempty"`
+	RawVendorStatus    string            `json:"raw_vendor_status,omitempty"`
+	RawHeaders         map[string]string `json:"raw_headers,omitempty"`
+
+	// D12: graceful degradation — parser errors do not abort dispatch
+	ParseError string `json:"parse_error,omitempty"`
 }
 
 type WebhookEventHandler func(ctx context.Context, event *WebhookEvent) error

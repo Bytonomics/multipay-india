@@ -67,6 +67,40 @@ type PaymentLinkProvider interface {
 	CancelPaymentLink(ctx context.Context, req *domain.CancelPaymentLinkRequest) (*domain.PaymentLink, error)
 }
 
+// PlanProvider defines operations for billing plans.
+type PlanProvider interface {
+	// CreatePlan creates a new billing plan on the payment provider.
+	CreatePlan(ctx context.Context, req *domain.CreatePlanRequest) (*domain.Plan, error)
+
+	// GetPlan retrieves an existing billing plan from the payment provider.
+	GetPlan(ctx context.Context, req *domain.GetPlanRequest) (*domain.Plan, error)
+}
+
+// SubscriptionProvider defines operations for subscriptions.
+// All methods are first-class — both providers support them, no capability gating.
+type SubscriptionProvider interface {
+	// CreateSubscription creates a new subscription. Accepts either PlanID (existing) or PlanDetails (inline).
+	CreateSubscription(ctx context.Context, req *domain.CreateSubscriptionRequest) (*domain.Subscription, error)
+
+	// GetSubscription retrieves an existing subscription.
+	GetSubscription(ctx context.Context, req *domain.GetSubscriptionRequest) (*domain.Subscription, error)
+
+	// CancelSubscription cancels a subscription.
+	CancelSubscription(ctx context.Context, req *domain.CancelSubscriptionRequest) (*domain.Subscription, error)
+
+	// PauseSubscription pauses an active subscription.
+	PauseSubscription(ctx context.Context, req *domain.PauseSubscriptionRequest) (*domain.Subscription, error)
+
+	// ResumeSubscription resumes a paused subscription.
+	ResumeSubscription(ctx context.Context, req *domain.ResumeSubscriptionRequest) (*domain.Subscription, error)
+
+	// ChangePlan changes the plan of an existing subscription.
+	ChangePlan(ctx context.Context, req *domain.ChangePlanRequest) (*domain.Subscription, error)
+
+	// GetSubscriptionPayments retrieves all payments for a subscription.
+	GetSubscriptionPayments(ctx context.Context, req *domain.GetSubscriptionPaymentsRequest) ([]*domain.SubscriptionPayment, error)
+}
+
 // WebhookConsumerProvider defines operations for webhook processing.
 type WebhookConsumerProvider interface {
 	// VerifySignature verifies the authenticity of a webhook request.
@@ -75,6 +109,9 @@ type WebhookConsumerProvider interface {
 
 	// ParseEvent parses and unmarshals a webhook payload into a domain event.
 	ParseEvent(ctx context.Context, payload []byte, headers map[string]string) (*domain.WebhookEvent, error)
+
+	// SupportedWebhookEvents returns the list of webhook event types supported by this provider.
+	SupportedWebhookEvents() []domain.WebhookEventType
 }
 
 // ProviderAdapter is the main port that embeds all provider-specific capability interfaces.
@@ -86,6 +123,8 @@ type ProviderAdapter interface {
 	RefundProvider
 	InstrumentProvider
 	PaymentLinkProvider
+	PlanProvider
+	SubscriptionProvider
 	WebhookConsumerProvider
 	MetadataMapper
 

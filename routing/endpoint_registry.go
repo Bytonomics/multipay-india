@@ -1,7 +1,6 @@
 package routing
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -9,27 +8,26 @@ import (
 	"github.com/Bytonomics/multipay-adapter/domain"
 )
 
-// WebhookEventHandler is the function signature for handling webhook events.
-// It takes a context and a webhook event, and returns an error if processing fails.
-type WebhookEventHandler func(context.Context, *domain.WebhookEvent) error
+const maxEndpoints = 40
 
 // EndpointRegistry manages webhook handlers registered for specific provider+accountID combinations.
 // It is thread-safe for concurrent access using sync.RWMutex.
 type EndpointRegistry struct {
 	mu       sync.RWMutex
-	handlers map[string]map[string]WebhookEventHandler // provider -> accountID -> handler
+	handlers map[string]map[string]domain.WebhookEventHandler // provider -> accountID -> handler
 }
 
 // NewEndpointRegistry creates a new EndpointRegistry instance.
 func NewEndpointRegistry() *EndpointRegistry {
 	return &EndpointRegistry{
-		handlers: make(map[string]map[string]WebhookEventHandler),
+		handlers: make(map[string]map[string]domain.WebhookEventHandler),
 	}
 }
 
 // Register registers a webhook handler for a specific provider+accountID combination.
-// It returns an error if a handler is already registered for that provider+accountID combo.
-func (r *EndpointRegistry) Register(provider domain.Provider, accountID string, handler WebhookEventHandler) error {
+// It returns an error if a handler is already registered for that provider+accountID combo
+// or if the total endpoint count would exceed the maximum.
+func (r *EndpointRegistry) Register(provider domain.Provider, accountID string, handler domain.WebhookEventHandler) error {
 	if handler == nil {
 		return errors.New("handler cannot be nil")
 	}
@@ -43,9 +41,18 @@ func (r *EndpointRegistry) Register(provider domain.Provider, accountID string, 
 
 	providerStr := provider.String()
 
+	// Count total registered endpoints across all providers
+	total := 0
+	for _, accounts := range r.handlers {
+		total += len(accounts)
+	}
+	if total >= maxEndpoints {
+		return fmt.Errorf("endpoint registration limit reached (%d); maximum %d webhook endpoints are supported", total, maxEndpoints)
+	}
+
 	// Check if provider entry exists
 	if _, ok := r.handlers[providerStr]; !ok {
-		r.handlers[providerStr] = make(map[string]WebhookEventHandler)
+		r.handlers[providerStr] = make(map[string]domain.WebhookEventHandler)
 	}
 
 	// Check if handler already registered for this provider+accountID
@@ -59,7 +66,7 @@ func (r *EndpointRegistry) Register(provider domain.Provider, accountID string, 
 
 // Lookup returns the webhook handler for a specific provider+accountID combination.
 // It returns ErrProviderNotFound if no handler is registered.
-func (r *EndpointRegistry) Lookup(provider domain.Provider, accountID string) (WebhookEventHandler, error) {
+func (r *EndpointRegistry) Lookup(provider domain.Provider, accountID string) (domain.WebhookEventHandler, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 

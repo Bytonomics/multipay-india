@@ -18,13 +18,15 @@ import (
 // All services share a single ProviderAdapter, SupportMatrix, and HookPipeline
 // for consistent behavior across the client.
 type MultiPayClient struct {
-	orders       *orchestration.OrderService
-	payments     *orchestration.PaymentService
-	refunds      *orchestration.RefundService
-	instruments  *orchestration.InstrumentService
-	paymentLinks *orchestration.PaymentLinkService
-	webhooks     *orchestration.WebhookService
-	capabilities *orchestration.CapabilityService
+	orders        *orchestration.OrderService
+	payments      *orchestration.PaymentService
+	refunds       *orchestration.RefundService
+	instruments   *orchestration.InstrumentService
+	paymentLinks  *orchestration.PaymentLinkService
+	webhooks      *orchestration.WebhookService
+	plans         *orchestration.PlanService
+	subscriptions *orchestration.SubscriptionService
+	capabilities  *orchestration.CapabilityService
 }
 
 // NewClient creates a new MultiPayClient from the provided configuration.
@@ -46,6 +48,10 @@ func NewClient(cfg *ClientConfig) (*MultiPayClient, error) {
 
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
+	}
+
+	if cfg.WebhookStore == nil {
+		panic("ClientConfig.WebhookStore is required (cannot be nil); WebhookStore provides durable event capture for webhook replay and idempotency")
 	}
 
 	adapter := cfg.Provider
@@ -83,6 +89,10 @@ func NewClient(cfg *ClientConfig) (*MultiPayClient, error) {
 	instrumentService := orchestration.NewInstrumentService(provider, adapter, validator, pipeline, logger, clock)
 	paymentLinkService := orchestration.NewPaymentLinkService(provider, adapter, validator, pipeline, logger, clock)
 
+	// Create PlanService and SubscriptionService (first-class services, no validator)
+	planService := orchestration.NewPlanService(provider, adapter, pipeline, logger, clock)
+	subscriptionService := orchestration.NewSubscriptionService(provider, adapter, pipeline, logger, clock)
+
 	// WebhookService has a different constructor (requires Provider, Adapter, Pipeline, Store, EndpointRegistry, Logger)
 	endpointRegistry := routing.NewEndpointRegistry()
 	webhookService := orchestration.NewWebhookService(provider, adapter, pipeline, cfg.WebhookStore, endpointRegistry, logger)
@@ -91,13 +101,15 @@ func NewClient(cfg *ClientConfig) (*MultiPayClient, error) {
 	capabilityService := orchestration.NewCapabilityService(supportMatrix)
 
 	return &MultiPayClient{
-		orders:       orderService,
-		payments:     paymentService,
-		refunds:      refundService,
-		instruments:  instrumentService,
-		paymentLinks: paymentLinkService,
-		webhooks:     webhookService,
-		capabilities: capabilityService,
+		orders:        orderService,
+		payments:      paymentService,
+		refunds:       refundService,
+		instruments:   instrumentService,
+		paymentLinks:  paymentLinkService,
+		webhooks:      webhookService,
+		plans:         planService,
+		subscriptions: subscriptionService,
+		capabilities:  capabilityService,
 	}, nil
 }
 
@@ -134,4 +146,14 @@ func (c *MultiPayClient) Webhooks() *orchestration.WebhookService {
 // Capabilities returns the CapabilityService for capability discovery and queries.
 func (c *MultiPayClient) Capabilities() *orchestration.CapabilityService {
 	return c.capabilities
+}
+
+// Plans returns the PlanService for plan operations.
+func (c *MultiPayClient) Plans() *orchestration.PlanService {
+	return c.plans
+}
+
+// Subscriptions returns the SubscriptionService for subscription operations.
+func (c *MultiPayClient) Subscriptions() *orchestration.SubscriptionService {
+	return c.subscriptions
 }

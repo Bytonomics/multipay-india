@@ -4,11 +4,19 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/SmrutAI/pedantigo"
+
 	"github.com/Bytonomics/multipay-adapter/capabilities"
 	"github.com/Bytonomics/multipay-adapter/domain"
 	"github.com/Bytonomics/multipay-adapter/hooks"
 	"github.com/Bytonomics/multipay-adapter/logging"
 	"github.com/Bytonomics/multipay-adapter/ports"
+)
+
+var (
+	createOrderValidator       = pedantigo.New[domain.CreateOrderRequest]()
+	getOrderValidator          = pedantigo.New[domain.GetOrderRequest]()
+	listOrderPaymentsValidator = pedantigo.New[domain.ListOrderPaymentsRequest]()
 )
 
 // OrderService orchestrates order operations across multiple payment providers.
@@ -43,6 +51,10 @@ func NewOrderService(provider domain.Provider, adapter ports.ProviderAdapter, va
 func (s *OrderService) CreateOrder(ctx context.Context, req *domain.CreateOrderRequest) (*domain.Order, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
+	}
+
+	if err := createOrderValidator.Validate(req); err != nil {
+		return nil, fmt.Errorf("request validation failed: %w", err)
 	}
 
 	provider := s.provider
@@ -88,6 +100,10 @@ func (s *OrderService) GetOrder(ctx context.Context, req *domain.GetOrderRequest
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
+	if err := getOrderValidator.Validate(req); err != nil {
+		return nil, fmt.Errorf("request validation failed: %w", err)
+	}
+
 	provider := s.provider
 	adapter := s.adapter
 
@@ -130,6 +146,10 @@ func (s *OrderService) GetOrder(ctx context.Context, req *domain.GetOrderRequest
 func (s *OrderService) ListOrderPayments(ctx context.Context, req *domain.ListOrderPaymentsRequest) ([]*domain.Payment, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
+	}
+
+	if err := listOrderPaymentsValidator.Validate(req); err != nil {
+		return nil, fmt.Errorf("request validation failed: %w", err)
 	}
 
 	provider := s.provider

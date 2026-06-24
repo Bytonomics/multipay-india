@@ -15,15 +15,22 @@ import (
 	"github.com/Bytonomics/multipay-adapter/ports"
 )
 
+// apiResponse is the JSON envelope for all webhook handler responses.
+type apiResponse struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
 // WebhookHandler implements http.Handler for webhook routing and processing.
 // It provides the core webhook flow: endpoint matching, deduplication, signature verification,
 // event parsing, and handler dispatch.
 type WebhookHandler struct {
-	matcher  *EndpointMatcher
-	adapter  ports.ProviderAdapter
-	store    ports.WebhookStore
-	logger   ports.Logger
-	handlers map[string]WebhookEventHandler
+	matcher        *EndpointMatcher
+	adapter        ports.ProviderAdapter
+	store          ports.WebhookStore
+	logger         ports.Logger
+	handlers       map[domain.WebhookEventType]domain.WebhookEventHandler
+	defaultHandler domain.WebhookEventHandler
 }
 
 // NewWebhookHandler creates a new WebhookHandler with the given dependencies.
@@ -34,7 +41,14 @@ func NewWebhookHandler(
 	adapter ports.ProviderAdapter,
 	store ports.WebhookStore,
 	logger ports.Logger,
+	defaultHandler domain.WebhookEventHandler,
 ) *WebhookHandler {
+	if defaultHandler == nil {
+		panic("defaultHandler is required (cannot be nil); all unregistered and unknown events route here")
+	}
+	if store == nil {
+		panic("WebhookStore is required (cannot be nil); it is the durable capture of received events")
+	}
 	if logger == nil {
 		panic("logger is required (cannot be nil)")
 	}
@@ -42,11 +56,12 @@ func NewWebhookHandler(
 	wrappedLogger := logging.NewCallerLogger(logger, 2)
 
 	return &WebhookHandler{
-		matcher:  matcher,
-		adapter:  adapter,
-		store:    store,
-		logger:   wrappedLogger,
-		handlers: make(map[string]WebhookEventHandler),
+		matcher:        matcher,
+		adapter:        adapter,
+		store:          store,
+		logger:         wrappedLogger,
+		handlers:       make(map[domain.WebhookEventType]domain.WebhookEventHandler),
+		defaultHandler: defaultHandler,
 	}
 }
 
@@ -54,7 +69,7 @@ func NewWebhookHandler(
 // When a webhook event of this type is received and successfully processed,
 // this handler will be called with the parsed event.
 // Calling RegisterEventHandler multiple times for the same eventType replaces the previous handler.
-func (h *WebhookHandler) RegisterEventHandler(eventType string, handler WebhookEventHandler) {
+func (h *WebhookHandler) RegisterEventHandler(eventType domain.WebhookEventType, handler domain.WebhookEventHandler) {
 	h.handlers[eventType] = handler
 }
 
@@ -62,19 +77,18 @@ func (h *WebhookHandler) RegisterEventHandler(eventType string, handler WebhookE
 // It executes the 8-step webhook flow:
 //
 // 1. Extract provider + accountID from request path via EndpointMatcher
-// 2. Read and store raw request body
+// 2. Read and store raw request body (durable capture)
 // 3. Check for duplicates using SHA256(body) as dedupeKey
 // 4. If duplicate, return 200 ACK immediately
 // 5. Validate that the webhook provider matches the configured adapter provider
 // 6. Verify webhook signature using adapter.VerifySignature()
-// 7. Parse event using adapter.ParseEvent()
-// 8. Dispatch to registered WebhookEventHandler and mark as processed
+// 7. Parse event (best-effort; parse failure does NOT abort dispatch)
+// 8. Dispatch to registered handler or DefaultHandler (typed dispatch); always 2xx after sig verify
 //
 // HTTP responses follow this pattern:
-// - 200: Success or duplicate (safe to retry)
-// - 202: No handler registered for event type (graceful, no error)
-// - 400: Bad request (invalid path, provider mismatch, signature, parse error)
-// - 500: Handler execution error
+// - 200: Success, duplicate, or after signature verification (always 2xx after sig verify)
+// - 400: Bad request (invalid path, provider mismatch, signature verification failed)
+// - 500: Other infrastructure errors
 //
 // All responses are JSON with "code" and "message" fields.
 func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -107,35 +121,34 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	// 3. Store raw payload for audit/recovery
-	if h.store != nil {
-		// Use dedupeKey = SHA256(body) for uniqueness
-		dedupeKey := dedupeHash(body)
-		if storeErr := h.store.StoreRawPayload(ctx, provider, accountID, body); storeErr != nil {
-			// Log but don't fail - storage is best-effort
-			if respErr := respondError(ctx, h.logger, w, http.StatusInternalServerError, "STORAGE_ERROR", "Failed to store webhook payload"); respErr != nil {
-				h.logger.Error(ctx, "failed to send storage error response", "error", respErr.Error())
-			}
-			return
-		}
+	// 3. Compute dedupeKey early (needed for both IsDuplicate and MarkProcessed)
+	dedupeKey := dedupeHash(body)
 
-		// 4. Check for duplicate via dedupeKey
-		isDuplicate, dedupErr := h.store.IsDuplicate(ctx, provider, accountID, dedupeKey)
-		if dedupErr != nil {
-			// Log but don't fail - dedup check is best-effort
-			if respErr := respondError(ctx, h.logger, w, http.StatusInternalServerError, "DEDUP_ERROR", "Failed to check for duplicates"); respErr != nil {
-				h.logger.Error(ctx, "failed to send dedup error response", "error", respErr.Error())
-			}
-			return
+	// Store raw payload for audit/recovery (G8: mandatory, no nil guard)
+	if storeErr := h.store.StoreRawPayload(ctx, provider, accountID, body); storeErr != nil {
+		// Log but don't fail - storage is best-effort
+		if respErr := respondError(ctx, h.logger, w, http.StatusInternalServerError, "STORAGE_ERROR", "Failed to store webhook payload"); respErr != nil {
+			h.logger.Error(ctx, "failed to send storage error response", "error", respErr.Error())
 		}
+		return
+	}
 
-		if isDuplicate {
-			// Duplicate webhook - return 200 ACK immediately (idempotent)
-			if err := respondSuccess(ctx, h.logger, w, "DUPLICATE_ACK", "Duplicate webhook, acknowledged"); err != nil {
-				h.logger.Error(ctx, "failed to send duplicate ack response", "error", err.Error())
-			}
-			return
+	// 4. Check for duplicate via dedupeKey
+	isDuplicate, dedupErr := h.store.IsDuplicate(ctx, provider, accountID, dedupeKey)
+	if dedupErr != nil {
+		// Log but don't fail - dedup check is best-effort
+		if respErr := respondError(ctx, h.logger, w, http.StatusInternalServerError, "DEDUP_ERROR", "Failed to check for duplicates"); respErr != nil {
+			h.logger.Error(ctx, "failed to send dedup error response", "error", respErr.Error())
 		}
+		return
+	}
+
+	if isDuplicate {
+		// Duplicate webhook - return 200 ACK immediately (idempotent)
+		if err := respondSuccess(ctx, h.logger, w, "DUPLICATE_ACK", "Duplicate webhook, acknowledged"); err != nil {
+			h.logger.Error(ctx, "failed to send duplicate ack response", "error", err.Error())
+		}
+		return
 	}
 
 	// 5. Use configured adapter (validate provider matches)
@@ -169,46 +182,46 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 7. Parse event
+	// 7. Parse event — best-effort; parse failure does NOT abort dispatch
 	event, parseErr := h.adapter.ParseEvent(ctx, body, headers)
+	if event == nil {
+		event = &domain.WebhookEvent{}
+	}
+	// D11: always populate raw/source fields regardless of parse outcome
+	event.Provider = provider
+	event.AccountID = accountID
+	event.WebhookURL = r.URL.Path
+	event.RawPayload = body
+	if event.RawHeaders == nil {
+		event.RawHeaders = headers
+	}
 	if parseErr != nil {
-		if respErr := respondError(ctx, h.logger, w, http.StatusBadRequest, "PARSE_ERROR", "Failed to parse webhook event"); respErr != nil {
-			h.logger.Error(ctx, "failed to send parse error response", "error", respErr.Error())
+		event.ParseError = parseErr.Error()
+		if event.EventType == "" {
+			event.EventType = domain.EventUnknown
 		}
-		return
 	}
 
-	// 8. Dispatch to registered handler
-	eventTypeStr := string(event.EventType)
-	handler, ok := h.handlers[eventTypeStr]
+	// 8. Dispatch — specific handler or DefaultHandler; never 202
+	handler, ok := h.handlers[event.EventType]
 	if !ok {
-		// No handler registered for this event type - acknowledge gracefully (202 Accepted)
-		if err := respondAccepted(ctx, h.logger, w); err != nil {
-			h.logger.Error(ctx, "failed to send accepted response for unregistered event type", "error", err.Error(), "eventType", eventTypeStr)
-		}
-		return
+		handler = h.defaultHandler
 	}
-
-	// Execute handler
 	if err := handler(ctx, event); err != nil {
-		if respErr := respondError(ctx, h.logger, w, http.StatusInternalServerError, "HANDLER_ERROR", "Failed to process webhook event"); respErr != nil {
-			h.logger.Error(ctx, "failed to send handler error response", "error", respErr.Error())
-		}
-		return
-	}
-
-	// Mark as processed
-	if h.store != nil {
-		dedupeKey := dedupeHash(body)
+		// G8: handler error → log at error, respond 2xx. Event is already persisted by StoreRawPayload
+		// and NOT MarkProcessed, so it's queryable as "received but unprocessed" for replay.
+		// Never let a buggy handler disable the endpoint (vendors auto-disable on repeated 5xx).
+		h.logger.Error(ctx, "webhook handler returned error", "error", err.Error(), "eventType", string(event.EventType))
+		// fall through to 2xx — DO NOT call MarkProcessed
+	} else {
+		// Success: mark as processed to prevent reprocessing
 		if markErr := h.store.MarkProcessed(ctx, provider, accountID, dedupeKey); markErr != nil {
-			// Log marking error but don't fail - the event was already processed successfully
-			// Returning 200 to prevent retries since processing completed
-			h.logger.Error(ctx, "failed to mark webhook as processed", "error", markErr.Error(), "provider", provider, "accountID", accountID)
+			h.logger.Error(ctx, "failed to mark webhook as processed", "error", markErr.Error())
 		}
 	}
 
-	// Success
-	if err := respondSuccess(ctx, h.logger, w, "ACK", "Webhook processed successfully"); err != nil {
+	// D12: always respond 2xx after signature verification — prevents vendor auto-disabling on handler errors
+	if err := respondSuccess(ctx, h.logger, w, "ACK", "Webhook processed"); err != nil {
 		h.logger.Error(ctx, "failed to send success response", "error", err.Error())
 	}
 }
@@ -226,10 +239,7 @@ func dedupeHash(body []byte) string {
 func respondError(ctx context.Context, logger ports.Logger, w http.ResponseWriter, statusCode int, errCode, message string) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{
-		"code":    errCode,
-		"message": message,
-	}); err != nil {
+	if err := json.NewEncoder(w).Encode(apiResponse{Code: errCode, Message: message}); err != nil {
 		logger.Error(ctx, "failed to encode error response in respondError", "error", err.Error(), "statusCode", statusCode, "errCode", errCode)
 
 		return fmt.Errorf("encode error response: %w", err)
@@ -243,29 +253,10 @@ func respondError(ctx context.Context, logger ports.Logger, w http.ResponseWrite
 func respondSuccess(ctx context.Context, logger ports.Logger, w http.ResponseWriter, code, message string) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{
-		"code":    code,
-		"message": message,
-	}); err != nil {
+	if err := json.NewEncoder(w).Encode(apiResponse{Code: code, Message: message}); err != nil {
 		logger.Error(ctx, "failed to encode success response in respondSuccess", "error", err.Error(), "code", code)
 
 		return fmt.Errorf("encode success response: %w", err)
-	}
-	return nil
-}
-
-// respondAccepted sends a JSON accepted response (HTTP 202 Accepted).
-// Used when the webhook is valid but no handler is registered for the event type.
-// Returns an error if JSON encoding fails (response may be partially written).
-func respondAccepted(ctx context.Context, logger ports.Logger, w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusAccepted)
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{
-		"code":    "ACCEPTED",
-		"message": "Event accepted but not yet processed",
-	}); err != nil {
-		logger.Error(ctx, "failed to encode accepted response in respondAccepted", "error", err.Error())
-		return fmt.Errorf("encode accepted response: %w", err)
 	}
 	return nil
 }

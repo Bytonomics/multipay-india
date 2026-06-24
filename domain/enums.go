@@ -145,6 +145,45 @@ const (
 	EventPaymentFailed     WebhookEventType = "payment.failed"
 	EventRefundCreated     WebhookEventType = "refund.created"
 	EventRefundProcessed   WebhookEventType = "refund.processed"
+
+	// Subscription webhook events
+	EventSubAuthenticated WebhookEventType = "subscription.authenticated"
+	EventSubActivated     WebhookEventType = "subscription.activated"
+	EventSubCharged       WebhookEventType = "subscription.charged"
+	EventSubPaymentFailed WebhookEventType = "subscription.payment_failed"
+	EventSubHalted        WebhookEventType = "subscription.halted"
+	EventSubOnHold        WebhookEventType = "subscription.on_hold"
+	EventSubPaused        WebhookEventType = "subscription.paused"
+	EventSubResumed       WebhookEventType = "subscription.resumed"
+	EventSubCancelled     WebhookEventType = "subscription.cancelled"
+	EventSubCompleted     WebhookEventType = "subscription.completed"
+	EventSubUpdated       WebhookEventType = "subscription.updated"
+	EventSubCardExpiring  WebhookEventType = "subscription.card_expiring"
+	EventSubRefund        WebhookEventType = "subscription.refund"
+
+	// EventUnknown is emitted when the vendor event cannot be classified. Routes to DefaultHandler.
+	EventUnknown WebhookEventType = "unknown"
+
+	// EventOrderExpired: Cashfree ORDER.EXPIRED
+	EventOrderExpired WebhookEventType = "order.expired"
+
+	// EventRefundFailed: Cashfree REFUND.FAILED; Razorpay refund.failed
+	EventRefundFailed WebhookEventType = "refund.failed"
+
+	// EventSubCardExpired: Cashfree SUBSCRIPTION_STATUS_CHANGED status=CARD_EXPIRED
+	EventSubCardExpired WebhookEventType = "subscription.card_expired"
+
+	// EventSubExpired: Cashfree SUBSCRIPTION_STATUS_CHANGED status=EXPIRED or LINK_EXPIRED (merged)
+	EventSubExpired WebhookEventType = "subscription.expired"
+
+	// EventSubBankApprovalPending: Cashfree SUBSCRIPTION_STATUS_CHANGED status=BANK_APPROVAL_PENDING
+	EventSubBankApprovalPending WebhookEventType = "subscription.bank_approval_pending"
+
+	// EventSubPreDebitNotice: Cashfree SUBSCRIPTION_PAYMENT_NOTIFICATION_INITIATED
+	EventSubPreDebitNotice WebhookEventType = "subscription.pre_debit_notice"
+
+	// EventSubPaymentCancelled: Cashfree SUBSCRIPTION_PAYMENT_CANCELLED
+	EventSubPaymentCancelled WebhookEventType = "subscription.payment_cancelled"
 )
 
 // String returns the string representation of the WebhookEventType.
@@ -156,7 +195,14 @@ func (w WebhookEventType) String() string {
 func (w WebhookEventType) IsValid() bool {
 	switch w {
 	case EventOrderCreated, EventPaymentAuthorized, EventPaymentCaptured,
-		EventPaymentFailed, EventRefundCreated, EventRefundProcessed:
+		EventPaymentFailed, EventRefundCreated, EventRefundProcessed,
+		EventSubAuthenticated, EventSubActivated, EventSubCharged, EventSubPaymentFailed,
+		EventSubHalted, EventSubOnHold, EventSubPaused,
+		EventSubResumed, EventSubCancelled, EventSubCompleted, EventSubUpdated,
+		EventSubCardExpiring, EventSubRefund,
+		EventUnknown, EventOrderExpired, EventRefundFailed,
+		EventSubCardExpired, EventSubExpired, EventSubBankApprovalPending,
+		EventSubPreDebitNotice, EventSubPaymentCancelled:
 		return true
 	}
 	return false

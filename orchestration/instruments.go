@@ -4,11 +4,19 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/SmrutAI/pedantigo"
+
 	"github.com/Bytonomics/multipay-adapter/capabilities"
 	"github.com/Bytonomics/multipay-adapter/domain"
 	"github.com/Bytonomics/multipay-adapter/hooks"
 	"github.com/Bytonomics/multipay-adapter/logging"
 	"github.com/Bytonomics/multipay-adapter/ports"
+)
+
+var (
+	getInstrumentValidator    = pedantigo.New[domain.GetInstrumentRequest]()
+	listInstrumentsValidator  = pedantigo.New[domain.ListInstrumentsRequest]()
+	deleteInstrumentValidator = pedantigo.New[domain.DeleteInstrumentRequest]()
 )
 
 // InstrumentService orchestrates instrument operations with validation, capability checking, and hooks.
@@ -42,6 +50,10 @@ func NewInstrumentService(provider domain.Provider, adapter ports.ProviderAdapte
 func (s *InstrumentService) GetInstrument(ctx context.Context, req *domain.GetInstrumentRequest) (*domain.Instrument, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
+	}
+
+	if err := getInstrumentValidator.Validate(req); err != nil {
+		return nil, fmt.Errorf("request validation failed: %w", err)
 	}
 
 	provider := s.provider
@@ -88,6 +100,10 @@ func (s *InstrumentService) ListInstruments(ctx context.Context, req *domain.Lis
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
+	if err := listInstrumentsValidator.Validate(req); err != nil {
+		return nil, fmt.Errorf("request validation failed: %w", err)
+	}
+
 	provider := s.provider
 	adapter := s.adapter
 
@@ -130,6 +146,10 @@ func (s *InstrumentService) ListInstruments(ctx context.Context, req *domain.Lis
 func (s *InstrumentService) DeleteInstrument(ctx context.Context, req *domain.DeleteInstrumentRequest) (*domain.Instrument, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
+	}
+
+	if err := deleteInstrumentValidator.Validate(req); err != nil {
+		return nil, fmt.Errorf("request validation failed: %w", err)
 	}
 
 	provider := s.provider

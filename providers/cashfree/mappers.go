@@ -490,3 +490,227 @@ func rawResponse(v interface{}) domain.RawProviderResponse {
 	}
 	return domain.RawProviderResponse(data)
 }
+
+// MapPlanEntityToCanonical maps a Cashfree PlanEntity to the canonical domain.Plan type.
+// Handles type conversions, currency lookup, and status mapping.
+func MapPlanEntityToCanonical(entity *cf.PlanEntity) *domain.Plan {
+	if entity == nil {
+		return nil
+	}
+
+	// Extract currency from the entity (if available in the response)
+	currency := ""
+	if entity.PlanCurrency != nil {
+		currency = *entity.PlanCurrency
+	}
+
+	// Map Cashfree status string to domain status (if status field exists in PlanEntity)
+	status := ""
+	if entity.PlanStatus != nil {
+		status = *entity.PlanStatus
+	}
+
+	plan := &domain.Plan{
+		PlanID:         StringPtrToStr(entity.PlanId),
+		PlanName:       StringPtrToStr(entity.PlanName),
+		PlanType:       mapPlanType(entity.PlanType),
+		Currency:       domain.Currency(currency),
+		AmountMinor:    domain.AmountMinor(AmountMajorToMinor(FloatPtrToFloat64(entity.PlanRecurringAmount), currency)),
+		MaxAmountMinor: domain.AmountMinor(AmountMajorToMinor(FloatPtrToFloat64(entity.PlanMaxAmount), currency)),
+		Interval:       getInt32OrDefault(entity.PlanIntervals),
+		IntervalType:   mapPlanIntervalType(entity.PlanIntervalType),
+		MaxCycles:      getInt32OrDefault(entity.PlanMaxCycles),
+		Status:         status,
+		Note:           StringPtrToStr(entity.PlanNote),
+		Provider:       domain.ProviderCashfree,
+		Raw:            rawResponse(entity),
+	}
+
+	return plan
+}
+
+// MapSubscriptionEntityToCanonical maps a Cashfree SubscriptionEntity to the canonical domain.Subscription type.
+// Handles status mapping and timestamp conversion.
+func MapSubscriptionEntityToCanonical(entity *cf.SubscriptionEntity) *domain.Subscription {
+	if entity == nil {
+		return nil
+	}
+
+	// Extract PlanID from nested PlanDetails
+	planID := ""
+	if entity.PlanDetails != nil {
+		planID = StringPtrToStr(entity.PlanDetails.PlanId)
+	}
+
+	// Extract customer details from nested CustomerDetails
+	customerEmail := ""
+	customerPhone := ""
+	if entity.CustomerDetails != nil {
+		customerEmail = entity.CustomerDetails.CustomerEmail
+		customerPhone = entity.CustomerDetails.CustomerPhone
+	}
+
+	// Extract auth link from AuthorisationDetails if available
+	authLink := ""
+	// Note: AuthorisationDetails may contain auth URL, but specific field name depends on Cashfree SDK version
+
+	subscription := &domain.Subscription{
+		SubscriptionID:         StringPtrToStr(entity.SubscriptionId),
+		ProviderSubscriptionID: StringPtrToStr(entity.CfSubscriptionId),
+		PlanID:                 planID,
+		Status:                 mapSubscriptionStatus(entity.SubscriptionStatus),
+		CustomerEmail:          customerEmail,
+		CustomerPhone:          customerPhone,
+		AuthLink:               authLink,
+		ExpiresAt:              timePtr(TimeFromTimestamp(entity.SubscriptionExpiryTime)),
+		FirstChargeTime:        timePtr(TimeFromTimestamp(entity.SubscriptionFirstChargeTime)),
+		NextChargeDate:         timePtr(TimeFromTimestamp(entity.NextScheduleDate)),
+		Provider:               domain.ProviderCashfree,
+		Raw:                    rawResponse(entity),
+	}
+
+	return subscription
+}
+
+// MapSubscriptionPaymentEntityToCanonical maps a Cashfree SubscriptionPaymentEntity to the canonical domain.SubscriptionPayment type.
+// currency is the ISO-4217 code of the parent subscription's plan, used to convert the major-unit payment_amount to minor units; it must be a non-empty code resolved by the caller.
+func MapSubscriptionPaymentEntityToCanonical(entity *cf.SubscriptionPaymentEntity, currency string) *domain.SubscriptionPayment {
+	if entity == nil {
+		return nil
+	}
+
+	payment := &domain.SubscriptionPayment{
+		PaymentID:      StringPtrToStr(entity.PaymentId),
+		SubscriptionID: StringPtrToStr(entity.SubscriptionId),
+		AmountMinor:    domain.AmountMinor(AmountMajorToMinor(FloatPtrToFloat64(entity.PaymentAmount), currency)),
+		Status:         mapSubscriptionPaymentStatus(entity.PaymentStatus),
+		PaymentType:    mapSubscriptionPaymentType(entity.PaymentType),
+		ScheduledDate:  timePtr(TimeFromTimestamp(entity.PaymentScheduleDate)),
+		InitiatedDate:  timePtr(TimeFromTimestamp(entity.PaymentInitiatedDate)),
+		RetryAttempts:  int(getInt32OrDefault(entity.RetryAttempts)),
+		Provider:       domain.ProviderCashfree,
+		Raw:            rawResponse(entity),
+	}
+
+	return payment
+}
+
+// mapPlanType converts Cashfree plan type strings to canonical domain.PlanType.
+func mapPlanType(typePtr *string) domain.PlanType {
+	planType := ""
+	if typePtr != nil {
+		planType = *typePtr
+	}
+	switch planType {
+	case "PERIODIC":
+		return domain.PlanTypePeriodic
+	case "ON_DEMAND":
+		return domain.PlanTypeOnDemand
+	default:
+		return domain.PlanTypePeriodic
+	}
+}
+
+// mapPlanIntervalType converts Cashfree plan interval type strings to canonical domain.PlanIntervalType.
+func mapPlanIntervalType(typePtr *string) domain.PlanIntervalType {
+	intervalType := ""
+	if typePtr != nil {
+		intervalType = *typePtr
+	}
+	switch intervalType {
+	case "DAY":
+		return domain.PlanIntervalDay
+	case "WEEK":
+		return domain.PlanIntervalWeek
+	case "MONTH":
+		return domain.PlanIntervalMonth
+	case "YEAR":
+		return domain.PlanIntervalYear
+	default:
+		return domain.PlanIntervalMonth
+	}
+}
+
+// mapSubscriptionStatus converts Cashfree subscription status strings to canonical domain.SubscriptionStatus.
+func mapSubscriptionStatus(statusPtr *string) domain.SubscriptionStatus {
+	status := ""
+	if statusPtr != nil {
+		status = *statusPtr
+	}
+	switch status {
+	case "INITIALIZED":
+		return domain.SubscriptionStatusInitialized
+	case "BANK_APPROVAL_PENDING":
+		return domain.SubscriptionStatusBankApprovalPending
+	case "AUTHENTICATED":
+		return domain.SubscriptionStatusAuthenticated
+	case "ACTIVE":
+		return domain.SubscriptionStatusActive
+	case "PENDING":
+		return domain.SubscriptionStatusPending
+	case "ON_HOLD":
+		return domain.SubscriptionStatusOnHold
+	case "HALTED":
+		return domain.SubscriptionStatusHalted
+	case "PAUSED":
+		return domain.SubscriptionStatusPaused
+	case "CUSTOMER_PAUSED":
+		return domain.SubscriptionStatusCustomerPaused
+	case "CANCELLED":
+		return domain.SubscriptionStatusCancelled
+	case "CUSTOMER_CANCELLED":
+		return domain.SubscriptionStatusCustomerCancelled
+	case "COMPLETED":
+		return domain.SubscriptionStatusCompleted
+	case "EXPIRED":
+		return domain.SubscriptionStatusExpired
+	default:
+		return domain.SubscriptionStatusInitialized
+	}
+}
+
+// mapSubscriptionPaymentStatus converts Cashfree subscription payment status strings to canonical domain.SubscriptionPaymentStatus.
+func mapSubscriptionPaymentStatus(statusPtr *string) domain.SubscriptionPaymentStatus {
+	status := ""
+	if statusPtr != nil {
+		status = *statusPtr
+	}
+	switch status {
+	case "SCHEDULED":
+		return domain.SubPaymentStatusScheduled
+	case "PENDING":
+		return domain.SubPaymentStatusPending
+	case "SUCCESS":
+		return domain.SubPaymentStatusSuccess
+	case "FAILED":
+		return domain.SubPaymentStatusFailed
+	case "CANCELLED":
+		return domain.SubPaymentStatusCancelled
+	default:
+		return domain.SubPaymentStatusScheduled
+	}
+}
+
+// mapSubscriptionPaymentType converts Cashfree subscription payment type strings to canonical domain.SubscriptionPaymentType.
+func mapSubscriptionPaymentType(typePtr *string) domain.SubscriptionPaymentType {
+	paymentType := ""
+	if typePtr != nil {
+		paymentType = *typePtr
+	}
+	switch paymentType {
+	case "AUTH":
+		return domain.SubPaymentTypeAuth
+	case "CHARGE":
+		return domain.SubPaymentTypeCharge
+	default:
+		return domain.SubPaymentTypeCharge
+	}
+}
+
+// getInt32OrDefault safely converts a *int32 pointer to int32 or returns 0.
+func getInt32OrDefault(i *int32) int32 {
+	if i == nil {
+		return 0
+	}
+	return *i
+}

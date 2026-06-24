@@ -7,6 +7,11 @@ import (
 	"github.com/Bytonomics/multipay-adapter/domain"
 )
 
+// D17: Typed request struct for Razorpay List Payments API.
+type razorpayListPaymentsRequest struct {
+	OrderID string `json:"order_id"`
+}
+
 // GetPayment retrieves a specific payment for an order.
 // It takes a GetPaymentRequest containing order and payment IDs and returns a canonical Payment domain object.
 func (a *Adapter) GetPayment(ctx context.Context, req *domain.GetPaymentRequest) (*domain.Payment, error) {
@@ -27,52 +32,14 @@ func (a *Adapter) GetPayment(ctx context.Context, req *domain.GetPaymentRequest)
 		return nil, fmt.Errorf("failed to fetch payment: %w", err)
 	}
 
-	// Map Razorpay response to canonical domain type
-	payment := &domain.Payment{
-		ProviderPaymentID: getString(responseMap, "id"),
-		OrderID:           getString(responseMap, "order_id"),
-		AmountMinor:       domain.AmountMinor(getInt64(responseMap, "amount")),
-		Currency:          domain.Currency(getString(responseMap, "currency")),
-		Status:            mapPaymentStatus(getString(responseMap, "status")),
-		PaymentMethod:     getString(responseMap, "method"),
-		IsCaptured:        getBool(responseMap, "captured"),
-		BankReference:     getString(responseMap, "bank_account"),
-		ErrorCode:         getString(responseMap, "error_code"),
-		ErrorMessage:      getString(responseMap, "error_description"),
-		PaymentTime:       getTime(responseMap, "created_at"),
-		Raw:               rawMapResponse(responseMap),
-		ProviderDetails: &domain.PaymentProviderDetail{
-			Razorpay: &domain.RazorpayPaymentDetail{
-				Entity:         getString(responseMap, "entity"),
-				Description:    getString(responseMap, "description"),
-				Email:          getString(responseMap, "email"),
-				Contact:        getString(responseMap, "contact"),
-				Fee:            getInt64(responseMap, "fee"),
-				Tax:            getInt64(responseMap, "tax"),
-				AmountRefunded: getInt64(responseMap, "amount_refunded"),
-				RefundStatus:   getString(responseMap, "refund_status"),
-				International:  getBool(responseMap, "international"),
-				CardID:         getString(responseMap, "card_id"),
-				Bank:           getString(responseMap, "bank"),
-				VPA:            getString(responseMap, "vpa"),
-				Wallet:         getString(responseMap, "wallet"),
-				ErrorSource:    getString(responseMap, "error_source"),
-				ErrorStep:      getString(responseMap, "error_step"),
-				ErrorReason:    getString(responseMap, "error_reason"),
-			},
-		},
+	// D17: Decode map to typed struct at SDK boundary
+	typed, err := decodeResponse[razorpayPaymentResponse](responseMap)
+	if err != nil {
+		return nil, err
 	}
 
-	// Populate acquirer_data if present
-	if acqData := getMap(responseMap, "acquirer_data"); len(acqData) > 0 {
-		payment.ProviderDetails.Razorpay.AcquirerData = &domain.RazorpayAcquirerData{
-			BankTransactionID: getString(acqData, "bank_transaction_id"),
-			AuthCode:          getString(acqData, "auth_code"),
-			RRN:               getString(acqData, "rrn"),
-		}
-	}
-
-	return payment, nil
+	// D17: Map typed struct to canonical domain type
+	return mapPaymentFromResponse(typed, rawMapResponse(responseMap)), nil
 }
 
 // ListPayments retrieves all payments for an order.
@@ -86,8 +53,9 @@ func (a *Adapter) ListPayments(ctx context.Context, req *domain.ListPaymentsRequ
 	}
 
 	// Build parameters to filter payments by order
-	params := map[string]interface{}{
-		"order_id": req.OrderID,
+	params, err := encodeRequest(&razorpayListPaymentsRequest{OrderID: req.OrderID})
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode list payments request: %w", err)
 	}
 
 	// Call Razorpay SDK to fetch payments
@@ -100,65 +68,16 @@ func (a *Adapter) ListPayments(ctx context.Context, req *domain.ListPaymentsRequ
 		return nil, fmt.Errorf("failed to list payments: %w", err)
 	}
 
-	// Handle the response - Razorpay returns a map with "items" key containing payment list
-	itemsList, ok := paymentsData["items"].([]interface{})
-	if !ok {
-		// No items found, return empty slice
-		return []*domain.Payment{}, nil
+	// D17: Decode map to typed struct at SDK boundary
+	typed, err := decodeResponse[razorpayPaymentListResponse](paymentsData)
+	if err != nil {
+		return nil, err
 	}
 
-	// Map each payment response to canonical domain type
-	payments := make([]*domain.Payment, 0, len(itemsList))
-	for _, item := range itemsList {
-		itemMap, ok := item.(map[string]interface{})
-		if !ok {
-			continue
-		}
-
-		payment := &domain.Payment{
-			ProviderPaymentID: getString(itemMap, "id"),
-			OrderID:           getString(itemMap, "order_id"),
-			AmountMinor:       domain.AmountMinor(getInt64(itemMap, "amount")),
-			Currency:          domain.Currency(getString(itemMap, "currency")),
-			Status:            mapPaymentStatus(getString(itemMap, "status")),
-			PaymentMethod:     getString(itemMap, "method"),
-			IsCaptured:        getBool(itemMap, "captured"),
-			BankReference:     getString(itemMap, "bank_account"),
-			ErrorCode:         getString(itemMap, "error_code"),
-			ErrorMessage:      getString(itemMap, "error_description"),
-			PaymentTime:       getTime(itemMap, "created_at"),
-			Raw:               rawMapResponse(itemMap),
-			ProviderDetails: &domain.PaymentProviderDetail{
-				Razorpay: &domain.RazorpayPaymentDetail{
-					Entity:         getString(itemMap, "entity"),
-					Description:    getString(itemMap, "description"),
-					Email:          getString(itemMap, "email"),
-					Contact:        getString(itemMap, "contact"),
-					Fee:            getInt64(itemMap, "fee"),
-					Tax:            getInt64(itemMap, "tax"),
-					AmountRefunded: getInt64(itemMap, "amount_refunded"),
-					RefundStatus:   getString(itemMap, "refund_status"),
-					International:  getBool(itemMap, "international"),
-					CardID:         getString(itemMap, "card_id"),
-					Bank:           getString(itemMap, "bank"),
-					VPA:            getString(itemMap, "vpa"),
-					Wallet:         getString(itemMap, "wallet"),
-					ErrorSource:    getString(itemMap, "error_source"),
-					ErrorStep:      getString(itemMap, "error_step"),
-					ErrorReason:    getString(itemMap, "error_reason"),
-				},
-			},
-		}
-
-		// Populate acquirer_data if present
-		if acqData := getMap(itemMap, "acquirer_data"); len(acqData) > 0 {
-			payment.ProviderDetails.Razorpay.AcquirerData = &domain.RazorpayAcquirerData{
-				BankTransactionID: getString(acqData, "bank_transaction_id"),
-				AuthCode:          getString(acqData, "auth_code"),
-				RRN:               getString(acqData, "rrn"),
-			}
-		}
-
+	// D17: Map each typed payment response to canonical domain type
+	payments := make([]*domain.Payment, 0, len(typed.Items))
+	for i := range typed.Items {
+		payment := mapPaymentFromResponse(&typed.Items[i], rawMapResponse(paymentsData))
 		payments = append(payments, payment)
 	}
 
@@ -187,50 +106,12 @@ func (a *Adapter) CapturePayment(ctx context.Context, req *domain.CapturePayment
 		return nil, fmt.Errorf("failed to capture payment: %w", err)
 	}
 
-	// Map Razorpay response to canonical domain type
-	payment := &domain.Payment{
-		ProviderPaymentID: getString(responseMap, "id"),
-		OrderID:           getString(responseMap, "order_id"),
-		AmountMinor:       domain.AmountMinor(getInt64(responseMap, "amount")),
-		Currency:          domain.Currency(getString(responseMap, "currency")),
-		Status:            mapPaymentStatus(getString(responseMap, "status")),
-		PaymentMethod:     getString(responseMap, "method"),
-		IsCaptured:        getBool(responseMap, "captured"),
-		BankReference:     getString(responseMap, "bank_account"),
-		ErrorCode:         getString(responseMap, "error_code"),
-		ErrorMessage:      getString(responseMap, "error_description"),
-		PaymentTime:       getTime(responseMap, "created_at"),
-		Raw:               rawMapResponse(responseMap),
-		ProviderDetails: &domain.PaymentProviderDetail{
-			Razorpay: &domain.RazorpayPaymentDetail{
-				Entity:         getString(responseMap, "entity"),
-				Description:    getString(responseMap, "description"),
-				Email:          getString(responseMap, "email"),
-				Contact:        getString(responseMap, "contact"),
-				Fee:            getInt64(responseMap, "fee"),
-				Tax:            getInt64(responseMap, "tax"),
-				AmountRefunded: getInt64(responseMap, "amount_refunded"),
-				RefundStatus:   getString(responseMap, "refund_status"),
-				International:  getBool(responseMap, "international"),
-				CardID:         getString(responseMap, "card_id"),
-				Bank:           getString(responseMap, "bank"),
-				VPA:            getString(responseMap, "vpa"),
-				Wallet:         getString(responseMap, "wallet"),
-				ErrorSource:    getString(responseMap, "error_source"),
-				ErrorStep:      getString(responseMap, "error_step"),
-				ErrorReason:    getString(responseMap, "error_reason"),
-			},
-		},
+	// D17: Decode map to typed struct at SDK boundary
+	typed, err := decodeResponse[razorpayPaymentResponse](responseMap)
+	if err != nil {
+		return nil, err
 	}
 
-	// Populate acquirer_data if present
-	if acqData := getMap(responseMap, "acquirer_data"); len(acqData) > 0 {
-		payment.ProviderDetails.Razorpay.AcquirerData = &domain.RazorpayAcquirerData{
-			BankTransactionID: getString(acqData, "bank_transaction_id"),
-			AuthCode:          getString(acqData, "auth_code"),
-			RRN:               getString(acqData, "rrn"),
-		}
-	}
-
-	return payment, nil
+	// D17: Map typed struct to canonical domain type
+	return mapPaymentFromResponse(typed, rawMapResponse(responseMap)), nil
 }

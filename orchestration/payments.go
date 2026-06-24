@@ -4,11 +4,19 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/SmrutAI/pedantigo"
+
 	"github.com/Bytonomics/multipay-adapter/capabilities"
 	"github.com/Bytonomics/multipay-adapter/domain"
 	"github.com/Bytonomics/multipay-adapter/hooks"
 	"github.com/Bytonomics/multipay-adapter/logging"
 	"github.com/Bytonomics/multipay-adapter/ports"
+)
+
+var (
+	getPaymentValidator     = pedantigo.New[domain.GetPaymentRequest]()
+	listPaymentsValidator   = pedantigo.New[domain.ListPaymentsRequest]()
+	capturePaymentValidator = pedantigo.New[domain.CapturePaymentRequest]()
 )
 
 // PaymentService orchestrates payment operations across multiple payment providers.
@@ -43,6 +51,10 @@ func NewPaymentService(provider domain.Provider, adapter ports.ProviderAdapter, 
 func (s *PaymentService) GetPayment(ctx context.Context, req *domain.GetPaymentRequest) (*domain.Payment, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
+	}
+
+	if err := getPaymentValidator.Validate(req); err != nil {
+		return nil, fmt.Errorf("request validation failed: %w", err)
 	}
 
 	provider := s.provider
@@ -89,6 +101,10 @@ func (s *PaymentService) ListPayments(ctx context.Context, req *domain.ListPayme
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
+	if err := listPaymentsValidator.Validate(req); err != nil {
+		return nil, fmt.Errorf("request validation failed: %w", err)
+	}
+
 	provider := s.provider
 	adapter := s.adapter
 
@@ -131,6 +147,10 @@ func (s *PaymentService) ListPayments(ctx context.Context, req *domain.ListPayme
 func (s *PaymentService) CapturePayment(ctx context.Context, req *domain.CapturePaymentRequest) (*domain.Payment, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
+	}
+
+	if err := capturePaymentValidator.Validate(req); err != nil {
+		return nil, fmt.Errorf("request validation failed: %w", err)
 	}
 
 	provider := s.provider

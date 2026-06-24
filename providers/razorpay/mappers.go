@@ -2,139 +2,21 @@ package razorpay
 
 import (
 	"encoding/json"
-	"strconv"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/Bytonomics/multipay-adapter/domain"
 )
 
-// getString safely extracts a string value from a map.
-// Returns empty string if the key doesn't exist or the value is not a string.
-func getString(m map[string]interface{}, key string) string {
-	if m == nil {
-		return ""
-	}
-	val, ok := m[key]
-	if !ok {
-		return ""
-	}
-	s, ok := val.(string)
-	if !ok {
-		return ""
-	}
-	return s
-}
-
-// getInt64 safely extracts an int64 value from a map.
-// Handles conversion from float64 (JSON number type).
-// Returns 0 if the key doesn't exist or the value cannot be converted to int64.
-func getInt64(m map[string]interface{}, key string) int64 {
-	if m == nil {
-		return 0
-	}
-	val, ok := m[key]
-	if !ok {
-		return 0
-	}
-
-	// Handle int64 directly
-	if i, ok := val.(int64); ok {
-		return i
-	}
-
-	// Handle float64 (JSON numbers come as float64)
-	if f, ok := val.(float64); ok {
-		return int64(f)
-	}
-
-	// Handle string representation
-	if s, ok := val.(string); ok {
-		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
-			return i
-		}
-	}
-
-	return 0
-}
-
-// getMap safely extracts a nested map[string]interface{} from a map.
-// Returns an empty map if the key doesn't exist or the value is not a map.
-func getMap(m map[string]interface{}, key string) map[string]interface{} {
-	if m == nil {
-		return make(map[string]interface{})
-	}
-	val, ok := m[key]
-	if !ok {
-		return make(map[string]interface{})
-	}
-	innerMap, ok := val.(map[string]interface{})
-	if !ok {
-		return make(map[string]interface{})
-	}
-	return innerMap
-}
-
-// getTime safely extracts and parses a time value from a map.
-// Supports both Unix timestamp (float64/int64) and RFC3339 string formats.
-// Returns nil if the key doesn't exist or parsing fails.
-func getTime(m map[string]interface{}, key string) *time.Time {
-	if m == nil {
-		return nil
-	}
-	val, ok := m[key]
-	if !ok {
-		return nil
-	}
-
-	// Try as Unix timestamp (float64 or int64)
-	if f, ok := val.(float64); ok {
-		t := time.Unix(int64(f), 0)
-		return &t
-	}
-	if i, ok := val.(int64); ok {
-		t := time.Unix(i, 0)
-		return &t
-	}
-
-	// Try as string (RFC3339 or other format)
-	if s, ok := val.(string); ok {
-		// Try RFC3339 format
-		if t, err := time.Parse(time.RFC3339, s); err == nil {
-			return &t
-		}
-		// Try Unix timestamp as string
-		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
-			t := time.Unix(i, 0)
-			return &t
-		}
-	}
-
-	return nil
-}
-
 // rawMapResponse converts a map to a RawProviderResponse (JSON bytes).
-func rawMapResponse(m map[string]interface{}) domain.RawProviderResponse {
+func rawMapResponse(m map[string]any) domain.RawProviderResponse {
 	data, err := json.Marshal(m)
 	if err != nil {
 		// If marshaling fails, return empty response
 		return domain.RawProviderResponse{}
 	}
 	return domain.RawProviderResponse(data)
-}
-
-// getBool safely extracts a bool value from a map.
-// Returns false if the key doesn't exist or the value is not a bool.
-func getBool(m map[string]interface{}, key string) bool {
-	v, ok := m[key]
-	if !ok || v == nil {
-		return false
-	}
-	b, ok := v.(bool)
-	if !ok {
-		return false
-	}
-	return b
 }
 
 // isNotFoundError checks if an error indicates a "not found" condition.
@@ -145,4 +27,221 @@ func isNotFoundError(err error) bool {
 	}
 	errMsg := strings.ToLower(err.Error())
 	return strings.Contains(errMsg, "not found")
+}
+
+// PART A: Typed structs for Razorpay API responses
+
+type razorpayItem struct {
+	Name        string `json:"name"`
+	Amount      int64  `json:"amount"`
+	Currency    string `json:"currency"`
+	Description string `json:"description"`
+}
+
+type razorpayPlanResponse struct {
+	ID        string            `json:"id"`
+	Period    string            `json:"period"`
+	Interval  int32             `json:"interval"`
+	Item      razorpayItem      `json:"item"`
+	Notes     map[string]string `json:"notes"`
+	CreatedAt int64             `json:"created_at"`
+}
+
+type razorpayPlanCreateRequest struct {
+	Period   string            `json:"period"`
+	Interval int32             `json:"interval"`
+	Item     razorpayItem      `json:"item"`
+	Notes    map[string]string `json:"notes,omitempty"`
+}
+
+type razorpaySubscriptionResponse struct {
+	ID             string            `json:"id"`
+	PlanID         string            `json:"plan_id"`
+	Status         string            `json:"status"`
+	ShortURL       string            `json:"short_url"`
+	ChargeAt       int64             `json:"charge_at"`
+	StartAt        int64             `json:"start_at"`
+	ExpireBy       int64             `json:"expire_by"`
+	CustomerID     string            `json:"customer_id"`
+	Notes          map[string]string `json:"notes"`
+	CreatedAt      int64             `json:"created_at"`
+	TotalCount     int32             `json:"total_count"`
+	PaidCount      int32             `json:"paid_count"`
+	RemainingCount int32             `json:"remaining_count"`
+}
+
+type razorpayInvoiceResponse struct {
+	ID        string `json:"id"`
+	PaymentID string `json:"payment_id"`
+	Amount    int64  `json:"amount"`
+	Currency  string `json:"currency"`
+	Status    string `json:"status"`
+	OrderID   string `json:"order_id"`
+	PaidAt    int64  `json:"paid_at"`
+	CreatedAt int64  `json:"created_at"`
+}
+
+type razorpayInvoiceListResponse struct {
+	Items []razorpayInvoiceResponse `json:"items"`
+	Count int                       `json:"count"`
+}
+
+// PART B: Boundary helpers for encoding/decoding
+
+func decodeResponse[T any](m map[string]any) (*T, error) {
+	b, err := json.Marshal(m)
+	if err != nil {
+		return nil, fmt.Errorf("marshal razorpay response: %w", err)
+	}
+	out := new(T)
+	if err := json.Unmarshal(b, out); err != nil {
+		return nil, fmt.Errorf("decode razorpay response: %w", err)
+	}
+	return out, nil
+}
+
+func encodeRequest(v any) (map[string]any, error) {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return nil, fmt.Errorf("marshal razorpay request: %w", err)
+	}
+	m := map[string]any{}
+	if err := json.Unmarshal(b, &m); err != nil {
+		return nil, fmt.Errorf("encode razorpay request: %w", err)
+	}
+	return m, nil
+}
+
+func unixPtr(sec int64) *time.Time {
+	if sec == 0 {
+		return nil
+	}
+	t := time.Unix(sec, 0).UTC()
+	return &t
+}
+
+// PART C: Interval type and status helpers
+
+func mapPlanIntervalTypeToRazorpay(it domain.PlanIntervalType) string {
+	switch it {
+	case domain.PlanIntervalDay:
+		return "daily"
+	case domain.PlanIntervalWeek:
+		return "weekly"
+	case domain.PlanIntervalMonth:
+		return "monthly"
+	case domain.PlanIntervalYear:
+		return "yearly"
+	default:
+		return "monthly"
+	}
+}
+
+func mapInvoiceStatusToPaymentStatus(status string) domain.SubscriptionPaymentStatus {
+	switch strings.ToLower(status) {
+	case "paid":
+		return domain.SubPaymentStatusSuccess
+	case "issued", "partially_paid":
+		return domain.SubPaymentStatusPending
+	case "cancelled":
+		return domain.SubPaymentStatusCancelled
+	case "expired":
+		return domain.SubPaymentStatusFailed
+	default:
+		return domain.SubPaymentStatusPending
+	}
+}
+
+// mapPlanIntervalTypeFromRazorpay maps Razorpay period strings to canonical domain.PlanIntervalType.
+// Razorpay uses: "daily", "weekly", "monthly", "yearly"
+func mapPlanIntervalTypeFromRazorpay(period string) domain.PlanIntervalType {
+	switch strings.ToLower(period) {
+	case "daily", "day":
+		return domain.PlanIntervalDay
+	case "weekly", "week":
+		return domain.PlanIntervalWeek
+	case "monthly", "month":
+		return domain.PlanIntervalMonth
+	case "yearly", "year":
+		return domain.PlanIntervalYear
+	default:
+		return domain.PlanIntervalMonth
+	}
+}
+
+// mapSubscriptionStatusFromRazorpay maps Razorpay subscription status strings to canonical domain.SubscriptionStatus.
+// Razorpay subscription statuses: created, issued, authenticated, paused, halted, cancelled, expired, completed
+func mapSubscriptionStatusFromRazorpay(status string) domain.SubscriptionStatus {
+	switch strings.ToLower(status) {
+	case "created":
+		return domain.SubscriptionStatusInitialized
+	case "issued":
+		return domain.SubscriptionStatusPending
+	case "authenticated":
+		return domain.SubscriptionStatusAuthenticated
+	case "active":
+		return domain.SubscriptionStatusActive
+	case "paused":
+		return domain.SubscriptionStatusPaused
+	case "halted":
+		return domain.SubscriptionStatusHalted
+	case "cancelled":
+		return domain.SubscriptionStatusCancelled
+	case "expired":
+		return domain.SubscriptionStatusExpired
+	case "completed":
+		return domain.SubscriptionStatusCompleted
+	default:
+		return domain.SubscriptionStatusInitialized
+	}
+}
+
+// PART E: New struct-based mappers
+
+func mapPlanFromResponse(r *razorpayPlanResponse, raw map[string]any) *domain.Plan {
+	return &domain.Plan{
+		PlanID:         r.ID,
+		PlanName:       r.Item.Name,
+		PlanType:       domain.PlanTypePeriodic,
+		Currency:       domain.Currency(r.Item.Currency),
+		AmountMinor:    domain.AmountMinor(r.Item.Amount),
+		MaxAmountMinor: domain.AmountMinor(r.Item.Amount),
+		Interval:       r.Interval,
+		IntervalType:   mapPlanIntervalTypeFromRazorpay(r.Period),
+		Note:           r.Notes["note"],
+		Status:         "",
+		Provider:       domain.ProviderRazorpay,
+		Raw:            rawMapResponse(raw),
+	}
+}
+
+func mapSubscriptionFromResponse(r *razorpaySubscriptionResponse, raw map[string]any) *domain.Subscription {
+	return &domain.Subscription{
+		SubscriptionID:         r.ID,
+		ProviderSubscriptionID: r.ID,
+		PlanID:                 r.PlanID,
+		Status:                 mapSubscriptionStatusFromRazorpay(r.Status),
+		AuthLink:               r.ShortURL,
+		ExpiresAt:              unixPtr(r.ExpireBy),
+		FirstChargeTime:        unixPtr(r.StartAt),
+		NextChargeDate:         unixPtr(r.ChargeAt),
+		CustomerEmail:          "",
+		CustomerPhone:          "",
+		Provider:               domain.ProviderRazorpay,
+		Raw:                    rawMapResponse(raw),
+	}
+}
+
+func mapInvoiceToSubscriptionPayment(inv *razorpayInvoiceResponse, subscriptionID string, raw map[string]any) *domain.SubscriptionPayment {
+	// PaymentType and RetryAttempts: not available from Razorpay invoices. Always zero.
+	return &domain.SubscriptionPayment{
+		PaymentID:      inv.PaymentID,
+		SubscriptionID: subscriptionID,
+		AmountMinor:    domain.AmountMinor(inv.Amount),
+		Status:         mapInvoiceStatusToPaymentStatus(inv.Status),
+		ScheduledDate:  unixPtr(inv.CreatedAt),
+		InitiatedDate:  unixPtr(inv.PaidAt),
+		Provider:       domain.ProviderRazorpay,
+		Raw:            rawMapResponse(raw),
+	}
 }

@@ -7,6 +7,29 @@ import (
 	"github.com/Bytonomics/multipay-adapter/domain"
 )
 
+// D17: Typed request struct for Razorpay Create Order API.
+type razorpayCreateOrderRequest struct {
+	Amount   int64           `json:"amount"`
+	Currency string          `json:"currency"`
+	Notes    domain.Metadata `json:"notes,omitempty"`
+	Receipt  string          `json:"receipt,omitempty"`
+}
+
+// D17: Typed response struct for Razorpay Order API responses.
+type razorpayOrderResponse struct {
+	ID         string `json:"id"`
+	Entity     string `json:"entity"`
+	Receipt    string `json:"receipt"`
+	Amount     int64  `json:"amount"`
+	Currency   string `json:"currency"`
+	Status     string `json:"status"`
+	CreatedAt  int64  `json:"created_at"`
+	OfferID    string `json:"offer_id"`
+	AmountPaid int64  `json:"amount_paid"`
+	AmountDue  int64  `json:"amount_due"`
+	Attempts   int64  `json:"attempts"`
+}
+
 // CreateOrder creates a new order on Razorpay.
 // It takes a CreateOrderRequest and returns a canonical Order domain object.
 // The amount is in paisa (minor currency unit), which Razorpay uses natively.
@@ -16,15 +39,14 @@ func (a *Adapter) CreateOrder(ctx context.Context, req *domain.CreateOrderReques
 	}
 
 	// Build Razorpay order creation parameters
-	params := map[string]interface{}{
-		"amount":   req.AmountMinor, // paisa
-		"currency": string(req.Currency),
-		"notes":    req.Metadata,
-	}
-
-	// Add optional order ID as receipt if provided
-	if req.OrderID != "" {
-		params["receipt"] = req.OrderID
+	params, err := encodeRequest(&razorpayCreateOrderRequest{
+		Amount:   int64(req.AmountMinor),
+		Currency: string(req.Currency),
+		Notes:    req.Metadata,
+		Receipt:  req.OrderID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode create order request: %w", err)
 	}
 
 	// Call Razorpay SDK to create order
@@ -33,28 +55,14 @@ func (a *Adapter) CreateOrder(ctx context.Context, req *domain.CreateOrderReques
 		return nil, fmt.Errorf("failed to create order: %w", err)
 	}
 
-	// Map Razorpay response to canonical domain type
-	order := &domain.Order{
-		ProviderOrderID: getString(responseMap, "id"),
-		OrderID:         getString(responseMap, "receipt"),
-		AmountMinor:     domain.AmountMinor(getInt64(responseMap, "amount")),
-		Currency:        domain.Currency(getString(responseMap, "currency")),
-		Status:          mapOrderStatus(getString(responseMap, "status")),
-		CreatedAt:       getTime(responseMap, "created_at"),
-		Raw:             rawMapResponse(responseMap),
-		ProviderDetails: &domain.OrderProviderDetail{
-			Razorpay: &domain.RazorpayOrderDetail{
-				Entity:     getString(responseMap, "entity"),
-				Receipt:    getString(responseMap, "receipt"),
-				OfferID:    getString(responseMap, "offer_id"),
-				AmountPaid: getInt64(responseMap, "amount_paid"),
-				AmountDue:  getInt64(responseMap, "amount_due"),
-				Attempts:   getInt64(responseMap, "attempts"),
-			},
-		},
+	// D17: Decode map to typed struct at SDK boundary
+	typed, err := decodeResponse[razorpayOrderResponse](responseMap)
+	if err != nil {
+		return nil, err
 	}
 
-	return order, nil
+	// D17: Map typed struct to canonical domain type
+	return mapOrderFromResponse(typed, responseMap), nil
 }
 
 // GetOrder retrieves an existing order from Razorpay.
@@ -77,28 +85,57 @@ func (a *Adapter) GetOrder(ctx context.Context, req *domain.GetOrderRequest) (*d
 		return nil, fmt.Errorf("failed to fetch order: %w", err)
 	}
 
-	// Map Razorpay response to canonical domain type
-	order := &domain.Order{
-		ProviderOrderID: getString(responseMap, "id"),
-		OrderID:         getString(responseMap, "receipt"),
-		AmountMinor:     domain.AmountMinor(getInt64(responseMap, "amount")),
-		Currency:        domain.Currency(getString(responseMap, "currency")),
-		Status:          mapOrderStatus(getString(responseMap, "status")),
-		CreatedAt:       getTime(responseMap, "created_at"),
-		Raw:             rawMapResponse(responseMap),
-		ProviderDetails: &domain.OrderProviderDetail{
-			Razorpay: &domain.RazorpayOrderDetail{
-				Entity:     getString(responseMap, "entity"),
-				Receipt:    getString(responseMap, "receipt"),
-				OfferID:    getString(responseMap, "offer_id"),
-				AmountPaid: getInt64(responseMap, "amount_paid"),
-				AmountDue:  getInt64(responseMap, "amount_due"),
-				Attempts:   getInt64(responseMap, "attempts"),
-			},
-		},
+	// D17: Decode map to typed struct at SDK boundary
+	typed, err := decodeResponse[razorpayOrderResponse](responseMap)
+	if err != nil {
+		return nil, err
 	}
 
-	return order, nil
+	// D17: Map typed struct to canonical domain type
+	return mapOrderFromResponse(typed, responseMap), nil
+}
+
+// D17: Typed response struct for Razorpay Payment API responses (used in list responses).
+type razorpayPaymentResponse struct {
+	ID               string                `json:"id"`
+	Entity           string                `json:"entity"`
+	OrderID          string                `json:"order_id"`
+	Amount           int64                 `json:"amount"`
+	Currency         string                `json:"currency"`
+	Status           string                `json:"status"`
+	Method           string                `json:"method"`
+	Captured         bool                  `json:"captured"`
+	BankAccount      string                `json:"bank_account"`
+	ErrorCode        string                `json:"error_code"`
+	ErrorDescription string                `json:"error_description"`
+	CreatedAt        int64                 `json:"created_at"`
+	Description      string                `json:"description"`
+	Email            string                `json:"email"`
+	Contact          string                `json:"contact"`
+	Fee              int64                 `json:"fee"`
+	Tax              int64                 `json:"tax"`
+	AmountRefunded   int64                 `json:"amount_refunded"`
+	RefundStatus     string                `json:"refund_status"`
+	International    bool                  `json:"international"`
+	CardID           string                `json:"card_id"`
+	Bank             string                `json:"bank"`
+	VPA              string                `json:"vpa"`
+	Wallet           string                `json:"wallet"`
+	ErrorSource      string                `json:"error_source"`
+	ErrorStep        string                `json:"error_step"`
+	ErrorReason      string                `json:"error_reason"`
+	AcquirerData     *razorpayAcquirerData `json:"acquirer_data"`
+}
+
+type razorpayAcquirerData struct {
+	BankTransactionID string `json:"bank_transaction_id"`
+	AuthCode          string `json:"auth_code"`
+	RRN               string `json:"rrn"`
+}
+
+// D17: Typed response struct for payment list response.
+type razorpayPaymentListResponse struct {
+	Items []razorpayPaymentResponse `json:"items"`
 }
 
 // ListOrderPayments retrieves all payments associated with a specific order.
@@ -121,77 +158,92 @@ func (a *Adapter) ListOrderPayments(ctx context.Context, req *domain.ListOrderPa
 		return nil, fmt.Errorf("failed to list order payments: %w", err)
 	}
 
-	// Handle the response - Razorpay returns a map with "items" key containing payment list
-	items := getMap(paymentsData, "items")
-
-	// Check if items is actually a list (slice)
-	itemsList, ok := items["items"].([]interface{})
-	if !ok {
-		// Try to extract items directly if it's the top-level response
-		if topItems, ok := paymentsData["items"].([]interface{}); ok {
-			itemsList = topItems
-		} else {
-			// No items found, return empty slice
-			return []*domain.Payment{}, nil
-		}
+	// D17: Decode map to typed struct at SDK boundary
+	typed, err := decodeResponse[razorpayPaymentListResponse](paymentsData)
+	if err != nil {
+		return nil, err
 	}
 
-	// Map each payment response to canonical domain type
-	payments := make([]*domain.Payment, 0, len(itemsList))
-	for _, item := range itemsList {
-		itemMap, ok := item.(map[string]interface{})
-		if !ok {
-			continue
-		}
-
-		payment := &domain.Payment{
-			ProviderPaymentID: getString(itemMap, "id"),
-			OrderID:           getString(itemMap, "order_id"),
-			AmountMinor:       domain.AmountMinor(getInt64(itemMap, "amount")),
-			Currency:          domain.Currency(getString(itemMap, "currency")),
-			Status:            mapPaymentStatus(getString(itemMap, "status")),
-			PaymentMethod:     getString(itemMap, "method"),
-			IsCaptured:        getBool(itemMap, "captured"),
-			BankReference:     getString(itemMap, "bank_account"),
-			ErrorCode:         getString(itemMap, "error_code"),
-			ErrorMessage:      getString(itemMap, "error_description"),
-			PaymentTime:       getTime(itemMap, "created_at"),
-			Raw:               rawMapResponse(itemMap),
-			ProviderDetails: &domain.PaymentProviderDetail{
-				Razorpay: &domain.RazorpayPaymentDetail{
-					Entity:         getString(itemMap, "entity"),
-					Description:    getString(itemMap, "description"),
-					Email:          getString(itemMap, "email"),
-					Contact:        getString(itemMap, "contact"),
-					Fee:            getInt64(itemMap, "fee"),
-					Tax:            getInt64(itemMap, "tax"),
-					AmountRefunded: getInt64(itemMap, "amount_refunded"),
-					RefundStatus:   getString(itemMap, "refund_status"),
-					International:  getBool(itemMap, "international"),
-					CardID:         getString(itemMap, "card_id"),
-					Bank:           getString(itemMap, "bank"),
-					VPA:            getString(itemMap, "vpa"),
-					Wallet:         getString(itemMap, "wallet"),
-					ErrorSource:    getString(itemMap, "error_source"),
-					ErrorStep:      getString(itemMap, "error_step"),
-					ErrorReason:    getString(itemMap, "error_reason"),
-				},
-			},
-		}
-
-		// Populate acquirer_data if present
-		if acqData := getMap(itemMap, "acquirer_data"); len(acqData) > 0 {
-			payment.ProviderDetails.Razorpay.AcquirerData = &domain.RazorpayAcquirerData{
-				BankTransactionID: getString(acqData, "bank_transaction_id"),
-				AuthCode:          getString(acqData, "auth_code"),
-				RRN:               getString(acqData, "rrn"),
-			}
-		}
-
+	// D17: Map each typed payment response to canonical domain type
+	payments := make([]*domain.Payment, 0, len(typed.Items))
+	for i := range typed.Items {
+		payment := mapPaymentFromResponse(&typed.Items[i], rawMapResponse(paymentsData))
 		payments = append(payments, payment)
 	}
 
 	return payments, nil
+}
+
+// D17: Typed struct mapper for order response
+func mapOrderFromResponse(r *razorpayOrderResponse, raw map[string]any) *domain.Order {
+	return &domain.Order{
+		ProviderOrderID: r.ID,
+		OrderID:         r.Receipt,
+		AmountMinor:     domain.AmountMinor(r.Amount),
+		Currency:        domain.Currency(r.Currency),
+		Status:          mapOrderStatus(r.Status),
+		CreatedAt:       unixPtr(r.CreatedAt),
+		Raw:             rawMapResponse(raw),
+		ProviderDetails: &domain.OrderProviderDetail{
+			Razorpay: &domain.RazorpayOrderDetail{
+				Entity:     r.Entity,
+				Receipt:    r.Receipt,
+				OfferID:    r.OfferID,
+				AmountPaid: r.AmountPaid,
+				AmountDue:  r.AmountDue,
+				Attempts:   r.Attempts,
+			},
+		},
+	}
+}
+
+// D17: Typed struct mapper for payment response
+func mapPaymentFromResponse(r *razorpayPaymentResponse, raw domain.RawProviderResponse) *domain.Payment {
+	payment := &domain.Payment{
+		ProviderPaymentID: r.ID,
+		OrderID:           r.OrderID,
+		AmountMinor:       domain.AmountMinor(r.Amount),
+		Currency:          domain.Currency(r.Currency),
+		Status:            mapPaymentStatus(r.Status),
+		PaymentMethod:     r.Method,
+		IsCaptured:        r.Captured,
+		BankReference:     r.BankAccount,
+		ErrorCode:         r.ErrorCode,
+		ErrorMessage:      r.ErrorDescription,
+		PaymentTime:       unixPtr(r.CreatedAt),
+		Raw:               raw,
+		ProviderDetails: &domain.PaymentProviderDetail{
+			Razorpay: &domain.RazorpayPaymentDetail{
+				Entity:         r.Entity,
+				Description:    r.Description,
+				Email:          r.Email,
+				Contact:        r.Contact,
+				Fee:            r.Fee,
+				Tax:            r.Tax,
+				AmountRefunded: r.AmountRefunded,
+				RefundStatus:   r.RefundStatus,
+				International:  r.International,
+				CardID:         r.CardID,
+				Bank:           r.Bank,
+				VPA:            r.VPA,
+				Wallet:         r.Wallet,
+				ErrorSource:    r.ErrorSource,
+				ErrorStep:      r.ErrorStep,
+				ErrorReason:    r.ErrorReason,
+			},
+		},
+	}
+
+	// D17: Map acquirer_data if present
+	if r.AcquirerData != nil {
+		payment.ProviderDetails.Razorpay.AcquirerData = &domain.RazorpayAcquirerData{
+			BankTransactionID: r.AcquirerData.BankTransactionID,
+			AuthCode:          r.AcquirerData.AuthCode,
+			RRN:               r.AcquirerData.RRN,
+		}
+	}
+
+	return payment
 }
 
 // mapOrderStatus converts Razorpay order status to canonical domain OrderStatus.

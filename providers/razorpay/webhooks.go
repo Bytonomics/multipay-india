@@ -21,16 +21,29 @@ var webhookEventMap = map[string]domain.WebhookEventType{
 	"payment.failed":     domain.EventPaymentFailed,
 	"payment.captured":   domain.EventPaymentCaptured,
 	"refund.created":     domain.EventRefundCreated,
-	"refund.failed":      domain.EventPaymentFailed, // Treat refund failure similar to payment failure
+	"refund.failed":      domain.EventRefundFailed,    // D16 fix — correct mapping
+	"refund.processed":   domain.EventRefundProcessed, // G11: general refund event
+	// Subscription events
+	"subscription.authenticated":  domain.EventSubAuthenticated,
+	"subscription.activated":      domain.EventSubActivated,
+	"subscription.charged":        domain.EventSubCharged,
+	"subscription.payment_failed": domain.EventSubPaymentFailed,
+	"subscription.pending":        domain.EventSubOnHold, // pending = subscription at-risk (G1 fix)
+	"subscription.halted":         domain.EventSubHalted,
+	"subscription.paused":         domain.EventSubPaused,
+	"subscription.resumed":        domain.EventSubResumed,
+	"subscription.cancelled":      domain.EventSubCancelled,
+	"subscription.completed":      domain.EventSubCompleted,
+	"subscription.updated":        domain.EventSubUpdated,
 }
 
 // razorpayWebhookPayload represents the Razorpay webhook payload structure.
 // This is a simplified representation capturing the essential fields.
 type razorpayWebhookPayload struct {
-	EventID   string                 `json:"event_id"`
-	Event     string                 `json:"event"`
-	CreatedAt int64                  `json:"created_at"`
-	Payload   map[string]interface{} `json:"payload"`
+	EventID   string         `json:"event_id"`
+	Event     string         `json:"event"`
+	CreatedAt int64          `json:"created_at"`
+	Payload   map[string]any `json:"payload"`
 }
 
 // verifySignature verifies the HMAC-SHA256 signature of a Razorpay webhook payload.
@@ -110,9 +123,8 @@ func parseEvent(ctx context.Context, body []byte, headers map[string]string) (*d
 	// Map the Razorpay event type to the canonical domain event type.
 	domainEventType, ok := webhookEventMap[eventTypeLower]
 	if !ok {
-		// Return an error if the event type is not supported.
-		// This is not a verification failure, but an unrecognized event.
-		return nil, fmt.Errorf("unsupported Razorpay event type: %q: %w", payload.Event, domain.ErrWebhookEventNotFound)
+		// Unknown event — route to DefaultHandler, not an error.
+		domainEventType = domain.EventUnknown
 	}
 
 	// Convert the Unix timestamp (createdAt) to time.Time.
@@ -124,19 +136,40 @@ func parseEvent(ctx context.Context, body []byte, headers map[string]string) (*d
 		eventTime = time.Now()
 	}
 
-	// Convert the Payload map to JSON bytes for RawPayload.
-	rawPayloadBytes, err := json.Marshal(payload.Payload)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal payload to JSON: %w", err)
+	// Construct base webhook event.
+	// RawPayload intentionally NOT set here — ServeHTTP sets it to the full verbatim body (D11).
+	event := &domain.WebhookEvent{
+		Provider:           domain.ProviderRazorpay,
+		EventType:          domainEventType,
+		EventTime:          &eventTime,
+		DedupeKey:          payload.EventID,
+		RawVendorEventType: payload.Event, // verbatim Razorpay event name (D11)
 	}
 
-	// Construct and return the domain webhook event.
-	event := &domain.WebhookEvent{
-		Provider:   domain.ProviderRazorpay,
-		EventType:  domainEventType,
-		EventTime:  &eventTime,
-		RawPayload: rawPayloadBytes,
-		DedupeKey:  payload.EventID,
+	// Handle subscription webhook events
+	if strings.HasPrefix(eventTypeLower, "subscription.") {
+		// Extract subscription wrapper from the webhook payload
+		if subscriptionWrapper, ok := payload.Payload["subscription"].(map[string]any); ok {
+			// Unwrap the entity key (Razorpay nests subscription fields under entity)
+			entityData, entityOK := subscriptionWrapper["entity"].(map[string]any)
+			if !entityOK || len(entityData) == 0 {
+				event.ParseError = "subscription.entity missing or empty in webhook payload"
+			} else {
+				// Decode subscription from the entity data
+				typed, derr := decodeResponse[razorpaySubscriptionResponse](entityData)
+				if derr != nil {
+					// Decode failure: preserve event type, record parse error (D12: never abort dispatch)
+					event.ParseError = derr.Error()
+					event.Subscription = nil
+				} else {
+					event.Subscription = mapSubscriptionFromResponse(typed, entityData)
+					// Set RawVendorStatus for subscription events (D11)
+					if typed.Status != "" {
+						event.RawVendorStatus = typed.Status
+					}
+				}
+			}
+		}
 	}
 
 	return event, nil

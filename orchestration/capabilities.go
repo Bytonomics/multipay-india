@@ -81,17 +81,17 @@ func (s *CapabilityService) AllCapabilities(ctx context.Context, provider domain
 		capabilities.CapWebhookEdit,
 		capabilities.CapWebhookDelete,
 		capabilities.CapWebhookList,
-		capabilities.CapSubscriptionCreate,
-		capabilities.CapSubscriptionFetch,
 		capabilities.CapSubscriptionList,
-		capabilities.CapPlanCreate,
-		capabilities.CapPlanFetch,
 		capabilities.CapPlanList,
 		capabilities.CapPaymentLinkUpdate,
 		capabilities.CapPaymentLinkNotify,
 		capabilities.CapPaymentLinkList,
 		capabilities.CapUPICreate,
 		capabilities.CapVPAValidate,
+
+		// Cashfree-specific subscription capabilities
+		capabilities.CapSubscriptionManualCharge,
+		capabilities.CapSubscriptionEligibility,
 
 		// Settlement capabilities
 		capabilities.CapSettlementOrderFetch,

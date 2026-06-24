@@ -105,7 +105,7 @@ func (a *Adapter) ProviderName() domain.Provider {
 
 // ProviderCapabilities returns all capabilities supported by Razorpay.
 // This includes both core shared capabilities and Razorpay-specific capabilities.
-// Returns all 29 Razorpay-supported capabilities.
+// Returns all 36 Razorpay-supported capabilities.
 func (a *Adapter) ProviderCapabilities() []capabilities.Capability {
 	return []capabilities.Capability{
 		// Core shared capabilities (16)
@@ -126,7 +126,7 @@ func (a *Adapter) ProviderCapabilities() []capabilities.Capability {
 		capabilities.CapPaymentLinkCancel,
 		capabilities.CapWebhookConsume,
 
-		// Razorpay-specific capabilities (13)
+		// Razorpay-specific capabilities (20)
 		capabilities.CapOrderUpdate,
 		capabilities.CapOrderList,
 		capabilities.CapPaymentCapture,
@@ -140,11 +140,7 @@ func (a *Adapter) ProviderCapabilities() []capabilities.Capability {
 		capabilities.CapWebhookEdit,
 		capabilities.CapWebhookDelete,
 		capabilities.CapWebhookList,
-		capabilities.CapSubscriptionCreate,
-		capabilities.CapSubscriptionFetch,
 		capabilities.CapSubscriptionList,
-		capabilities.CapPlanCreate,
-		capabilities.CapPlanFetch,
 		capabilities.CapPlanList,
 		capabilities.CapPaymentLinkUpdate,
 		capabilities.CapPaymentLinkNotify,
@@ -152,6 +148,18 @@ func (a *Adapter) ProviderCapabilities() []capabilities.Capability {
 		capabilities.CapUPICreate,
 		capabilities.CapVPAValidate,
 	}
+}
+
+// CreatePlan creates a new subscription plan.
+// See plans.go for implementation.
+func (a *Adapter) CreatePlan(ctx context.Context, req *domain.CreatePlanRequest) (*domain.Plan, error) {
+	return createPlan(ctx, a, req)
+}
+
+// GetPlan retrieves an existing subscription plan.
+// See plans.go for implementation.
+func (a *Adapter) GetPlan(ctx context.Context, req *domain.GetPlanRequest) (*domain.Plan, error) {
+	return getPlan(ctx, a, req)
 }
 
 // VerifySignature verifies the authenticity of a webhook request from Razorpay.
@@ -166,26 +174,55 @@ func (a *Adapter) ParseEvent(ctx context.Context, payload []byte, headers map[st
 	return parseEvent(ctx, payload, headers)
 }
 
-func (a *Adapter) MapOrderMetadata(_ context.Context, metadata domain.Metadata) (map[string]interface{}, error) {
-	notes := make(map[string]interface{}, len(metadata))
+func (a *Adapter) MapOrderMetadata(_ context.Context, metadata domain.Metadata) (map[string]any, error) {
+	notes := make(map[string]any, len(metadata))
 	for k, v := range metadata {
 		notes[k] = v
 	}
-	return map[string]interface{}{"notes": notes}, nil
+	return map[string]any{"notes": notes}, nil
 }
 
-func (a *Adapter) MapRefundMetadata(_ context.Context, metadata domain.Metadata) (map[string]interface{}, error) {
-	notes := make(map[string]interface{}, len(metadata))
+func (a *Adapter) MapRefundMetadata(_ context.Context, metadata domain.Metadata) (map[string]any, error) {
+	notes := make(map[string]any, len(metadata))
 	for k, v := range metadata {
 		notes[k] = v
 	}
-	return map[string]interface{}{"notes": notes}, nil
+	return map[string]any{"notes": notes}, nil
 }
 
-func (a *Adapter) MapPaymentLinkMetadata(_ context.Context, metadata domain.Metadata) (map[string]interface{}, error) {
-	notes := make(map[string]interface{}, len(metadata))
+func (a *Adapter) MapPaymentLinkMetadata(_ context.Context, metadata domain.Metadata) (map[string]any, error) {
+	notes := make(map[string]any, len(metadata))
 	for k, v := range metadata {
 		notes[k] = v
 	}
-	return map[string]interface{}{"notes": notes}, nil
+	return map[string]any{"notes": notes}, nil
+}
+
+// SupportedWebhookEvents returns the canonical event types Razorpay can emit.
+// These correspond to Razorpay webhook events from the public API.
+func (a *Adapter) SupportedWebhookEvents() []domain.WebhookEventType {
+	return []domain.WebhookEventType{
+		// Subscription lifecycle
+		domain.EventSubAuthenticated,
+		domain.EventSubActivated,
+		domain.EventSubCharged,
+		domain.EventSubPaymentFailed,
+		domain.EventSubOnHold,
+		domain.EventSubHalted,
+		domain.EventSubPaused,
+		domain.EventSubResumed,
+		domain.EventSubCancelled,
+		domain.EventSubCompleted,
+		domain.EventSubUpdated,
+		// Order & payment events
+		domain.EventPaymentAuthorized,
+		domain.EventPaymentCaptured,
+		domain.EventPaymentFailed,
+		// Refund events
+		domain.EventRefundCreated,
+		domain.EventRefundProcessed,
+		domain.EventRefundFailed,
+	}
+	// NOT emitted by RZ (exclude): EventSubCardExpiring, EventSubCardExpired, EventSubExpired,
+	// EventSubBankApprovalPending, EventSubPreDebitNotice, EventSubPaymentCancelled, EventSubRefund
 }

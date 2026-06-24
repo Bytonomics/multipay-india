@@ -67,7 +67,7 @@ func NewAdapter(config *Config) (*Adapter, error) {
 		XClientId:             &config.ClientID,
 		XClientSecret:         &config.ClientSecret,
 		XEnvironment:          &cfEnv,
-		XEnableErrorAnalytics: ptrBool(false), // disable Sentry side effects
+		XEnableErrorAnalytics: new(bool), // disable Sentry side effects
 	}
 
 	return &Adapter{
@@ -82,7 +82,7 @@ func (a *Adapter) ProviderName() domain.Provider {
 }
 
 // ProviderCapabilities returns the list of capabilities supported by Cashfree.
-// Cashfree supports 25 total capabilities.
+// Cashfree supports 27 total capabilities.
 func (a *Adapter) ProviderCapabilities() []capabilities.Capability {
 	return []capabilities.Capability{
 		// Core shared capabilities
@@ -113,6 +113,8 @@ func (a *Adapter) ProviderCapabilities() []capabilities.Capability {
 		capabilities.CapSettlementList,
 		capabilities.CapSettlementReconFetch,
 		capabilities.CapReconFetch,
+		capabilities.CapSubscriptionManualCharge,
+		capabilities.CapSubscriptionEligibility,
 	}
 }
 
@@ -210,6 +212,18 @@ func (a *Adapter) CancelPaymentLink(ctx context.Context, req *domain.CancelPayme
 	return cancelPaymentLink(ctx, a, req)
 }
 
+// CreatePlan creates a new subscription plan.
+// See plans.go for implementation.
+func (a *Adapter) CreatePlan(ctx context.Context, req *domain.CreatePlanRequest) (*domain.Plan, error) {
+	return createPlan(ctx, a, req)
+}
+
+// GetPlan retrieves an existing subscription plan.
+// See plans.go for implementation.
+func (a *Adapter) GetPlan(ctx context.Context, req *domain.GetPlanRequest) (*domain.Plan, error) {
+	return getPlan(ctx, a, req)
+}
+
 // VerifySignature verifies the authenticity of a webhook request.
 // See webhooks.go for implementation.
 func (a *Adapter) VerifySignature(ctx context.Context, payload []byte, headers map[string]string) error {
@@ -222,31 +236,60 @@ func (a *Adapter) ParseEvent(ctx context.Context, payload []byte, headers map[st
 	return parseEvent(ctx, payload, headers)
 }
 
-func (a *Adapter) MapOrderMetadata(_ context.Context, metadata domain.Metadata) (map[string]interface{}, error) {
-	result := make(map[string]interface{}, len(metadata))
+func (a *Adapter) MapOrderMetadata(_ context.Context, metadata domain.Metadata) (map[string]any, error) {
+	result := make(map[string]any, len(metadata))
 	for k, v := range metadata {
 		result[k] = v
 	}
 	return result, nil
 }
 
-func (a *Adapter) MapRefundMetadata(_ context.Context, metadata domain.Metadata) (map[string]interface{}, error) {
-	result := make(map[string]interface{}, len(metadata))
+func (a *Adapter) MapRefundMetadata(_ context.Context, metadata domain.Metadata) (map[string]any, error) {
+	result := make(map[string]any, len(metadata))
 	for k, v := range metadata {
 		result[k] = v
 	}
 	return result, nil
 }
 
-func (a *Adapter) MapPaymentLinkMetadata(_ context.Context, metadata domain.Metadata) (map[string]interface{}, error) {
-	result := make(map[string]interface{}, len(metadata))
+func (a *Adapter) MapPaymentLinkMetadata(_ context.Context, metadata domain.Metadata) (map[string]any, error) {
+	result := make(map[string]any, len(metadata))
 	for k, v := range metadata {
 		result[k] = v
 	}
 	return result, nil
 }
 
-// ptrBool is a helper to create a pointer to a bool.
-func ptrBool(b bool) *bool {
-	return &b
+// SupportedWebhookEvents returns the canonical event types Cashfree can emit.
+// These correspond to SUBSCRIPTION_* and ORDER.*/PAYMENT.*/REFUND.* event types
+// from the Cashfree PG webhook API version 2023-08-01.
+func (a *Adapter) SupportedWebhookEvents() []domain.WebhookEventType {
+	return []domain.WebhookEventType{
+		// Subscription lifecycle
+		domain.EventSubAuthenticated,
+		domain.EventSubActivated,
+		domain.EventSubCharged,
+		domain.EventSubPaymentFailed,
+		domain.EventSubOnHold,
+		domain.EventSubPaused,
+		domain.EventSubCancelled,
+		domain.EventSubCompleted,
+		domain.EventSubRefund,              // SUBSCRIPTION_REFUND_STATUS (CF-only)
+		domain.EventSubCardExpiring,        // SUBSCRIPTION_CARD_EXPIRY_REMINDER (CF-only)
+		domain.EventSubCardExpired,         // SUBSCRIPTION_STATUS_CHANGED → CARD_EXPIRED (CF-only)
+		domain.EventSubExpired,             // SUBSCRIPTION_STATUS_CHANGED → EXPIRED/LINK_EXPIRED (CF-only)
+		domain.EventSubBankApprovalPending, // SUBSCRIPTION_STATUS_CHANGED → BANK_APPROVAL_PENDING (CF-only)
+		domain.EventSubPreDebitNotice,      // SUBSCRIPTION_PAYMENT_NOTIFICATION_INITIATED (CF-only)
+		domain.EventSubPaymentCancelled,    // SUBSCRIPTION_PAYMENT_CANCELLED (CF-only)
+		// Order & payment events
+		domain.EventPaymentCaptured, // ORDER.PAID
+		domain.EventPaymentAuthorized,
+		domain.EventPaymentFailed,
+		domain.EventOrderExpired,
+		// Refund events
+		domain.EventRefundProcessed, // REFUND.PROCESSED
+		domain.EventRefundFailed,    // REFUND.FAILED
+	}
+	// NOT emitted by CF (exclude): EventSubResumed, EventSubHalted, EventSubUpdated,
+	// EventRefundCreated (CF uses REFUND.PROCESSED directly; no separate "created" event)
 }

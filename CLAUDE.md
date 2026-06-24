@@ -244,16 +244,36 @@ Enforced by gci: `stdlib -> external -> github.com/Bytonomics`
 
 ```go
 mpClient, err := client.NewClient(&client.ClientConfig{
-    Provider: cashfreeAdapter,
-    Logger:   yourLogger,
+    Provider:     cashfreeAdapter,
+    WebhookStore: yourStore, // mandatory — NewClient panics if nil
+    Logger:       yourLogger,
 })
 ```
 
 Rules:
 - `Provider` is the `ports.ProviderAdapter` implementation
 - Provider identity is derived internally via `cfg.Provider.ProviderName()`
+- `WebhookStore` is mandatory — `NewClient` panics if nil (durable capture for dedup + replay)
 - Request structs and service methods must remain provider-free
-- Use `domain.EnvironmentSandbox` / `domain.EnvironmentProduction` for provider configs
+- Use `domain.EnvironmentSandbox` (`"SANDBOX"`) / `domain.EnvironmentProduction` (`"PRODUCTION"`) for provider configs — values are UPPERCASE
+
+### Typed Structs, Never Maps
+
+Build SDK requests and internal payloads with typed structs — never `map[string]interface{}`. The ONLY exception is decoding a raw vendor response body at the boundary, then immediately mapping it to a typed domain struct.
+
+### Request Validation via pedantigo
+
+Validate every request struct at the service-method boundary (right after the nil check) using a module-level validator. Field rules live in `pedantigo:""` tags; cross-field rules (e.g. exactly-one-of) live in a `Validate() error` method that pedantigo runs automatically.
+
+```go
+var createPlanValidator = pedantigo.New[domain.CreatePlanRequest]()
+// after nil check:
+if err := createPlanValidator.Validate(req); err != nil { return nil, err }
+```
+
+### Webhooks Always Return 2xx
+
+After signature verification, the webhook endpoint MUST return 2xx — even when an event handler errors. Log it and leave the event persisted-but-unprocessed for replay; never return 5xx (vendors auto-disable endpoints on repeated 5xx).
 
 ---
 

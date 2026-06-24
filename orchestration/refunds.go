@@ -4,11 +4,19 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/SmrutAI/pedantigo"
+
 	"github.com/Bytonomics/multipay-adapter/capabilities"
 	"github.com/Bytonomics/multipay-adapter/domain"
 	"github.com/Bytonomics/multipay-adapter/hooks"
 	"github.com/Bytonomics/multipay-adapter/logging"
 	"github.com/Bytonomics/multipay-adapter/ports"
+)
+
+var (
+	createRefundValidator = pedantigo.New[domain.CreateRefundRequest]()
+	getRefundValidator    = pedantigo.New[domain.GetRefundRequest]()
+	listRefundsValidator  = pedantigo.New[domain.ListRefundsRequest]()
 )
 
 // RefundService orchestrates refund operations across multiple payment providers.
@@ -43,6 +51,10 @@ func NewRefundService(provider domain.Provider, adapter ports.ProviderAdapter, v
 func (s *RefundService) CreateRefund(ctx context.Context, req *domain.CreateRefundRequest) (*domain.Refund, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
+	}
+
+	if err := createRefundValidator.Validate(req); err != nil {
+		return nil, fmt.Errorf("request validation failed: %w", err)
 	}
 
 	provider := s.provider
@@ -89,6 +101,10 @@ func (s *RefundService) GetRefund(ctx context.Context, req *domain.GetRefundRequ
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
 
+	if err := getRefundValidator.Validate(req); err != nil {
+		return nil, fmt.Errorf("request validation failed: %w", err)
+	}
+
 	provider := s.provider
 	adapter := s.adapter
 
@@ -131,6 +147,10 @@ func (s *RefundService) GetRefund(ctx context.Context, req *domain.GetRefundRequ
 func (s *RefundService) ListRefunds(ctx context.Context, req *domain.ListRefundsRequest) ([]*domain.Refund, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
+	}
+
+	if err := listRefundsValidator.Validate(req); err != nil {
+		return nil, fmt.Errorf("request validation failed: %w", err)
 	}
 
 	provider := s.provider

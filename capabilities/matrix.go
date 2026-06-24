@@ -40,41 +40,39 @@ func NewSupportMatrix() *SupportMatrix {
 		CapWebhookConsume:    true,
 
 		// Cashfree-specific capabilities
-		CapInstrumentCryptogram:  true,
-		CapOfferCreate:           true,
-		CapOfferFetch:            true,
-		CapEligibilityFetch:      true,
-		CapPaymentLinkListOrders: true,
-		CapSettlementOrderFetch:  true,
-		CapSettlementList:        true,
-		CapSettlementReconFetch:  true,
-		CapReconFetch:            true,
+		CapInstrumentCryptogram:     true,
+		CapOfferCreate:              true,
+		CapOfferFetch:               true,
+		CapEligibilityFetch:         true,
+		CapPaymentLinkListOrders:    true,
+		CapSettlementOrderFetch:     true,
+		CapSettlementList:           true,
+		CapSettlementReconFetch:     true,
+		CapReconFetch:               true,
+		CapSubscriptionManualCharge: true,
+		CapSubscriptionEligibility:  true,
+		CapSubscriptionList:         false,
+		CapPlanList:                 false,
 
 		// Razorpay-only capabilities (not supported by Cashfree)
-		CapOrderUpdate:        false,
-		CapOrderList:          false,
-		CapPaymentCapture:     false,
-		CapRefundUpdate:       false,
-		CapCustomerCreate:     false,
-		CapCustomerFetch:      false,
-		CapCustomerEdit:       false,
-		CapCustomerList:       false,
-		CapWebhookCreate:      false,
-		CapWebhookFetch:       false,
-		CapWebhookEdit:        false,
-		CapWebhookDelete:      false,
-		CapWebhookList:        false,
-		CapSubscriptionCreate: false,
-		CapSubscriptionFetch:  false,
-		CapSubscriptionList:   false,
-		CapPlanCreate:         false,
-		CapPlanFetch:          false,
-		CapPlanList:           false,
-		CapPaymentLinkUpdate:  false,
-		CapPaymentLinkNotify:  false,
-		CapPaymentLinkList:    false,
-		CapUPICreate:          false,
-		CapVPAValidate:        false,
+		CapOrderUpdate:       false,
+		CapOrderList:         false,
+		CapPaymentCapture:    false,
+		CapRefundUpdate:      false,
+		CapCustomerCreate:    false,
+		CapCustomerFetch:     false,
+		CapCustomerEdit:      false,
+		CapCustomerList:      false,
+		CapWebhookCreate:     false,
+		CapWebhookFetch:      false,
+		CapWebhookEdit:       false,
+		CapWebhookDelete:     false,
+		CapWebhookList:       false,
+		CapPaymentLinkUpdate: false,
+		CapPaymentLinkNotify: false,
+		CapPaymentLinkList:   false,
+		CapUPICreate:         false,
+		CapVPAValidate:       false,
 
 		// Razorpay-specific settlement capabilities (not supported by Cashfree)
 		CapSettlementAll:            false,
@@ -106,30 +104,30 @@ func NewSupportMatrix() *SupportMatrix {
 		CapWebhookConsume:    true,
 
 		// Razorpay-specific capabilities
-		CapOrderUpdate:        true,
-		CapOrderList:          true,
-		CapPaymentCapture:     true,
-		CapRefundUpdate:       true,
-		CapCustomerCreate:     true,
-		CapCustomerFetch:      true,
-		CapCustomerEdit:       true,
-		CapCustomerList:       true,
-		CapWebhookCreate:      true,
-		CapWebhookFetch:       true,
-		CapWebhookEdit:        true,
-		CapWebhookDelete:      true,
-		CapWebhookList:        true,
-		CapSubscriptionCreate: true,
-		CapSubscriptionFetch:  true,
-		CapSubscriptionList:   true,
-		CapPlanCreate:         true,
-		CapPlanFetch:          true,
-		CapPlanList:           true,
-		CapPaymentLinkUpdate:  true,
-		CapPaymentLinkNotify:  true,
-		CapPaymentLinkList:    true,
-		CapUPICreate:          true,
-		CapVPAValidate:        true,
+		CapOrderUpdate:       true,
+		CapOrderList:         true,
+		CapPaymentCapture:    true,
+		CapRefundUpdate:      true,
+		CapCustomerCreate:    true,
+		CapCustomerFetch:     true,
+		CapCustomerEdit:      true,
+		CapCustomerList:      true,
+		CapWebhookCreate:     true,
+		CapWebhookFetch:      true,
+		CapWebhookEdit:       true,
+		CapWebhookDelete:     true,
+		CapWebhookList:       true,
+		CapSubscriptionList:  true,
+		CapPlanList:          true,
+		CapPaymentLinkUpdate: true,
+		CapPaymentLinkNotify: true,
+		CapPaymentLinkList:   true,
+		CapUPICreate:         true,
+		CapVPAValidate:       true,
+
+		// Cashfree-specific capabilities (not supported by Razorpay)
+		CapSubscriptionManualCharge: false,
+		CapSubscriptionEligibility:  false,
 
 		// Cashfree-only capabilities (not supported by Razorpay)
 		CapInstrumentCryptogram:  false,
@@ -165,11 +163,12 @@ func NewSupportMatrix() *SupportMatrix {
 	m.descriptions[descKey(domain.ProviderCashfree, CapOrderCreate)] = "Create order via PGCreateOrder"
 	m.descriptions[descKey(domain.ProviderCashfree, CapPaymentPay)] = "Pay order via PGPayOrder"
 	m.descriptions[descKey(domain.ProviderCashfree, CapInstrumentCryptogram)] = "Fetch instrument cryptogram via PGCustomerInstrumentsFetchCryptogram"
+	m.descriptions[descKey(domain.ProviderCashfree, CapSubscriptionManualCharge)] = "Trigger manual charge for ON_DEMAND subscription"
+	m.descriptions[descKey(domain.ProviderCashfree, CapSubscriptionEligibility)] = "Check subscription eligibility"
 
 	m.descriptions[descKey(domain.ProviderRazorpay, CapOrderCreate)] = "Create order via resources.Order.Create"
 	m.descriptions[descKey(domain.ProviderRazorpay, CapOrderUpdate)] = "Update order via resources.Order.Update"
 	m.descriptions[descKey(domain.ProviderRazorpay, CapPaymentCapture)] = "Capture payment via resources.Payment.Capture"
-	m.descriptions[descKey(domain.ProviderRazorpay, CapSubscriptionCreate)] = "Create subscription via resources.Subscription.Create"
 
 	return m
 }

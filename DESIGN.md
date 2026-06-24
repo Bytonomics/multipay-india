@@ -12,12 +12,20 @@ graph TD
     MultiPayClient --> RefundService
     MultiPayClient --> InstrumentService
     MultiPayClient --> PaymentLinkService
+    MultiPayClient --> PlanService["PlanService (First-Class)"]
+    MultiPayClient --> SubscriptionService["SubscriptionService (First-Class)"]
     MultiPayClient --> WebhookService
     MultiPayClient --> CapabilityService
 
     OrderService --> HookPipeline
     OrderService --> CapabilityValidator
     OrderService --> ProviderAdapter["Direct ProviderAdapter"]
+
+    PlanService --> HookPipeline
+    PlanService --> ProviderAdapter
+
+    SubscriptionService --> HookPipeline
+    SubscriptionService --> ProviderAdapter
 
     ProviderAdapter --> CashfreeAdapter
     ProviderAdapter --> RazorpayAdapter
@@ -26,7 +34,12 @@ graph TD
     RazorpayAdapter --> RazorpaySDK["Razorpay Go SDK"]
 ```
 
-**Explanation**: The MultiPayClient is the main entry point that callers interact with. It wraps 7 orchestration services (Orders, Payments, Refunds, Instruments, Payment Links, Webhooks, and Capabilities) bound to a single payment provider adapter (Cashfree or Razorpay) specified at client construction time. Each service uses a consistent pipeline of hooks, capability validation, and direct adapter calls. These adapters wrap the official SDKs from each provider.
+**Explanation**: The MultiPayClient is the main entry point that callers interact with. It wraps 9 orchestration services bound to a single payment provider adapter (Cashfree or Razorpay) specified at client construction time:
+
+- **7 Capability-Gated Services**: Orders, Payments, Refunds, Instruments, Payment Links, Webhooks, Capabilities — require capability validation
+- **2 First-Class Services**: Plans, Subscriptions — no capability validation, both providers fully support all operations
+
+Each service uses a consistent pipeline of hooks and direct adapter calls. These adapters wrap the official SDKs from each provider.
 
 ## Hook Pipeline Flow
 
@@ -57,6 +70,89 @@ sequenceDiagram
 7. **Return**: Result or wrapped error is returned to caller
 
 All services share the same `Adapter`, `Validator`, `Pipeline`, `Logger`, and `Clock` instances, injected at construction via `client.NewClient()`.
+
+## Plans and Subscriptions — First-Class Services
+
+Plans and Subscriptions are **first-class services** on both Cashfree and Razorpay. Unlike capability-gated services (Orders, Payments, Refunds, Instruments, Payment Links), Plans and Subscriptions do NOT require capability validation — both providers fully support all operations.
+
+### Supported Operations
+
+| Operation | Cashfree | Razorpay | First-Class |
+|-----------|----------|----------|------------|
+| CreatePlan | ✓ | ✓ | YES |
+| GetPlan | ✓ | ✓ | YES |
+| CreateSubscription | ✓ | ✓ | YES |
+| GetSubscription | ✓ | ✓ | YES |
+| CancelSubscription | ✓ | ✓ | YES |
+| PauseSubscription | ✓ | ✓ | YES |
+| ResumeSubscription | ✓ | ✓ | YES |
+| ChangePlan | ✓ | ✓ | YES |
+| GetSubscriptionPayments | ✓ | ✓ | YES |
+
+### Service Flow (No Capability Gate)
+
+First-class services follow the same hook pipeline as capability-gated services, **except** they skip capability validation:
+
+```
+Caller
+ → Service.CreatePlan(ctx, req)
+   → nil check on req
+   → pedantigo validation (cached module-level validator)
+   → build HookContext{Provider, RequestType, RequestData, StartTime}
+   → ExecuteBefore(ctx, hookCtx)
+   → adapter.CreatePlan(ctx, req)
+   → on success: set hookCtx.ResponseData, ExecuteAfter, return result
+   → on error: set hookCtx.Error, ExecuteOnError, return wrapped error
+```
+
+The absence of `RequireCapability()` distinguishes first-class services from capability-gated ones.
+
+### Request Validation via Pedantigo
+
+All plan and subscription request structs use **pedantigo** for validation:
+
+```go
+var (
+    createPlanValidator = pedantigo.New[domain.CreatePlanRequest]()
+    getPlanValidator    = pedantigo.New[domain.GetPlanRequest]()
+    createSubscriptionValidator = pedantigo.New[domain.CreateSubscriptionRequest]()
+    // ... 4 more subscription validators
+)
+```
+
+Module-level validators are created once and cached for performance. Validation is called immediately after nil checks:
+
+```go
+if err := createPlanValidator.Validate(req); err != nil {
+    return nil, fmt.Errorf("request validation failed: %w", err)
+}
+```
+
+### Provider-Specific Behaviors
+
+**Cashfree SDK v6**:
+- Plans: `SubsCreatePlanWithContext`, `SubsFetchPlanWithContext`
+- Subscriptions: `SubsCreateSubscriptionWithContext`, `SubsFetchSubscriptionWithContext`, `SubsManageSubscriptionWithContext(action)`
+  - Actions: `CANCEL`, `PAUSE`, `ACTIVATE` (resume), `CHANGE_PLAN`
+  - **Note**: ChangePlan always applies at next billing cycle; ScheduleAt=NOW generates a warning
+
+**Razorpay v1.4.1**:
+- Plans: `Plan.Create`, `Plan.Fetch`
+- Subscriptions: `Subscription.Create`, `Subscription.Fetch`, `Subscription.Cancel`, `Subscription.Pause`, `Subscription.Resume`, `Subscription.Update`
+  - **Note**: CreateSubscription auto-creates a plan if PlanDetails is provided (2-step SDK call internally)
+  - Update supports `schedule_change_at` ("now" or "cycle_end")
+
+### Webhook Events for Subscriptions
+
+Both adapters extend their `ParseEvent()` to handle subscription webhook events:
+
+**Cashfree**: Uses `SUBSCRIPTION_STATUS_CHANGED` as catch-all type, disambiguates via `status` field in payload
+- Supported statuses: `ACTIVE`, `ON_HOLD`, `PAUSED`, `CANCELLED`, `CUSTOMER_CANCELLED`, `CUSTOMER_PAUSED`, `COMPLETED`, `SUBSCRIPTION_AUTH_STATUS`, `SUBSCRIPTION_PAYMENT_SUCCESS`, `SUBSCRIPTION_PAYMENT_FAILED`, `SUBSCRIPTION_CARD_EXPIRY_REMINDER`, `SUBSCRIPTION_REFUND_STATUS`
+
+**Razorpay**: Uses explicit event names (lowercase)
+- Supported events: `subscription.authenticated`, `subscription.activated`, `subscription.charged`, `subscription.pending`, `subscription.halted`, `subscription.paused`, `subscription.resumed`, `subscription.cancelled`, `subscription.completed`, `subscription.updated`, `subscription.refund`
+
+Both adapters populate the `Subscription` field in `domain.WebhookEvent` when the event is subscription-related.
 
 ## Webhook Routing Flow
 
