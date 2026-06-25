@@ -1,0 +1,419 @@
+/* ============================================
+   SECURE VAULT VARIANT — CSS Variables
+   Dark-optimized with complete light palette
+   ============================================ */
+
+.secureVault {
+  --mpay-bg-primary: #0b1220;
+  --mpay-bg-card: #1a1f26;
+  --mpay-bg-card-hover: #2a313b;
+  --mpay-bg-slot: #151922;
+  --mpay-bg-slot-selected: #1a2028;
+
+  --mpay-border-primary: #2a313b;
+  --mpay-border-slot: #1e2630;
+  --mpay-border-slot-selected: #22c55e;
+
+  --mpay-text-primary: #e2e8f0;
+  --mpay-text-secondary: #94a3b8;
+  --mpay-text-muted: #64748b;
+
+  --mpay-glow-selected: #22c55e;
+  --mpay-shield-bg: #22c55e;
+  --mpay-shield-icon: #ffffff;
+
+  --mpay-error: #ef4444;
+  --mpay-warning: #f59e0b;
+
+  --mpay-accent-green: #34d399;
+  --mpay-accent-circuit: #0ea5e9;
+
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+/* ============================================
+   LIGHT THEME OVERRIDES
+   ============================================ */
+
+.secureVault[data-theme="light"] {
+  --mpay-bg-primary: #ffffff;
+  --mpay-bg-card: #f3f4f6;
+  --mpay-bg-card-hover: #e5e7eb;
+  --mpay-bg-slot: #ffffff;
+  --mpay-bg-slot-selected: #f0fdf4;
+
+  --mpay-border-primary: #d1d5db;
+  --mpay-border-slot: #e5e7eb;
+  --mpay-border-slot-selected: #059669;
+
+  --mpay-text-primary: #111827;
+  --mpay-text-secondary: #4b5563;
+  --mpay-text-muted: #9ca3af;
+
+  --mpay-glow-selected: #22c55e;
+  --mpay-shield-bg: #059669;
+  --mpay-shield-icon: #ffffff;
+
+  --mpay-accent-green: #34d399;
+  --mpay-accent-circuit: #0ea5e9;
+}
+
+/* ============================================
+   VAULT FRAME STRUCTURE
+   ============================================ */
+
+.vaultFrame {
+  background: var(--mpay-bg-primary);
+  border: 2px solid var(--mpay-border-primary);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+
+.secureVault[data-theme="light"] .vaultFrame {
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.15);
+}
+
+/* Vault header with lock and circuit motifs */
+.vaultHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--mpay-border-primary);
+}
+
+.lockIcon {
+  width: 24px;
+  height: 24px;
+  color: var(--mpay-accent-green);
+  flex-shrink: 0;
+}
+
+.headerTitle {
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--mpay-text-secondary);
+  flex: 1;
+}
+
+.circuitDecoration {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.circuitDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--mpay-accent-circuit);
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+}
+
+.circuitDot:hover {
+  opacity: 1;
+}
+
+/* ============================================
+   VAULT SLOTS CONTAINER
+   ============================================ */
+
+.vaultSlots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 400px) {
+  .vaultSlots {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================
+   INDIVIDUAL VAULT SLOT
+   ============================================ */
+
+.vaultSlot {
+  position: relative;
+  background: var(--mpay-bg-slot);
+  border: 2px solid var(--mpay-border-slot);
+  border-radius: 12px;
+  padding: 20px 16px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80px;
+  overflow: hidden;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.secureVault[data-theme="light"] .vaultSlot {
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.vaultSlot:hover:not(:disabled) {
+  background: var(--mpay-bg-card-hover);
+  border-color: var(--mpay-border-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.secureVault[data-theme="light"] .vaultSlot:hover:not(:disabled) {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+/* Selected slot with green glow */
+.vaultSlot.selected {
+  background: var(--mpay-bg-slot-selected);
+  border-color: var(--mpay-border-slot-selected);
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.15), inset 0 2px 8px rgba(34, 197, 94, 0.1);
+}
+
+.vaultSlot.selected:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.2), inset 0 2px 12px rgba(34, 197, 94, 0.15);
+}
+
+/* Selection glow inner effect */
+.selectionGlow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 10px;
+}
+
+.glowInner {
+  position: absolute;
+  inset: -50%;
+  background: radial-gradient(circle at center, var(--mpay-glow-selected) 0%, transparent 70%);
+  opacity: 0.3;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.2;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(1.05);
+  }
+}
+
+/* Shield badge for selected slot */
+.shieldBadge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  background: var(--mpay-shield-bg);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.4);
+  z-index: 2;
+  animation: shield-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes shield-pop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.shieldIcon {
+  width: 14px;
+  height: 14px;
+  color: var(--mpay-shield-icon);
+}
+
+/* Provider label */
+.providerLabel {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--mpay-text-primary);
+  text-align: center;
+  position: relative;
+  z-index: 1;
+  letter-spacing: 0.02em;
+}
+
+/* Loading state */
+.vaultSlot.loading {
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.slotLoading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 10px;
+  z-index: 3;
+}
+
+.secureVault[data-theme="light"] .slotLoading {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--mpay-border-primary);
+  border-top-color: var(--mpay-accent-green);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Error state */
+.vaultSlot.error:not(.loading) {
+  border-color: var(--mpay-error);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.errorIndicator {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  background: var(--mpay-error);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+  z-index: 2;
+}
+
+/* Circuit pattern decoration */
+.circuitPattern {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 40px;
+  height: 40px;
+  opacity: 0.15;
+  color: var(--mpay-accent-circuit);
+  pointer-events: none;
+}
+
+.secureVault[data-theme="light"] .circuitPattern {
+  opacity: 0.08;
+}
+
+/* ============================================
+   VAULT FOOTER
+   ============================================ */
+
+.vaultFooter {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--mpay-border-primary);
+}
+
+.totalDisplay {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.totalLabel {
+  font-size: 13px;
+  color: var(--mpay-text-secondary);
+  font-weight: 500;
+}
+
+.totalValue {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--mpay-text-primary);
+  letter-spacing: 0.02em;
+}
+
+.taxNote {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--mpay-text-muted);
+  line-height: 1.4;
+}
+
+.taxNoteIcon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--mpay-bg-card);
+  border: 1px solid var(--mpay-border-primary);
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--mpay-accent-circuit);
+}
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
+
+@media (max-width: 480px) {
+  .vaultFrame {
+    padding: 20px;
+    border-radius: 12px;
+  }
+
+  .vaultSlots {
+    gap: 12px;
+  }
+
+  .vaultSlot {
+    padding: 16px 12px;
+    min-height: 72px;
+  }
+
+  .providerLabel {
+    font-size: 14px;
+  }
+
+  .totalValue {
+    font-size: 16px;
+  }
+}

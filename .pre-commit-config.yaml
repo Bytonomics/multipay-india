@@ -66,3 +66,16 @@ repos:
         language: system
         types: [go]
         pass_filenames: false
+
+  # ============================================
+  # 6. TYPESCRIPT HOOKS (scoped to .ts/.tsx files, run inside multipay-frontend-ts/)
+  # ============================================
+  - repo: local
+    hooks:
+      - id: frontend-ts-check
+        name: TypeScript frontend check
+        description: Runs make -C multipay-frontend-ts check (typecheck + lint + test)
+        entry: make -C multipay-frontend-ts check
+        language: system
+        types_or: [ts, tsx]
+        pass_filenames: false

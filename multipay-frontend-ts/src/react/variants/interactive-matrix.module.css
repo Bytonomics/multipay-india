@@ -1,0 +1,346 @@
+/* InteractiveMatrix - V2 Power of choice/game-grid variant */
+/* Responsive grid: 2-up → 3-up wide → 1-up mobile */
+
+.container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Grid System - Uniform responsive cards */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+/* Base Card Styles */
+.card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+  min-height: 120px;
+}
+
+.card:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+.card:focus-visible {
+  outline: 2px solid #4d9bff;
+  outline-offset: 2px;
+}
+
+/* Selected Card State - Pops out with blue glow and checkmark */
+.cardSelected {
+  border-color: #4d9bff;
+  background: #f0f7ff;
+  box-shadow: 0 0 0 4px rgba(77, 155, 255, 0.15), 0 8px 24px rgba(77, 155, 255, 0.25);
+  transform: scale(1.02);
+  z-index: 1;
+}
+
+/* Dim state for non-selected cards when one is selected */
+.cardDim {
+  opacity: 0.5;
+  filter: grayscale(0.3);
+}
+
+.cardDim:hover:not(:disabled) {
+  opacity: 0.7;
+  filter: grayscale(0);
+}
+
+/* Disabled state - greyed out with message */
+.cardDisabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.cardDisabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* Card Inner Content */
+.cardInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  width: 100%;
+}
+
+/* Logo styling */
+.logo {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border-radius: 12px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #475569;
+  letter-spacing: -0.5px;
+  border: 1px solid #cbd5e1;
+}
+
+.cardSelected .logo {
+  background: linear-gradient(135deg, #4d9bff 0%, #3b82f6 100%);
+  color: #ffffff;
+  border-color: #3b82f6;
+}
+
+.providerName {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+}
+
+.description {
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.4;
+  margin: 0;
+}
+
+/* Checkmark for selected card */
+.checkmark {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #4d9bff;
+  border-radius: 50%;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(77, 155, 255, 0.3);
+}
+
+/* Disabled overlay with loading/error states */
+.disabledOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 10px;
+  backdrop-filter: blur(2px);
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+  color: #64748b;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.errorIcon {
+  font-size: 18px;
+  color: #dc2626;
+  font-weight: 700;
+}
+
+/* Summary section with total and tax note */
+.summary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 24px;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.total {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1;
+}
+
+.taxNote {
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.4;
+  text-align: center;
+}
+
+/* DARK MODE PALETTE */
+@media (prefers-color-scheme: dark) {
+  .card {
+    background: #25292e;
+    border-color: #3a3f46;
+    color: #e2e8f0;
+  }
+
+  .card:hover:not(:disabled) {
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+  }
+
+  .cardSelected {
+    background: #1a2f3d;
+    border-color: #4d9bff;
+    box-shadow: 0 0 0 4px rgba(77, 155, 255, 0.2), 0 8px 24px rgba(77, 155, 255, 0.4);
+  }
+
+  .cardDim {
+    opacity: 0.4;
+    filter: grayscale(0.4);
+  }
+
+  .cardDisabled {
+    background: #2d3239;
+    border-color: #3a3f46;
+    opacity: 0.5;
+  }
+
+  .logo {
+    background: linear-gradient(135deg, #2d3239 0%, #3a3f46 100%);
+    color: #94a3b8;
+    border-color: #4a5059;
+  }
+
+  .cardSelected .logo {
+    background: linear-gradient(135deg, #4d9bff 0%, #3b82f6 100%);
+    color: #ffffff;
+    border-color: #3b82f6;
+  }
+
+  .providerName {
+    color: #e2e8f0;
+  }
+
+  .description {
+    color: #94a3b8;
+  }
+
+  .summary {
+    background: #25292e;
+    border-color: #3a3f46;
+  }
+
+  .total {
+    color: #e2e8f0;
+  }
+
+  .taxNote {
+    color: #94a3b8;
+  }
+
+  .disabledOverlay {
+    background: rgba(37, 41, 46, 0.85);
+  }
+
+  .spinner {
+    color: #94a3b8;
+  }
+}
+
+/* Dark mode class override for systems without prefers-color-scheme */
+:global(.dark) .card {
+  background: #25292e;
+  border-color: #3a3f46;
+  color: #e2e8f0;
+}
+
+:global(.dark) .card:hover:not(:disabled) {
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+}
+
+:global(.dark) .cardSelected {
+  background: #1a2f3d;
+  border-color: #4d9bff;
+  box-shadow: 0 0 0 4px rgba(77, 155, 255, 0.2), 0 8px 24px rgba(77, 155, 255, 0.4);
+}
+
+:global(.dark) .cardDim {
+  opacity: 0.4;
+  filter: grayscale(0.4);
+}
+
+:global(.dark) .cardDisabled {
+  background: #2d3239;
+  border-color: #3a3f46;
+  opacity: 0.5;
+}
+
+:global(.dark) .logo {
+  background: linear-gradient(135deg, #2d3239 0%, #3a3f46 100%);
+  color: #94a3b8;
+  border-color: #4a5059;
+}
+
+:global(.dark) .cardSelected .logo {
+  background: linear-gradient(135deg, #4d9bff 0%, #3b82f6 100%);
+  color: #ffffff;
+  border-color: #3b82f6;
+}
+
+:global(.dark) .providerName {
+  color: #e2e8f0;
+}
+
+:global(.dark) .description {
+  color: #94a3b8;
+}
+
+:global(.dark) .summary {
+  background: #25292e;
+  border-color: #3a3f46;
+}
+
+:global(.dark) .total {
+  color: #e2e8f0;
+}
+
+:global(.dark) .taxNote {
+  color: #94a3b8;
+}
+
+:global(.dark) .disabledOverlay {
+  background: rgba(37, 41, 46, 0.85);
+}
+
+:global(.dark) .spinner {
+  color: #94a3b8;
+}

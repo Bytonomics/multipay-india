@@ -62,7 +62,22 @@ func (a *Adapter) CreateOrder(ctx context.Context, req *domain.CreateOrderReques
 	}
 
 	// D17: Map typed struct to canonical domain type
-	return mapOrderFromResponse(typed, responseMap), nil
+	order := mapOrderFromResponse(typed, responseMap)
+	order.Checkout = buildRazorpayCheckout(a.config, req, order)
+	return order, nil
+}
+
+// buildRazorpayCheckout constructs checkout payload for frontend rendering.
+func buildRazorpayCheckout(cfg *Config, req *domain.CreateOrderRequest, order *domain.Order) *domain.CheckoutPayload {
+	return &domain.CheckoutPayload{
+		Provider:    domain.ProviderRazorpay,
+		Environment: cfg.Environment,
+		OrderID:     order.ProviderOrderID,
+		PublicKey:   cfg.Key,
+		CallbackURL: req.ReturnURL,
+		AmountMinor: order.AmountMinor,
+		Currency:    order.Currency,
+	}
 }
 
 // GetOrder retrieves an existing order from Razorpay.

@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Bytonomics/multipay-india/contract/checkout/checkout_payload.schema.json",
+  "title": "CheckoutPayload",
+  "description": "Frontend-bound, provider-agnostic payload for vendor hosted checkout redirect. Discriminated by provider field.",
+  "type": "object",
+  "required": ["provider", "environment"],
+  "properties": {
+    "provider": {
+      "type": "string",
+      "enum": ["cashfree", "razorpay"]
+    },
+    "environment": {
+      "type": "string",
+      "enum": ["SANDBOX", "PRODUCTION"]
+    },
+    "session_id": {
+      "type": "string",
+      "description": "Cashfree-only: session identifier for checkout"
+    },
+    "order_id": {
+      "type": "string",
+      "description": "Razorpay-only: order identifier"
+    },
+    "public_key": {
+      "type": "string",
+      "description": "Razorpay-only: public key for checkout"
+    },
+    "callback_url": {
+      "type": "string",
+      "description": "Razorpay-only: callback URL"
+    },
+    "amount_minor": {
+      "type": "integer",
+      "description": "Razorpay-only: amount in minor units (paisa/cents)"
+    },
+    "currency": {
+      "type": "string",
+      "description": "Razorpay-only: ISO 4217 currency code"
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "provider": {
+          "const": "cashfree"
+        },
+        "session_id": {
+          "type": "string"
+        }
+      },
+      "required": ["session_id"]
+    },
+    {
+      "properties": {
+        "provider": {
+          "const": "razorpay"
+        },
+        "order_id": {
+          "type": "string"
+        },
+        "public_key": {
+          "type": "string"
+        },
+        "callback_url": {
+          "type": "string"
+        },
+        "amount_minor": {
+          "type": "integer"
+        },
+        "currency": {
+          "type": "string"
+        }
+      },
+      "required": ["order_id", "public_key", "callback_url", "amount_minor", "currency"]
+    }
+  ]
+}

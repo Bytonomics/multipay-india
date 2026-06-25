@@ -1,0 +1,4 @@
+{
+  "provider": ["cashfree", "razorpay"],
+  "environment": ["SANDBOX", "PRODUCTION"]
+}

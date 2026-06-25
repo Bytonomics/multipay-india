@@ -1,0 +1,204 @@
+/**
+ * PaymentPicker Component Styles
+ * Main shell styles with variant support and theme handling
+ */
+
+/* ============================================
+   Picker Container
+   ============================================ */
+
+.picker {
+  --mpay-font-family: inherit;
+  font-family: var(--mpay-font-family);
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  background-color: var(--mpay-neutral-50);
+  border-radius: var(--mpay-radius-xl);
+  box-shadow: var(--mpay-shadow-lg);
+  overflow: hidden;
+  transition: var(--mpay-transition-all);
+}
+
+[data-theme="dark"] .picker {
+  background-color: var(--mpay-neutral-900);
+  box-shadow: var(--mpay-shadow-xl);
+}
+
+.picker:focus-within {
+  box-shadow: var(--mpay-shadow-xl);
+  outline: 2px solid var(--mpay-primary-500);
+  outline-offset: 2px;
+}
+
+[data-theme="dark"] .picker:focus-within {
+  box-shadow: var(--mpay-shadow-2xl);
+  outline-color: var(--mpay-primary-400);
+}
+
+/* ============================================
+   Total Section
+   ============================================ */
+
+.totalSection {
+  padding: var(--mpay-spacing-6);
+  text-align: center;
+  border-bottom: 1px solid var(--mpay-neutral-200);
+  background-color: var(--mpay-white);
+}
+
+[data-theme="dark"] .totalSection {
+  border-bottom-color: var(--mpay-neutral-700);
+  background-color: var(--mpay-neutral-800);
+}
+
+.totalLabel {
+  font-size: var(--mpay-font-size-sm);
+  font-weight: var(--mpay-font-weight-medium);
+  color: var(--mpay-neutral-600);
+  margin: 0 0 var(--mpay-spacing-2) 0;
+  line-height: var(--mpay-line-height-normal);
+  text-transform: uppercase;
+  letter-spacing: var(--mpay-letter-spacing-wide);
+}
+
+[data-theme="dark"] .totalLabel {
+  color: var(--mpay-neutral-400);
+}
+
+.totalAmount {
+  font-size: var(--mpay-font-size-3xl);
+  font-weight: var(--mpay-font-weight-bold);
+  color: var(--mpay-neutral-900);
+  margin: 0 0 var(--mpay-spacing-2) 0;
+  line-height: var(--mpay-line-height-tight);
+}
+
+[data-theme="dark"] .totalAmount {
+  color: var(--mpay-neutral-50);
+}
+
+.taxNote {
+  font-size: var(--mpay-font-size-xs);
+  font-weight: var(--mpay-font-weight-normal);
+  color: var(--mpay-neutral-500);
+  margin: 0;
+  line-height: var(--mpay-line-height-normal);
+}
+
+[data-theme="dark"] .taxNote {
+  color: var(--mpay-neutral-400);
+}
+
+/* ============================================
+   Providers Section
+   ============================================ */
+
+.providersSection {
+  padding: var(--mpay-spacing-4);
+  background-color: var(--mpay-neutral-50);
+}
+
+[data-theme="dark"] .providersSection {
+  background-color: var(--mpay-neutral-900);
+}
+
+/* Variant placeholder */
+.variantPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  padding: var(--mpay-spacing-6);
+  font-size: var(--mpay-font-size-base);
+  font-weight: var(--mpay-font-weight-medium);
+  color: var(--mpay-neutral-500);
+  text-align: center;
+  border-radius: var(--mpay-radius-lg);
+  background-color: var(--mpay-neutral-100);
+  border: 2px dashed var(--mpay-neutral-300);
+}
+
+[data-theme="dark"] .variantPlaceholder {
+  color: var(--mpay-neutral-400);
+  background-color: var(--mpay-neutral-800);
+  border-color: var(--mpay-neutral-600);
+}
+
+/* ============================================
+   Responsive Design
+   ============================================ */
+
+@media (max-width: 640px) {
+  .picker {
+    max-width: 100%;
+    border-radius: var(--mpay-radius-lg);
+  }
+
+  .totalSection {
+    padding: var(--mpay-spacing-4);
+  }
+
+  .totalAmount {
+    font-size: var(--mpay-font-size-2xl);
+  }
+
+  .providersSection {
+    padding: var(--mpay-spacing-3);
+  }
+}
+
+/* ============================================
+   Animation Classes
+   ============================================ */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.picker {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* ============================================
+   Accessibility
+   ============================================ */
+
+.picker:focus-visible {
+  outline: 2px solid var(--mpay-primary-500);
+  outline-offset: 4px;
+}
+
+[data-theme="dark"] .picker:focus-visible {
+  outline-color: var(--mpay-primary-400);
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .picker {
+    border: 2px solid var(--mpay-neutral-900);
+  }
+
+  [data-theme="dark"] .picker {
+    border-color: var(--mpay-neutral-100);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .picker {
+    animation: none;
+    transition: none;
+  }
+
+  .picker:focus-within {
+    transition: none;
+  }
+}

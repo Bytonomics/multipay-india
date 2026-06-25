@@ -347,6 +347,7 @@ type Order struct {
     Currency         Currency
     Metadata         Metadata
     ProviderDetails  *OrderProviderDetail  // NEW: provider-specific fields
+    Checkout         *Checkout              // NEW: canonical checkout session data
     Raw              RawProviderResponse
 }
 
@@ -365,6 +366,20 @@ type Payment struct {
 ```
 
 The `ProviderDetails` field is **optional** (`*`, omitempty in JSON) and is populated by the adapter during mapping.
+
+#### Canonical Checkout Data
+
+In contrast to `ProviderDetails` (which is provider-specific), the `Checkout` field holds **canonical checkout session data** that is consistent across all providers. This represents the unified checkout payload that would be sent to the frontend for rendering a checkout page:
+
+```go
+type Checkout struct {
+    CheckoutSessionID string           // Canonical checkout session ID
+    CheckoutPayload    CheckoutPayload  // Canonical checkout payload for frontend
+    ExpiresAt         time.Time        // Checkout session expiration
+}
+```
+
+The `CheckoutPayload` is **provider-agnostic** — it contains standardized checkout data (amount, currency, order metadata, payment methods) regardless of whether the underlying provider is Cashfree or Razorpay. This ensures the frontend receives a consistent checkout interface across all payment providers.
 
 #### Provider-Specific Fields Captured
 

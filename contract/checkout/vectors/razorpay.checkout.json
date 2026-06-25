@@ -1,0 +1,9 @@
+{
+  "provider": "razorpay",
+  "environment": "PRODUCTION",
+  "order_id": "order_RZP123",
+  "public_key": "rzp_live_xxx",
+  "callback_url": "https://api.smriti.ai/v1/payments/callback/razorpay",
+  "amount_minor": 50000,
+  "currency": "INR"
+}

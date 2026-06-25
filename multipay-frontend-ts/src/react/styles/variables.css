@@ -1,0 +1,423 @@
+/**
+ * Multipay Design System - CSS Custom Properties
+ * Complete token system for light and dark themes
+ */
+
+:root,
+[data-theme="light"] {
+  /* Neutral Colors - Light Theme */
+  --mpay-neutral-50: #fafafa;
+  --mpay-neutral-100: #f5f5f5;
+  --mpay-neutral-200: #e5e5e5;
+  --mpay-neutral-300: #d4d4d4;
+  --mpay-neutral-400: #a3a3a3;
+  --mpay-neutral-500: #737373;
+  --mpay-neutral-600: #525252;
+  --mpay-neutral-700: #404040;
+  --mpay-neutral-800: #262626;
+  --mpay-neutral-900: #171717;
+  --mpay-neutral-950: #0a0a0a;
+
+  /* Semantic Colors - Light Theme */
+  --mpay-white: #ffffff;
+  --mpay-black: #000000;
+
+  /* Primary Brand Colors - Light Theme */
+  --mpay-primary-50: #eff6ff;
+  --mpay-primary-100: #dbeafe;
+  --mpay-primary-200: #bfdbfe;
+  --mpay-primary-300: #93c5fd;
+  --mpay-primary-400: #60a5fa;
+  --mpay-primary-500: #3b82f6;
+  --mpay-primary-600: #2563eb;
+  --mpay-primary-700: #1d4ed8;
+  --mpay-primary-800: #1e40af;
+  --mpay-primary-900: #1e3a8a;
+  --mpay-primary-950: #172554;
+
+  /* Success Colors - Light Theme */
+  --mpay-success-50: #f0fdf4;
+  --mpay-success-100: #dcfce7;
+  --mpay-success-200: #bbf7d0;
+  --mpay-success-300: #86efac;
+  --mpay-success-400: #4ade80;
+  --mpay-success-500: #22c55e;
+  --mpay-success-600: #16a34a;
+  --mpay-success-700: #15803d;
+  --mpay-success-800: #166534;
+  --mpay-success-900: #14532d;
+  --mpay-success-950: #052e16;
+
+  /* Warning Colors - Light Theme */
+  --mpay-warning-50: #fffbeb;
+  --mpay-warning-100: #fef3c7;
+  --mpay-warning-200: #fde68a;
+  --mpay-warning-300: #fcd34d;
+  --mpay-warning-400: #fbbf24;
+  --mpay-warning-500: #f59e0b;
+  --mpay-warning-600: #d97706;
+  --mpay-warning-700: #b45309;
+  --mpay-warning-800: #92400e;
+  --mpay-warning-900: #78350f;
+  --mpay-warning-950: #451a03;
+
+  /* Error Colors - Light Theme */
+  --mpay-error-50: #fef2f2;
+  --mpay-error-100: #fee2e2;
+  --mpay-error-200: #fecaca;
+  --mpay-error-300: #fca5a5;
+  --mpay-error-400: #f87171;
+  --mpay-error-500: #ef4444;
+  --mpay-error-600: #dc2626;
+  --mpay-error-700: #b91c1c;
+  --mpay-error-800: #991b1b;
+  --mpay-error-900: #7f1d1d;
+  --mpay-error-950: #450a0a;
+
+  /* Info Colors - Light Theme */
+  --mpay-info-50: #f0f9ff;
+  --mpay-info-100: #e0f2fe;
+  --mpay-info-200: #bae6fd;
+  --mpay-info-300: #7dd3fc;
+  --mpay-info-400: #38bdf8;
+  --mpay-info-500: #0ea5e9;
+  --mpay-info-600: #0284c7;
+  --mpay-info-700: #0369a1;
+  --mpay-info-800: #075985;
+  --mpay-info-900: #0c4a6e;
+  --mpay-info-950: #082f49;
+
+  /* Typography - Light Theme */
+  --mpay-font-family: inherit;
+  --mpay-font-size-xs: 0.75rem;
+  --mpay-font-size-sm: 0.875rem;
+  --mpay-font-size-base: 1rem;
+  --mpay-font-size-lg: 1.125rem;
+  --mpay-font-size-xl: 1.25rem;
+  --mpay-font-size-2xl: 1.5rem;
+  --mpay-font-size-3xl: 1.875rem;
+  --mpay-font-size-4xl: 2.25rem;
+  --mpay-font-size-5xl: 3rem;
+
+  --mpay-font-weight-light: 300;
+  --mpay-font-weight-normal: 400;
+  --mpay-font-weight-medium: 500;
+  --mpay-font-weight-semibold: 600;
+  --mpay-font-weight-bold: 700;
+  --mpay-font-weight-extrabold: 800;
+
+  --mpay-line-height-tight: 1.25;
+  --mpay-line-height-normal: 1.5;
+  --mpay-line-height-relaxed: 1.75;
+
+  --mpay-letter-spacing-tight: -0.025em;
+  --mpay-letter-spacing-normal: 0;
+  --mpay-letter-spacing-wide: 0.025em;
+
+  /* Spacing - Light Theme */
+  --mpay-spacing-0: 0;
+  --mpay-spacing-px: 1px;
+  --mpay-spacing-0_5: 0.125rem;
+  --mpay-spacing-1: 0.25rem;
+  --mpay-spacing-1_5: 0.375rem;
+  --mpay-spacing-2: 0.5rem;
+  --mpay-spacing-2_5: 0.625rem;
+  --mpay-spacing-3: 0.75rem;
+  --mpay-spacing-3_5: 0.875rem;
+  --mpay-spacing-4: 1rem;
+  --mpay-spacing-5: 1.25rem;
+  --mpay-spacing-6: 1.5rem;
+  --mpay-spacing-7: 1.75rem;
+  --mpay-spacing-8: 2rem;
+  --mpay-spacing-9: 2.25rem;
+  --mpay-spacing-10: 2.5rem;
+  --mpay-spacing-11: 2.75rem;
+  --mpay-spacing-12: 3rem;
+  --mpay-spacing-14: 3.5rem;
+  --mpay-spacing-16: 4rem;
+  --mpay-spacing-20: 5rem;
+  --mpay-spacing-24: 6rem;
+  --mpay-spacing-28: 7rem;
+  --mpay-spacing-32: 8rem;
+  --mpay-spacing-36: 9rem;
+  --mpay-spacing-40: 10rem;
+  --mpay-spacing-44: 11rem;
+  --mpay-spacing-48: 12rem;
+  --mpay-spacing-52: 13rem;
+  --mpay-spacing-56: 14rem;
+  --mpay-spacing-60: 15rem;
+  --mpay-spacing-64: 16rem;
+  --mpay-spacing-72: 18rem;
+  --mpay-spacing-80: 20rem;
+  --mpay-spacing-96: 24rem;
+
+  /* Border Radius - Light Theme */
+  --mpay-radius-none: 0;
+  --mpay-radius-sm: 0.125rem;
+  --mpay-radius-base: 0.25rem;
+  --mpay-radius-md: 0.375rem;
+  --mpay-radius-lg: 0.5rem;
+  --mpay-radius-xl: 0.75rem;
+  --mpay-radius-2xl: 1rem;
+  --mpay-radius-3xl: 1.5rem;
+  --mpay-radius-full: 9999px;
+
+  /* Shadows - Light Theme */
+  --mpay-shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --mpay-shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --mpay-shadow-base: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --mpay-shadow-md: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --mpay-shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --mpay-shadow-xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  --mpay-shadow-2xl: 0 50px 100px -20px rgb(0 0 0 / 0.25);
+  --mpay-shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
+  --mpay-shadow-none: 0 0 #0000;
+
+  /* Z-Index - Light Theme */
+  --mpay-z-0: 0;
+  --mpay-z-10: 10;
+  --mpay-z-20: 20;
+  --mpay-z-30: 30;
+  --mpay-z-40: 40;
+  --mpay-z-50: 50;
+  --mpay-z-auto: auto;
+
+  /* Opacity - Light Theme */
+  --mpay-opacity-0: 0;
+  --mpay-opacity-5: 0.05;
+  --mpay-opacity-10: 0.1;
+  --mpay-opacity-20: 0.2;
+  --mpay-opacity-30: 0.3;
+  --mpay-opacity-40: 0.4;
+  --mpay-opacity-50: 0.5;
+  --mpay-opacity-60: 0.6;
+  --mpay-opacity-70: 0.7;
+  --mpay-opacity-80: 0.8;
+  --mpay-opacity-90: 0.9;
+  --mpay-opacity-95: 0.95;
+  --mpay-opacity-100: 1;
+
+  /* Transitions - Light Theme */
+  --mpay-transition-none: none;
+  --mpay-transition-all: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --mpay-transition-colors: color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --mpay-transition-opacity: opacity 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --mpay-transition-shadow: box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --mpay-transition-transform: transform 150ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Breakpoints - Light Theme */
+  --mpay-breakpoint-sm: 640px;
+  --mpay-breakpoint-md: 768px;
+  --mpay-breakpoint-lg: 1024px;
+  --mpay-breakpoint-xl: 1280px;
+  --mpay-breakpoint-2xl: 1536px;
+}
+
+[data-theme="dark"] {
+  /* Neutral Colors - Dark Theme */
+  --mpay-neutral-50: #0a0a0a;
+  --mpay-neutral-100: #171717;
+  --mpay-neutral-200: #262626;
+  --mpay-neutral-300: #404040;
+  --mpay-neutral-400: #525252;
+  --mpay-neutral-500: #737373;
+  --mpay-neutral-600: #a3a3a3;
+  --mpay-neutral-700: #d4d4d4;
+  --mpay-neutral-800: #e5e5e5;
+  --mpay-neutral-900: #f5f5f5;
+  --mpay-neutral-950: #fafafa;
+
+  /* Semantic Colors - Dark Theme */
+  --mpay-white: #ffffff;
+  --mpay-black: #000000;
+
+  /* Primary Brand Colors - Dark Theme */
+  --mpay-primary-50: #172554;
+  --mpay-primary-100: #1e3a8a;
+  --mpay-primary-200: #1e40af;
+  --mpay-primary-300: #1d4ed8;
+  --mpay-primary-400: #2563eb;
+  --mpay-primary-500: #3b82f6;
+  --mpay-primary-600: #60a5fa;
+  --mpay-primary-700: #93c5fd;
+  --mpay-primary-800: #bfdbfe;
+  --mpay-primary-900: #dbeafe;
+  --mpay-primary-950: #eff6ff;
+
+  /* Success Colors - Dark Theme */
+  --mpay-success-50: #052e16;
+  --mpay-success-100: #14532d;
+  --mpay-success-200: #166534;
+  --mpay-success-300: #15803d;
+  --mpay-success-400: #16a34a;
+  --mpay-success-500: #22c55e;
+  --mpay-success-600: #4ade80;
+  --mpay-success-700: #86efac;
+  --mpay-success-800: #bbf7d0;
+  --mpay-success-900: #dcfce7;
+  --mpay-success-950: #f0fdf4;
+
+  /* Warning Colors - Dark Theme */
+  --mpay-warning-50: #451a03;
+  --mpay-warning-100: #78350f;
+  --mpay-warning-200: #92400e;
+  --mpay-warning-300: #b45309;
+  --mpay-warning-400: #d97706;
+  --mpay-warning-500: #f59e0b;
+  --mpay-warning-600: #fbbf24;
+  --mpay-warning-700: #fcd34d;
+  --mpay-warning-800: #fde68a;
+  --mpay-warning-900: #fef3c7;
+  --mpay-warning-950: #fffbeb;
+
+  /* Error Colors - Dark Theme */
+  --mpay-error-50: #450a0a;
+  --mpay-error-100: #7f1d1d;
+  --mpay-error-200: #991b1b;
+  --mpay-error-300: #b91c1c;
+  --mpay-error-400: #dc2626;
+  --mpay-error-500: #ef4444;
+  --mpay-error-600: #f87171;
+  --mpay-error-700: #fca5a5;
+  --mpay-error-800: #fecaca;
+  --mpay-error-900: #fee2e2;
+  --mpay-error-950: #fef2f2;
+
+  /* Info Colors - Dark Theme */
+  --mpay-info-50: #082f49;
+  --mpay-info-100: #0c4a6e;
+  --mpay-info-200: #075985;
+  --mpay-info-300: #0369a1;
+  --mpay-info-400: #0284c7;
+  --mpay-info-500: #0ea5e9;
+  --mpay-info-600: #38bdf8;
+  --mpay-info-700: #7dd3fc;
+  --mpay-info-800: #bae6fd;
+  --mpay-info-900: #e0f2fe;
+  --mpay-info-950: #f0f9ff;
+
+  /* Typography - Dark Theme (inherited from light) */
+  --mpay-font-family: inherit;
+  --mpay-font-size-xs: 0.75rem;
+  --mpay-font-size-sm: 0.875rem;
+  --mpay-font-size-base: 1rem;
+  --mpay-font-size-lg: 1.125rem;
+  --mpay-font-size-xl: 1.25rem;
+  --mpay-font-size-2xl: 1.5rem;
+  --mpay-font-size-3xl: 1.875rem;
+  --mpay-font-size-4xl: 2.25rem;
+  --mpay-font-size-5xl: 3rem;
+
+  --mpay-font-weight-light: 300;
+  --mpay-font-weight-normal: 400;
+  --mpay-font-weight-medium: 500;
+  --mpay-font-weight-semibold: 600;
+  --mpay-font-weight-bold: 700;
+  --mpay-font-weight-extrabold: 800;
+
+  --mpay-line-height-tight: 1.25;
+  --mpay-line-height-normal: 1.5;
+  --mpay-line-height-relaxed: 1.75;
+
+  --mpay-letter-spacing-tight: -0.025em;
+  --mpay-letter-spacing-normal: 0;
+  --mpay-letter-spacing-wide: 0.025em;
+
+  /* Spacing - Dark Theme (inherited from light) */
+  --mpay-spacing-0: 0;
+  --mpay-spacing-px: 1px;
+  --mpay-spacing-0_5: 0.125rem;
+  --mpay-spacing-1: 0.25rem;
+  --mpay-spacing-1_5: 0.375rem;
+  --mpay-spacing-2: 0.5rem;
+  --mpay-spacing-2_5: 0.625rem;
+  --mpay-spacing-3: 0.75rem;
+  --mpay-spacing-3_5: 0.875rem;
+  --mpay-spacing-4: 1rem;
+  --mpay-spacing-5: 1.25rem;
+  --mpay-spacing-6: 1.5rem;
+  --mpay-spacing-7: 1.75rem;
+  --mpay-spacing-8: 2rem;
+  --mpay-spacing-9: 2.25rem;
+  --mpay-spacing-10: 2.5rem;
+  --mpay-spacing-11: 2.75rem;
+  --mpay-spacing-12: 3rem;
+  --mpay-spacing-14: 3.5rem;
+  --mpay-spacing-16: 4rem;
+  --mpay-spacing-20: 5rem;
+  --mpay-spacing-24: 6rem;
+  --mpay-spacing-28: 7rem;
+  --mpay-spacing-32: 8rem;
+  --mpay-spacing-36: 9rem;
+  --mpay-spacing-40: 10rem;
+  --mpay-spacing-44: 11rem;
+  --mpay-spacing-48: 12rem;
+  --mpay-spacing-52: 13rem;
+  --mpay-spacing-56: 14rem;
+  --mpay-spacing-60: 15rem;
+  --mpay-spacing-64: 16rem;
+  --mpay-spacing-72: 18rem;
+  --mpay-spacing-80: 20rem;
+  --mpay-spacing-96: 24rem;
+
+  /* Border Radius - Dark Theme (inherited from light) */
+  --mpay-radius-none: 0;
+  --mpay-radius-sm: 0.125rem;
+  --mpay-radius-base: 0.25rem;
+  --mpay-radius-md: 0.375rem;
+  --mpay-radius-lg: 0.5rem;
+  --mpay-radius-xl: 0.75rem;
+  --mpay-radius-2xl: 1rem;
+  --mpay-radius-3xl: 1.5rem;
+  --mpay-radius-full: 9999px;
+
+  /* Shadows - Dark Theme */
+  --mpay-shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --mpay-shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.4), 0 1px 2px -1px rgb(0 0 0 / 0.4);
+  --mpay-shadow-base: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+  --mpay-shadow-md: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+  --mpay-shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.4), 0 8px 10px -6px rgb(0 0 0 / 0.4);
+  --mpay-shadow-xl: 0 25px 50px -12px rgb(0 0 0 / 0.5);
+  --mpay-shadow-2xl: 0 50px 100px -20px rgb(0 0 0 / 0.5);
+  --mpay-shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 0.3);
+  --mpay-shadow-none: 0 0 #0000;
+
+  /* Z-Index - Dark Theme (inherited from light) */
+  --mpay-z-0: 0;
+  --mpay-z-10: 10;
+  --mpay-z-20: 20;
+  --mpay-z-30: 30;
+  --mpay-z-40: 40;
+  --mpay-z-50: 50;
+  --mpay-z-auto: auto;
+
+  /* Opacity - Dark Theme (inherited from light) */
+  --mpay-opacity-0: 0;
+  --mpay-opacity-5: 0.05;
+  --mpay-opacity-10: 0.1;
+  --mpay-opacity-20: 0.2;
+  --mpay-opacity-30: 0.3;
+  --mpay-opacity-40: 0.4;
+  --mpay-opacity-50: 0.5;
+  --mpay-opacity-60: 0.6;
+  --mpay-opacity-70: 0.7;
+  --mpay-opacity-80: 0.8;
+  --mpay-opacity-90: 0.9;
+  --mpay-opacity-95: 0.95;
+  --mpay-opacity-100: 1;
+
+  /* Transitions - Dark Theme (inherited from light) */
+  --mpay-transition-none: none;
+  --mpay-transition-all: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --mpay-transition-colors: color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --mpay-transition-opacity: opacity 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --mpay-transition-shadow: box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --mpay-transition-transform: transform 150ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Breakpoints - Dark Theme (inherited from light) */
+  --mpay-breakpoint-sm: 640px;
+  --mpay-breakpoint-md: 768px;
+  --mpay-breakpoint-lg: 1024px;
+  --mpay-breakpoint-xl: 1280px;
+  --mpay-breakpoint-2xl: 1536px;
+}

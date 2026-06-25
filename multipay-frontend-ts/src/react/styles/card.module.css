@@ -1,0 +1,269 @@
+/* Base card styles */
+.card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border: 2px solid var(--mpay-card-border, #e5e7eb);
+  border-radius: var(--mpay-card-border-radius, 12px);
+  background: var(--mpay-card-bg, #ffffff);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  min-height: 80px;
+}
+
+.card:hover:not(.disabled) {
+  border-color: var(--mpay-primary, #6366f1);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
+  transform: translateY(-2px);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--mpay-primary, #6366f1);
+  outline-offset: 2px;
+}
+
+/* SELECTED State */
+.card.selected {
+  border-color: var(--mpay-primary, #6366f1);
+  background: var(--mpay-card-selected-bg, #f5f3ff);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.card.selected:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15), 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+/* DISABLED State */
+.card.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+  background: var(--mpay-card-disabled-bg, #f9fafb);
+  border-color: var(--mpay-card-disabled-border, #e5e7eb);
+}
+
+.card.disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* LOADING State */
+.card.loading {
+  cursor: wait;
+}
+
+.card.loading .iconContainer {
+  opacity: 0.6;
+}
+
+/* ERROR State */
+.card.error {
+  border-color: var(--mpay-error, #ef4444);
+  background: var(--mpay-card-error-bg, #fef2f2);
+}
+
+.card.error:hover {
+  border-color: var(--mpay-error, #ef4444);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.1);
+}
+
+/* Icon container */
+.iconContainer {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.providerIcon {
+  width: 100%;
+  height: 100%;
+}
+
+.recommendedBadge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: var(--mpay-recommended-bg, #6366f1);
+  color: var(--mpay-recommended-text, #ffffff);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Content area */
+.content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.label {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--mpay-card-text, #111827);
+  line-height: 1.4;
+}
+
+.description {
+  font-size: 14px;
+  color: var(--mpay-card-text-secondary, #6b7280);
+  line-height: 1.4;
+}
+
+/* Disabled message */
+.disabledMessage {
+  font-size: 13px;
+  color: var(--mpay-card-disabled-text, #9ca3af);
+  font-style: italic;
+  margin-top: 4px;
+}
+
+/* Loading spinner and text */
+.loadingText {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--mpay-card-text-secondary, #6b7280);
+  margin-top: 4px;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--mpay-primary, #6366f1);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Error message and retry */
+.errorMessage {
+  font-size: 13px;
+  color: var(--mpay-error, #ef4444);
+  line-height: 1.4;
+  margin-top: 4px;
+}
+
+.retryButton {
+  margin-top: 8px;
+  padding: 6px 12px;
+  background: var(--mpay-primary, #6366f1);
+  color: var(--mpay-button-text, #ffffff);
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.retryButton:hover {
+  background: var(--mpay-primary-hover, #4f46e5);
+}
+
+.retryButton:focus {
+  outline: 2px solid var(--mpay-primary, #6366f1);
+  outline-offset: 2px;
+}
+
+/* Checkmark for selected state */
+.checkmark {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  color: var(--mpay-primary, #6366f1);
+  animation: scaleIn 0.2s ease;
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+/* Dark theme support */
+[data-theme='dark'] .card {
+  background: var(--mpay-card-bg, #1f2937);
+  border-color: var(--mpay-card-border, #374151);
+}
+
+[data-theme='dark'] .card:hover:not(.disabled) {
+  border-color: var(--mpay-primary, #818cf8);
+  box-shadow: 0 4px 12px rgba(129, 140, 248, 0.15);
+}
+
+[data-theme='dark'] .card.selected {
+  background: var(--mpay-card-selected-bg, #1e1b4b);
+  border-color: var(--mpay-primary, #818cf8);
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.15);
+}
+
+[data-theme='dark'] .card.disabled {
+  background: var(--mpay-card-disabled-bg, #111827);
+  border-color: var(--mpay-card-disabled-border, #374151);
+}
+
+[data-theme='dark'] .card.error {
+  background: var(--mpay-card-error-bg, #450a0a);
+  border-color: var(--mpay-error, #f87171);
+}
+
+[data-theme='dark'] .label {
+  color: var(--mpay-card-text, #f9fafb);
+}
+
+[data-theme='dark'] .description {
+  color: var(--mpay-card-text-secondary, #d1d5db);
+}
+
+[data-theme='dark'] .disabledMessage {
+  color: var(--mpay-card-disabled-text, #6b7280);
+}
+
+[data-theme='dark'] .loadingText {
+  color: var(--mpay-card-text-secondary, #d1d5db);
+}
+
+[data-theme='dark'] .spinner {
+  border-color: var(--mpay-primary, #818cf8);
+  border-top-color: transparent;
+}
+
+[data-theme='dark'] .errorMessage {
+  color: var(--mpay-error, #f87171);
+}
+
+[data-theme='dark'] .retryButton {
+  background: var(--mpay-primary, #818cf8);
+}
+
+[data-theme='dark'] .retryButton:hover {
+  background: var(--mpay-primary-hover, #6366f1);
+}
+
+[data-theme='dark'] .checkmark {
+  color: var(--mpay-primary, #818cf8);
+}

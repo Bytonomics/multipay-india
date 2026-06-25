@@ -52,7 +52,17 @@ func createOrder(ctx context.Context, adapter *Adapter, req *domain.CreateOrderR
 
 	// Map response to canonical type
 	order := MapOrderEntityToCanonical(cfOrder)
+	order.Checkout = buildCashfreeCheckout(adapter.config.Environment, order.SessionID)
 	return order, nil
+}
+
+// buildCashfreeCheckout constructs a CheckoutPayload for Cashfree orders.
+func buildCashfreeCheckout(env domain.Environment, sessionID string) *domain.CheckoutPayload {
+	return &domain.CheckoutPayload{
+		Provider:    domain.ProviderCashfree,
+		Environment: env,
+		SessionID:   sessionID,
+	}
 }
 
 // getOrder retrieves an existing order from the Cashfree payment gateway.

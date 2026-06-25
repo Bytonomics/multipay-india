@@ -46,6 +46,23 @@ type Order struct {
 	Metadata        Metadata             `json:"metadata,omitempty"`
 	ProviderDetails *OrderProviderDetail `json:"provider_details,omitempty"`
 	Raw             RawProviderResponse  `json:"raw,omitempty"`
+	Checkout        *CheckoutPayload     `json:"checkout,omitempty"`
+}
+
+// CheckoutPayload is the frontend-bound, provider-agnostic payload that lets a JS client
+// drive the vendor's hosted checkout redirect. Discriminated by Provider; only the fields
+// for that provider are populated.
+type CheckoutPayload struct {
+	Provider    Provider    `json:"provider"`
+	Environment Environment `json:"environment"` // serialized UPPERCASE (SANDBOX/PRODUCTION)
+	// Cashfree-only
+	SessionID string `json:"session_id,omitempty"`
+	// Razorpay-only
+	OrderID     string      `json:"order_id,omitempty"`
+	PublicKey   string      `json:"public_key,omitempty"`
+	CallbackURL string      `json:"callback_url,omitempty"`
+	AmountMinor AmountMinor `json:"amount_minor,omitempty"`
+	Currency    Currency    `json:"currency,omitempty"`
 }
 
 type GetOrderRequest struct {

@@ -4,9 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
@@ -145,48 +143,14 @@ func (s *WebhookService) HandleEvent(ctx context.Context, provider domain.Provid
 // MountHTTP mounts the webhook handler on an HTTP router.
 func (s *WebhookService) MountHTTP(basePath string, mux *http.ServeMux) {
 	matcher := routing.NewEndpointMatcher(basePath)
-
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
-
-		ctx := r.Context()
-
-		// Extract provider and accountID from route using EndpointMatcher
-		provider, accountID, ok := matcher.Match(r.URL.Path)
-		if !ok {
-			http.Error(w, "not found", http.StatusNotFound)
-			return
-		}
-
-		// Read body
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			http.Error(w, "failed to read body", http.StatusBadRequest)
-			return
-		}
-
-		// Extract headers
-		headers := make(map[string]string)
-		for key, values := range r.Header {
-			if len(values) > 0 {
-				headers[strings.ToLower(key)] = values[0]
-			}
-		}
-
-		// Handle event
-		_, handleErr := s.HandleEvent(ctx, provider, accountID, body, headers)
-		if handleErr != nil {
-			s.logger.Error(ctx, "webhook processing failed", "error", handleErr.Error())
-			http.Error(w, "webhook processing failed", http.StatusInternalServerError)
-			return
-		}
-
-		// Send success response
-		w.WriteHeader(http.StatusOK)
-		if _, writeErr := w.Write([]byte("OK")); writeErr != nil {
-			s.logger.Error(ctx, "failed to write webhook response", "error", writeErr.Error())
-		}
-	})
-
-	mux.Handle(basePath, handler)
+	// mandatory non-nil default handler: logs unhandled/unknown/parse-failed events, returns nil (=> 2xx)
+	defaultHandler := func(ctx context.Context, ev *domain.WebhookEvent) error {
+		s.logger.Info(ctx, "webhook event received (no specific handler)", "eventType", string(ev.EventType))
+		return nil
+	}
+	h := routing.NewWebhookHandler(matcher, s.adapter, s.store, s.logger, defaultHandler)
+	for evType, handler := range s.handlers {
+		h.RegisterEventHandler(evType, handler)
+	}
+	mux.Handle(basePath, h)
 }
