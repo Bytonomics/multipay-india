@@ -19,14 +19,14 @@
       "types": "./dist/react/index.d.ts",
       "import": "./dist/react/index.js"
     },
-    "./styles.css": "./dist/styles.css"
+    "./styles.css": "./dist/react/styles.css"
   },
   "files": [
     "dist"
   ],
   "peerDependencies": {
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0"
+    "react": ">=18",
+    "react-dom": ">=18"
   },
   "peerDependenciesMeta": {
     "react": {

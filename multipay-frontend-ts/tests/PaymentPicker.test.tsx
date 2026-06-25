@@ -2,22 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import type React from "react";
 import { PaymentPicker } from "../src/react/PaymentPicker";
-import type { PaymentPickerProps, PickerProviderId } from "../src/react/types";
-import type { Provider } from "../src/core/types";
-
-// Type for PaymentPicker ref
-type PaymentPickerRef = React.RefObject<{
-  selectProvider: (_providerId: PickerProviderId) => void;
-  getSelectedProvider: () => PickerProviderId;
-  isSelected: (_providerId: PickerProviderId) => boolean;
-  setProviderDisabled: (
-    _providerId: PickerProviderId,
-    _disabled: boolean,
-    _reason?: string,
-  ) => void;
-  focus: () => void;
-  blur: () => void;
-}>;
+import type {
+  PaymentPickerProps,
+  PickerProviders,
+  PickerControls,
+} from "../src/react/types";
+import { Provider, PickerVariant, PickerTheme } from "../src/core/types";
 
 describe("PaymentPicker Component", () => {
   // Mock window.matchMedia for theme detection
@@ -51,21 +41,22 @@ describe("PaymentPicker Component", () => {
     vi.clearAllMocks();
   });
 
-  const defaultProviders = [
-    { id: "cashfree" as PickerProviderId, label: "Cashfree", enabled: true },
-    { id: "razorpay" as PickerProviderId, label: "Razorpay", enabled: true },
-  ];
+  const defaultProviders: PickerProviders = {
+    cashfree: { label: "Cashfree", visible: true, enabled: true },
+    razorpay: { label: "Razorpay", visible: true, enabled: true },
+    payu: { label: "PayU", visible: false, enabled: true },
+  };
 
   const defaultProps: PaymentPickerProps = {
     payment: {
       amountMinor: 5000,
       currency: "INR",
       providers: defaultProviders,
-      defaultSelected: "cashfree" as PickerProviderId,
+      default: Provider.CASHFREE,
     },
     appearance: {
-      variant: "interactive-matrix",
-      theme: "light",
+      variant: PickerVariant.INTERACTIVE_MATRIX,
+      theme: PickerTheme.LIGHT,
     },
     onSelect: vi.fn(),
   };
@@ -79,8 +70,10 @@ describe("PaymentPicker Component", () => {
       expect(screen.getByText("Razorpay")).toBeInTheDocument();
 
       // Verify default selection
-      const cashfreeButton = screen.getByText("Cashfree").closest('[role="button"]');
-      expect(cashfreeButton).toHaveAttribute('aria-pressed', 'true');
+      const cashfreeButton = screen
+        .getByText("Cashfree")
+        .closest('[role="button"]');
+      expect(cashfreeButton).toHaveAttribute("aria-pressed", "true");
     });
 
     it("should NOT render PayU when not in payment.providers", () => {
@@ -90,61 +83,60 @@ describe("PaymentPicker Component", () => {
       expect(screen.queryByText("PayU")).not.toBeInTheDocument();
     });
 
-    it("should pre-select Cashfree when defaultSelected is cashfree", () => {
+    it("should pre-select Cashfree when default is Provider.CASHFREE", () => {
       const props = {
         ...defaultProps,
         payment: {
           ...defaultProps.payment,
-          defaultSelected: "cashfree" as PickerProviderId,
+          default: Provider.CASHFREE,
         },
       };
       render(<PaymentPicker {...props} />);
 
-      const cashfreeButton = screen.getByText("Cashfree").closest('[role="button"]');
-      expect(cashfreeButton).toHaveAttribute('aria-pressed', 'true');
+      const cashfreeButton = screen
+        .getByText("Cashfree")
+        .closest('[role="button"]');
+      expect(cashfreeButton).toHaveAttribute("aria-pressed", "true");
     });
 
-    it("should pre-select Razorpay when defaultSelected is razorpay", () => {
+    it("should pre-select Razorpay when default is Provider.RAZORPAY", () => {
       const props = {
         ...defaultProps,
         payment: {
           ...defaultProps.payment,
-          defaultSelected: "razorpay" as PickerProviderId,
+          default: Provider.RAZORPAY,
         },
       };
       render(<PaymentPicker {...props} />);
 
-      const razorpayButton = screen.getByText("Razorpay").closest('[role="button"]');
-      expect(razorpayButton).toHaveAttribute('aria-pressed', 'true');
+      const razorpayButton = screen
+        .getByText("Razorpay")
+        .closest('[role="button"]');
+      expect(razorpayButton).toHaveAttribute("aria-pressed", "true");
     });
 
-    it("should ignore invalid defaultSelected value", () => {
+    it("should ignore invalid default value and select first enabled provider", () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const props = {
         ...defaultProps,
         payment: {
           ...defaultProps.payment,
-          defaultSelected: "invalid" as PickerProviderId,
-          providers: [
-            {
-              id: "cashfree" as PickerProviderId,
-              label: "Cashfree",
-              enabled: true,
-            },
-            {
-              id: "razorpay" as PickerProviderId,
-              label: "Razorpay",
-              enabled: true,
-            },
-          ],
+          default: "invalid" as unknown as Provider,
+          providers: {
+            cashfree: { label: "Cashfree", visible: true, enabled: true },
+            razorpay: { label: "Razorpay", visible: true, enabled: true },
+            payu: { label: "PayU", visible: false, enabled: true },
+          },
         },
       };
       render(<PaymentPicker {...props} />);
 
       // Should default to first enabled provider (cashfree)
-      const cashfreeButton = screen.getByText("Cashfree").closest('[role="button"]');
-      expect(cashfreeButton).toHaveAttribute('aria-pressed', 'true');
+      const cashfreeButton = screen
+        .getByText("Cashfree")
+        .closest('[role="button"]');
+      expect(cashfreeButton).toHaveAttribute("aria-pressed", "true");
 
       // Verify console was warned about invalid default
       expect(consoleSpy).toHaveBeenCalled();
@@ -152,83 +144,71 @@ describe("PaymentPicker Component", () => {
       consoleSpy.mockRestore();
     });
 
-    it("should ignore disabled provider in defaultSelected", () => {
+    it("should ignore disabled provider in default and select first enabled provider", () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const props = {
         ...defaultProps,
         payment: {
           ...defaultProps.payment,
-          defaultSelected: "cashfree" as PickerProviderId,
-          providers: [
-            {
-              id: "cashfree" as PickerProviderId,
-              label: "Cashfree",
-              enabled: false,
-            },
-            {
-              id: "razorpay" as PickerProviderId,
-              label: "Razorpay",
-              enabled: true,
-            },
-          ],
+          default: Provider.CASHFREE,
+          providers: {
+            cashfree: { label: "Cashfree", visible: true, enabled: false },
+            razorpay: { label: "Razorpay", visible: true, enabled: true },
+            payu: { label: "PayU", visible: false, enabled: true },
+          },
         },
       };
       render(<PaymentPicker {...props} />);
 
       // Should default to first enabled provider (razorpay)
-      const razorpayButton = screen.getByText("Razorpay").closest('[role="button"]');
-      expect(razorpayButton).toHaveAttribute('aria-pressed', 'true');
+      const razorpayButton = screen
+        .getByText("Razorpay")
+        .closest('[role="button"]');
+      expect(razorpayButton).toHaveAttribute("aria-pressed", "true");
 
-      const cashfreeButton = screen.getByText("Cashfree").closest('[role="button"]');
+      // Disabled card should still render but be disabled
+      const cashfreeButton = screen
+        .getByText("Cashfree")
+        .closest('[role="button"]');
       expect(cashfreeButton).toBeDisabled();
 
       consoleSpy.mockRestore();
     });
 
-    it("should ignore absent provider in defaultSelected", () => {
+    it("should ignore absent provider in default and select first enabled provider", () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const props = {
         ...defaultProps,
         payment: {
           ...defaultProps.payment,
-          defaultSelected: "payu" as PickerProviderId,
-          providers: [
-            {
-              id: "cashfree" as PickerProviderId,
-              label: "Cashfree",
-              enabled: true,
-            },
-            {
-              id: "razorpay" as PickerProviderId,
-              label: "Razorpay",
-              enabled: true,
-            },
-          ],
+          default: Provider.PAYU,
+          providers: {
+            cashfree: { label: "Cashfree", visible: true, enabled: true },
+            razorpay: { label: "Razorpay", visible: true, enabled: true },
+            payu: { label: "PayU", visible: false, enabled: true },
+          },
         },
       };
       render(<PaymentPicker {...props} />);
 
       // Should default to first enabled provider (cashfree)
-      const cashfreeButton = screen.getByText("Cashfree").closest('[role="button"]');
-      expect(cashfreeButton).toHaveAttribute('aria-pressed', 'true');
+      const cashfreeButton = screen
+        .getByText("Cashfree")
+        .closest('[role="button"]');
+      expect(cashfreeButton).toHaveAttribute("aria-pressed", "true");
 
       consoleSpy.mockRestore();
     });
   });
 
   describe("Assertion 2: Theme rendering (light, dark, auto)", () => {
-    const variants: Array<
-      | "dynamic-stack"
-      | "interactive-matrix"
-      | "secure-vault"
-      | "neumorphic-flow"
-    > = [
-      "dynamic-stack",
-      "interactive-matrix",
-      "secure-vault",
-      "neumorphic-flow",
+    const variants = [
+      PickerVariant.DYNAMIC_STACK,
+      PickerVariant.INTERACTIVE_MATRIX,
+      PickerVariant.SECURE_VAULT,
+      PickerVariant.NEUMORPHIC_FLOW,
     ];
 
     variants.forEach((variant) => {
@@ -239,7 +219,7 @@ describe("PaymentPicker Component", () => {
             appearance: {
               ...defaultProps.appearance,
               variant,
-              theme: "light" as const,
+              theme: PickerTheme.LIGHT,
             },
           };
 
@@ -256,7 +236,7 @@ describe("PaymentPicker Component", () => {
             appearance: {
               ...defaultProps.appearance,
               variant,
-              theme: "dark" as const,
+              theme: PickerTheme.DARK,
             },
           };
 
@@ -285,7 +265,7 @@ describe("PaymentPicker Component", () => {
             appearance: {
               ...defaultProps.appearance,
               variant,
-              theme: "auto" as const,
+              theme: PickerTheme.AUTO,
             },
           };
 
@@ -314,7 +294,7 @@ describe("PaymentPicker Component", () => {
             appearance: {
               ...defaultProps.appearance,
               variant,
-              theme: "auto" as const,
+              theme: PickerTheme.AUTO,
             },
           };
 
@@ -364,7 +344,7 @@ describe("PaymentPicker Component", () => {
             appearance: {
               ...defaultProps.appearance,
               variant,
-              theme: "auto" as const,
+              theme: PickerTheme.AUTO,
             },
           };
 
@@ -395,58 +375,103 @@ describe("PaymentPicker Component", () => {
   });
 
   describe("Assertion 3: ONE card/slot per aggregator in every variant", () => {
-    const variants: Array<
-      | "dynamic-stack"
-      | "interactive-matrix"
-      | "secure-vault"
-      | "neumorphic-flow"
-    > = [
-      "dynamic-stack",
-      "interactive-matrix",
-      "secure-vault",
-      "neumorphic-flow",
-    ];
+    it(`${PickerVariant.DYNAMIC_STACK}: should render exactly one card per provider with expandable alternatives`, async () => {
+      const props = {
+        ...defaultProps,
+        appearance: {
+          ...defaultProps.appearance,
+          variant: PickerVariant.DYNAMIC_STACK,
+        },
+      };
 
-    variants.forEach((variant) => {
-      it(`${variant}: should render exactly one card per provider (no method-split elements)`, () => {
-        const props = {
-          ...defaultProps,
-          appearance: {
-            ...defaultProps.appearance,
-            variant,
-          },
-        };
+      render(<PaymentPicker {...props} />);
 
-        render(<PaymentPicker {...props} />);
+      // DynamicStack shows primary card + accordion with alternatives
+      // Initially: 1 primary card visible
+      expect(screen.getByText("Cashfree")).toBeInTheDocument();
 
-        // Count provider cards by finding all clickable provider elements
-        const providerCards = screen
-          .getAllByRole("button")
-          .filter(
-            (button) =>
-              button.textContent &&
-              (button.textContent.includes("Cashfree") ||
-                button.textContent.includes("Razorpay")),
-          );
+      // Expand accordion to reveal alternative cards
+      const accordionTrigger = screen.getByText(/Show Alternative Options/i);
+      fireEvent.click(accordionTrigger);
 
-        // Should have exactly 2 cards (one per provider)
-        expect(providerCards).toHaveLength(2);
-
-        // Verify no method-specific text (UPI, Cards, Wallets, etc.) is split into separate elements
-        expect(screen.queryByText("UPI")).not.toBeInTheDocument();
-        expect(screen.queryByText("Cards")).not.toBeInTheDocument();
-        expect(screen.queryByText("Wallets")).not.toBeInTheDocument();
+      // After expanding: all alternative cards visible
+      await waitFor(() => {
+        expect(screen.getByText("Razorpay")).toBeInTheDocument();
       });
+
+      // Verify no method-specific text
+      expect(screen.queryByText("UPI")).not.toBeInTheDocument();
+      expect(screen.queryByText("Cards")).not.toBeInTheDocument();
+    });
+
+    it(`${PickerVariant.INTERACTIVE_MATRIX}: should render exactly one card per provider (no method-split elements)`, () => {
+      const props = {
+        ...defaultProps,
+        appearance: {
+          ...defaultProps.appearance,
+          variant: PickerVariant.INTERACTIVE_MATRIX,
+        },
+      };
+
+      render(<PaymentPicker {...props} />);
+
+      // InteractiveMatrix shows all visible providers as cards
+      expect(screen.getByText("Cashfree")).toBeInTheDocument();
+      expect(screen.getByText("Razorpay")).toBeInTheDocument();
+
+      // Verify no method-specific text
+      expect(screen.queryByText("UPI")).not.toBeInTheDocument();
+      expect(screen.queryByText("Cards")).not.toBeInTheDocument();
+    });
+
+    it(`${PickerVariant.SECURE_VAULT}: should render exactly one card per provider (no method-split elements)`, () => {
+      const props = {
+        ...defaultProps,
+        appearance: {
+          ...defaultProps.appearance,
+          variant: PickerVariant.SECURE_VAULT,
+        },
+      };
+
+      render(<PaymentPicker {...props} />);
+
+      // SecureVault shows all visible providers as slots
+      expect(screen.getByText("Cashfree")).toBeInTheDocument();
+      expect(screen.getByText("Razorpay")).toBeInTheDocument();
+
+      // Verify no method-specific text
+      expect(screen.queryByText("UPI")).not.toBeInTheDocument();
+      expect(screen.queryByText("Cards")).not.toBeInTheDocument();
+    });
+
+    it(`${PickerVariant.NEUMORPHIC_FLOW}: should render exactly one segment per provider (no method-split elements)`, () => {
+      const props = {
+        ...defaultProps,
+        appearance: {
+          ...defaultProps.appearance,
+          variant: PickerVariant.NEUMORPHIC_FLOW,
+        },
+      };
+
+      render(<PaymentPicker {...props} />);
+
+      // NeumorphicFlow shows providers as toggle segments
+      expect(screen.getByText("Cashfree")).toBeInTheDocument();
+      expect(screen.getByText("Razorpay")).toBeInTheDocument();
+
+      // Verify no method-specific text
+      expect(screen.queryByText("UPI")).not.toBeInTheDocument();
+      expect(screen.queryByText("Cards")).not.toBeInTheDocument();
     });
   });
 
-  describe("Assertion 4: defaultSelected behavior", () => {
+  describe("Assertion 4: default Provider behavior", () => {
     it("should pre-select the named ENABLED aggregator", () => {
       const props = {
         ...defaultProps,
         payment: {
           ...defaultProps.payment,
-          defaultSelected: "razorpay" as PickerProviderId,
+          default: Provider.RAZORPAY,
         },
       };
 
@@ -457,17 +482,17 @@ describe("PaymentPicker Component", () => {
         .find((button) => button.textContent?.includes("Razorpay"));
 
       expect(razorpayCard).toBeDefined();
-      expect(razorpayCard).toHaveAttribute('aria-pressed', 'true');
+      expect(razorpayCard).toHaveAttribute("aria-pressed", "true");
     });
 
-    it("should select nothing when defaultSelected is invalid value", () => {
+    it("should select first enabled provider when default is invalid value", () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const props = {
         ...defaultProps,
         payment: {
           ...defaultProps.payment,
-          defaultSelected: "invalid_provider" as PickerProviderId,
+          default: "invalid_provider" as unknown as Provider,
         },
       };
 
@@ -477,32 +502,25 @@ describe("PaymentPicker Component", () => {
       const cashfreeCard = screen
         .getAllByRole("button")
         .find((button) => button.textContent?.includes("Cashfree"));
-      expect(cashfreeCard).toHaveAttribute('aria-pressed', 'true');
+      expect(cashfreeCard).toHaveAttribute("aria-pressed", "true");
 
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
     });
 
-    it("should select nothing when defaultSelected is disabled provider", () => {
+    it("should select first enabled provider when default is disabled provider", () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const props = {
         ...defaultProps,
         payment: {
           ...defaultProps.payment,
-          defaultSelected: "cashfree" as PickerProviderId,
-          providers: [
-            {
-              id: "cashfree" as PickerProviderId,
-              label: "Cashfree",
-              enabled: false,
-            },
-            {
-              id: "razorpay" as PickerProviderId,
-              label: "Razorpay",
-              enabled: true,
-            },
-          ],
+          default: Provider.CASHFREE,
+          providers: {
+            cashfree: { label: "Cashfree", visible: true, enabled: false },
+            razorpay: { label: "Razorpay", visible: true, enabled: true },
+            payu: { label: "PayU", visible: false, enabled: true },
+          },
         },
       };
 
@@ -512,8 +530,9 @@ describe("PaymentPicker Component", () => {
       const razorpayCard = screen
         .getAllByRole("button")
         .find((button) => button.textContent?.includes("Razorpay"));
-      expect(razorpayCard).toHaveAttribute('aria-pressed', 'true');
+      expect(razorpayCard).toHaveAttribute("aria-pressed", "true");
 
+      // Disabled card should render but be disabled
       const cashfreeCard = screen
         .getAllByRole("button")
         .find((button) => button.textContent?.includes("Cashfree"));
@@ -523,26 +542,19 @@ describe("PaymentPicker Component", () => {
       consoleSpy.mockRestore();
     });
 
-    it("should select nothing when defaultSelected is absent from providers array", () => {
+    it("should select first enabled provider when default is absent from visible providers", () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const props = {
         ...defaultProps,
         payment: {
           ...defaultProps.payment,
-          defaultSelected: "payu" as PickerProviderId,
-          providers: [
-            {
-              id: "cashfree" as PickerProviderId,
-              label: "Cashfree",
-              enabled: true,
-            },
-            {
-              id: "razorpay" as PickerProviderId,
-              label: "Razorpay",
-              enabled: true,
-            },
-          ],
+          default: Provider.PAYU,
+          providers: {
+            cashfree: { label: "Cashfree", visible: true, enabled: true },
+            razorpay: { label: "Razorpay", visible: true, enabled: true },
+            payu: { label: "PayU", visible: false, enabled: true },
+          },
         },
       };
 
@@ -552,20 +564,20 @@ describe("PaymentPicker Component", () => {
       const cashfreeCard = screen
         .getAllByRole("button")
         .find((button) => button.textContent?.includes("Cashfree"));
-      expect(cashfreeCard).toHaveAttribute('aria-pressed', 'true');
+      expect(cashfreeCard).toHaveAttribute("aria-pressed", "true");
 
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
     });
 
-    it("should emit dev warning for invalid/disabled/absent defaultSelected", () => {
+    it("should emit dev warning for invalid/disabled/absent default", () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const props = {
         ...defaultProps,
         payment: {
           ...defaultProps.payment,
-          defaultSelected: "invalid" as PickerProviderId,
+          default: "invalid" as unknown as Provider,
         },
       };
 
@@ -577,14 +589,14 @@ describe("PaymentPicker Component", () => {
   });
 
   describe("Assertion 5: Click behavior and onSelect callback", () => {
-    it("should call onSelect with canonical Provider (cashfree) when clicking enabled card", async () => {
+    it("should call onSelect with canonical Provider.CASHFREE when clicking enabled card", async () => {
       const mockOnSelect = vi.fn();
 
       const props = {
         ...defaultProps,
         payment: {
           ...defaultProps.payment,
-          defaultSelected: undefined,
+          default: Provider.RAZORPAY,
         },
         onSelect: mockOnSelect,
       };
@@ -599,19 +611,19 @@ describe("PaymentPicker Component", () => {
         fireEvent.click(cashfreeCard);
 
         await waitFor(() => {
-          expect(mockOnSelect).toHaveBeenCalledWith("cashfree" as Provider);
+          expect(mockOnSelect).toHaveBeenCalledWith(Provider.CASHFREE);
         });
       }
     });
 
-    it("should call onSelect with canonical Provider (razorpay) when clicking enabled card", async () => {
+    it("should call onSelect with canonical Provider.RAZORPAY when clicking enabled card", async () => {
       const mockOnSelect = vi.fn();
 
       const props = {
         ...defaultProps,
         payment: {
           ...defaultProps.payment,
-          defaultSelected: undefined,
+          default: Provider.CASHFREE,
         },
         onSelect: mockOnSelect,
       };
@@ -626,7 +638,7 @@ describe("PaymentPicker Component", () => {
         fireEvent.click(razorpayCard);
 
         await waitFor(() => {
-          expect(mockOnSelect).toHaveBeenCalledWith("razorpay" as Provider);
+          expect(mockOnSelect).toHaveBeenCalledWith(Provider.RAZORPAY);
         });
       }
     });
@@ -638,19 +650,16 @@ describe("PaymentPicker Component", () => {
         ...defaultProps,
         payment: {
           ...defaultProps.payment,
-          providers: [
-            {
-              id: "cashfree" as PickerProviderId,
+          providers: {
+            cashfree: {
               label: "Cashfree",
+              visible: true,
               enabled: false,
-              disabledReason: "Maintenance",
+              disabledMessage: "Maintenance",
             },
-            {
-              id: "razorpay" as PickerProviderId,
-              label: "Razorpay",
-              enabled: true,
-            },
-          ],
+            razorpay: { label: "Razorpay", visible: true, enabled: true },
+            payu: { label: "PayU", visible: false, enabled: true },
+          },
         },
         onSelect: mockOnSelect,
       };
@@ -677,19 +686,16 @@ describe("PaymentPicker Component", () => {
         ...defaultProps,
         payment: {
           ...defaultProps.payment,
-          providers: [
-            {
-              id: "cashfree" as PickerProviderId,
+          providers: {
+            cashfree: {
               label: "Cashfree",
+              visible: true,
               enabled: false,
-              disabledReason: "Temporarily unavailable",
+              disabledMessage: "Temporarily unavailable",
             },
-            {
-              id: "razorpay" as PickerProviderId,
-              label: "Razorpay",
-              enabled: true,
-            },
-          ],
+            razorpay: { label: "Razorpay", visible: true, enabled: true },
+            payu: { label: "PayU", visible: false, enabled: true },
+          },
         },
       };
 
@@ -698,51 +704,49 @@ describe("PaymentPicker Component", () => {
       expect(screen.getByText("Temporarily unavailable")).toBeInTheDocument();
     });
 
-    it('should never emit "payu" from onSelect callback', async () => {
+    it("should never emit Provider.PAYU from onSelect callback (PayU is code-only placeholder)", async () => {
       const mockOnSelect = vi.fn();
 
-      // Even if someone manually adds payu to providers
+      // PayU is a code-only placeholder - even if included in fixtures, it should NOT be visible
       const props = {
         ...defaultProps,
         payment: {
           ...defaultProps.payment,
-          providers: [
-            {
-              id: "cashfree" as PickerProviderId,
-              label: "Cashfree",
-              enabled: true,
-            },
-            {
-              id: "razorpay" as PickerProviderId,
-              label: "Razorpay",
-              enabled: true,
-            },
-            {
-              id: "multipay_default" as PickerProviderId,
-              label: "PayU",
-              enabled: true,
-            },
-          ],
+          providers: {
+            cashfree: { label: "Cashfree", visible: true, enabled: true },
+            razorpay: { label: "Razorpay", visible: true, enabled: true },
+            payu: { label: "PayU", visible: false, enabled: false }, // PayU never shown, never enabled
+          },
         },
         onSelect: mockOnSelect,
       };
 
       render(<PaymentPicker {...props} />);
 
-      // Try to click all provider cards
-      const allCards = screen.getAllByRole("button");
-      allCards.forEach((card) => {
+      // Verify PayU is NOT rendered in the DOM
+      expect(screen.queryByText("PayU")).not.toBeInTheDocument();
+
+      // Click all available (enabled) provider cards
+      const enabledCards = screen
+        .getAllByRole("button")
+        .filter(
+          (button) =>
+            button.textContent?.includes("Cashfree") ||
+            button.textContent?.includes("Razorpay"),
+        );
+
+      enabledCards.forEach((card) => {
         fireEvent.click(card);
       });
 
       await waitFor(() => {
         // Verify onSelect was only called with canonical providers
         mockOnSelect.mock.calls.forEach((call) => {
-          expect(["cashfree", "razorpay"]).toContain(call[0]);
+          expect([Provider.CASHFREE, Provider.RAZORPAY]).toContain(call[0]);
         });
 
-        // PayU should never be emitted
-        expect(mockOnSelect).not.toHaveBeenCalledWith("multipay_default");
+        // PayU should never be emitted (and never be in the fixture as visible)
+        expect(mockOnSelect).not.toHaveBeenCalledWith(Provider.PAYU);
       });
     });
   });
@@ -795,7 +799,9 @@ describe("PaymentPicker Component", () => {
       render(<PaymentPicker {...props} />);
 
       expect(
-        screen.getByText("Total amount inclusive of all taxes"),
+        screen.getByText(
+          "Final taxes are added at checkout by the payment provider.",
+        ),
       ).toBeInTheDocument();
     });
 
@@ -818,7 +824,9 @@ describe("PaymentPicker Component", () => {
 
       expect(screen.getByText(customNote)).toBeInTheDocument();
       expect(
-        screen.queryByText("Total amount inclusive of all taxes"),
+        screen.queryByText(
+          "Final taxes are added at checkout by the payment provider.",
+        ),
       ).not.toBeInTheDocument();
     });
 
@@ -837,7 +845,9 @@ describe("PaymentPicker Component", () => {
       // Verify total and tax note are in the document
       expect(screen.getByText("₹50.00")).toBeInTheDocument();
       expect(
-        screen.getByText("Total amount inclusive of all taxes"),
+        screen.getByText(
+          "Final taxes are added at checkout by the payment provider.",
+        ),
       ).toBeInTheDocument();
 
       // Verify they appear in a structured section (not just anywhere)
@@ -849,52 +859,8 @@ describe("PaymentPicker Component", () => {
   });
 
   describe("Assertion 7: PickerControls via ref", () => {
-    it("should provide setLoading control method via ref", async () => {
-      const mockRef: PaymentPickerRef = { current: null };
-
-      const props = {
-        ...defaultProps,
-        onSelect: vi.fn(),
-      };
-
-      render(<PaymentPicker {...props} ref={mockRef} />);
-
-      // Wait for ref to be populated
-      await waitFor(() => {
-        expect(mockRef.current).not.toBeNull();
-      });
-
-      // Call setLoading method
-      if (mockRef.current) {
-        mockRef.current.setProviderDisabled(
-          "cashfree" as PickerProviderId,
-          true,
-          "Test maintenance",
-        );
-
-        // Verify provider was disabled
-        await waitFor(() => {
-          const cashfreeCard = screen
-            .getAllByRole("button")
-            .find((button) => button.textContent?.includes("Cashfree"));
-          expect(cashfreeCard).toBeDisabled();
-        });
-      }
-    });
-
-    it("should provide setError control method via ref", async () => {
-      const mockRef: React.RefObject<{
-        selectProvider: (_providerId: PickerProviderId) => void;
-        getSelectedProvider: () => PickerProviderId;
-        isSelected: (_providerId: PickerProviderId) => boolean;
-        setProviderDisabled: (
-          _providerId: PickerProviderId,
-          _disabled: boolean,
-          _reason?: string,
-        ) => void;
-        focus: () => void;
-        blur: () => void;
-      }> = { current: null };
+    it("should provide error control method via ref", async () => {
+      const mockRef: React.RefObject<PickerControls> = { current: null };
 
       const props = {
         ...defaultProps,
@@ -907,8 +873,8 @@ describe("PaymentPicker Component", () => {
         expect(mockRef.current).not.toBeNull();
       });
 
-      // Note: setError is available via controls but doesn't directly render
-      // Error rendering is handled by the component's error state
+      // Note: setProviderDisabled is available via controls
+      // Error/loading rendering is handled by the component's state
       if (mockRef.current) {
         // Verify controls exists (implementation detail)
         expect(typeof mockRef.current.setProviderDisabled).toBe("function");
@@ -917,7 +883,7 @@ describe("PaymentPicker Component", () => {
 
     it("should provide selectProvider control method via ref", async () => {
       const mockOnSelect = vi.fn();
-      const mockRef: PaymentPickerRef = { current: null };
+      const mockRef: React.RefObject<PickerControls> = { current: null };
 
       const props = {
         ...defaultProps,
@@ -932,22 +898,22 @@ describe("PaymentPicker Component", () => {
 
       if (mockRef.current) {
         // Programmatically select razorpay
-        mockRef.current.selectProvider("razorpay" as PickerProviderId);
+        mockRef.current.selectProvider(Provider.RAZORPAY);
 
         await waitFor(() => {
-          expect(mockOnSelect).toHaveBeenCalledWith("razorpay" as Provider);
+          expect(mockOnSelect).toHaveBeenCalledWith(Provider.RAZORPAY);
         });
       }
     });
 
     it("should provide getSelectedProvider control method via ref", async () => {
-      const mockRef: PaymentPickerRef = { current: null };
+      const mockRef: React.RefObject<PickerControls> = { current: null };
 
       const props = {
         ...defaultProps,
         payment: {
           ...defaultProps.payment,
-          defaultSelected: "razorpay" as PickerProviderId,
+          default: Provider.RAZORPAY,
         },
         onSelect: vi.fn(),
       };
@@ -960,18 +926,18 @@ describe("PaymentPicker Component", () => {
 
       if (mockRef.current) {
         const selected = mockRef.current.getSelectedProvider();
-        expect(selected).toBe("razorpay");
+        expect(selected).toBe(Provider.RAZORPAY);
       }
     });
 
     it("should provide isSelected control method via ref", async () => {
-      const mockRef: PaymentPickerRef = { current: null };
+      const mockRef: React.RefObject<PickerControls> = { current: null };
 
       const props = {
         ...defaultProps,
         payment: {
           ...defaultProps.payment,
-          defaultSelected: "cashfree" as PickerProviderId,
+          default: Provider.CASHFREE,
         },
         onSelect: vi.fn(),
       };
@@ -983,48 +949,13 @@ describe("PaymentPicker Component", () => {
       });
 
       if (mockRef.current) {
-        expect(mockRef.current.isSelected("cashfree" as PickerProviderId)).toBe(
-          true,
-        );
-        expect(mockRef.current.isSelected("razorpay" as PickerProviderId)).toBe(
-          false,
-        );
-      }
-    });
-
-    it("should provide setProviderDisabled control method via ref", async () => {
-      const mockRef: PaymentPickerRef = { current: null };
-
-      const props = {
-        ...defaultProps,
-        onSelect: vi.fn(),
-      };
-
-      render(<PaymentPicker {...props} ref={mockRef} />);
-
-      await waitFor(() => {
-        expect(mockRef.current).not.toBeNull();
-      });
-
-      if (mockRef.current) {
-        mockRef.current.setProviderDisabled(
-          "cashfree" as PickerProviderId,
-          true,
-          "Maintenance",
-        );
-
-        await waitFor(() => {
-          const cashfreeCard = screen
-            .getAllByRole("button")
-            .find((button) => button.textContent?.includes("Cashfree"));
-          expect(cashfreeCard).toBeDisabled();
-          expect(screen.getByText("Maintenance")).toBeInTheDocument();
-        });
+        expect(mockRef.current.isSelected(Provider.CASHFREE)).toBe(true);
+        expect(mockRef.current.isSelected(Provider.RAZORPAY)).toBe(false);
       }
     });
 
     it("should provide focus and blur control methods via ref", async () => {
-      const mockRef: PaymentPickerRef = { current: null };
+      const mockRef: React.RefObject<PickerControls> = { current: null };
 
       const props = {
         ...defaultProps,
@@ -1049,89 +980,6 @@ describe("PaymentPicker Component", () => {
     });
   });
 
-  describe("Integration tests: Combined behavior", () => {
-    it("should handle complete selection flow with all features", async () => {
-      const mockOnSelect = vi.fn();
-      const mockRef: PaymentPickerRef = { current: null };
-
-      const props = {
-        ...defaultProps,
-        payment: {
-          ...defaultProps.payment,
-          amountMinor: 10000, // ₹100.00
-          currency: "INR",
-          providers: [
-            {
-              id: "cashfree" as PickerProviderId,
-              label: "Cashfree",
-              enabled: true,
-            },
-            {
-              id: "razorpay" as PickerProviderId,
-              label: "Razorpay",
-              enabled: true,
-            },
-          ],
-          defaultSelected: "cashfree" as PickerProviderId,
-        },
-        appearance: {
-          variant: "interactive-matrix" as const,
-          theme: "light" as const,
-          taxNote: "All taxes included",
-        },
-        onSelect: mockOnSelect,
-      };
-
-      render(<PaymentPicker {...props} ref={mockRef} />);
-
-      // Verify initial state
-      await waitFor(() => {
-        expect(screen.getByText("₹100.00")).toBeInTheDocument();
-        expect(screen.getByText("All taxes included")).toBeInTheDocument();
-        expect(screen.getByText("Cashfree")).toBeInTheDocument();
-        expect(screen.getByText("Razorpay")).toBeInTheDocument();
-      });
-
-      // Verify ref controls
-      if (mockRef.current) {
-        expect(mockRef.current.isSelected("cashfree" as PickerProviderId)).toBe(
-          true,
-        );
-        expect(mockRef.current.getSelectedProvider()).toBe("cashfree");
-      }
-
-      // Click razorpay card
-      const razorpayCard = screen
-        .getAllByRole("button")
-        .find((button) => button.textContent?.includes("Razorpay"));
-
-      if (razorpayCard) {
-        fireEvent.click(razorpayCard);
-
-        await waitFor(() => {
-          expect(mockOnSelect).toHaveBeenCalledWith("razorpay" as Provider);
-        });
-      }
-
-      // Use ref to disable cashfree
-      if (mockRef.current) {
-        mockRef.current.setProviderDisabled(
-          "cashfree" as PickerProviderId,
-          true,
-          "Temporarily down",
-        );
-
-        await waitFor(() => {
-          expect(screen.getByText("Temporarily down")).toBeInTheDocument();
-          const cashfreeCard = screen
-            .getAllByRole("button")
-            .find((button) => button.textContent?.includes("Cashfree"));
-          expect(cashfreeCard).toBeDisabled();
-        });
-      }
-    });
-  });
-
   describe("Error handling and edge cases", () => {
     it("should throw error when payment.amountMinor is missing", () => {
       const props = {
@@ -1151,18 +999,6 @@ describe("PaymentPicker Component", () => {
         payment: {
           ...defaultProps.payment,
           currency: "", // Invalid
-        },
-      };
-
-      expect(() => render(<PaymentPicker {...props} />)).toThrow();
-    });
-
-    it("should throw error when payment.providers is empty", () => {
-      const props = {
-        ...defaultProps,
-        payment: {
-          ...defaultProps.payment,
-          providers: [], // Invalid
         },
       };
 

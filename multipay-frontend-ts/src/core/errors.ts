@@ -58,27 +58,27 @@ export class MultiPayError extends Error {
  */
 export enum ErrorCodes {
   // Initialization errors
-  // SCRIPT_LOAD_FAILED = "SCRIPT_LOAD_FAILED",  // Commented out - not currently used in library
-  // SCRIPT_ALREADY_LOADED = "SCRIPT_ALREADY_LOADED",  // Commented out - not currently used in library
-  // INITIALIZATION_FAILED = "INITIALIZATION_FAILED",  // Commented out - not currently used in library
+  SCRIPT_LOAD_FAILED = "SCRIPT_LOAD_FAILED",
+  SCRIPT_ALREADY_LOADED = "SCRIPT_ALREADY_LOADED",
+  INITIALIZATION_FAILED = "INITIALIZATION_FAILED",
   // Payment flow errors
-  // CHECKOUT_FAILED = "CHECKOUT_FAILED",  // Commented out - not currently used in library
-  // CHECKOUT_CANCELLED = "CHECKOUT_CANCELLED",  // Commented out - not currently used in library
-  // PAYMENT_FAILED = "PAYMENT_FAILED",  // Commented out - not currently used in library
-  // PAYMENT_PENDING = "PAYMENT_PENDING",  // Commented out - not currently used in library
+  CHECKOUT_FAILED = "CHECKOUT_FAILED",
+  CHECKOUT_CANCELLED = "CHECKOUT_CANCELLED",
+  PAYMENT_FAILED = "PAYMENT_FAILED",
+  PAYMENT_PENDING = "PAYMENT_PENDING",
   // Validation errors
-  // INVALID_PAYLOAD = "INVALID_PAYLOAD",  // Commented out - not currently used in library
-  // MISSING_REQUIRED_FIELD = "MISSING_REQUIRED_FIELD",  // Commented out - not currently used in library
-  // INVALID_PROVIDER = "INVALID_PROVIDER",  // Commented out - not currently used in library
+  INVALID_PAYLOAD = "INVALID_PAYLOAD",
+  MISSING_REQUIRED_FIELD = "MISSING_REQUIRED_FIELD",
+  INVALID_PROVIDER = "INVALID_PROVIDER",
   // Configuration errors
-  // INVALID_CONFIG = "INVALID_CONFIG",  // Commented out - not currently used in library
-  // MISSING_API_KEY = "MISSING_API_KEY",  // Commented out - not currently used in library
-  // INVALID_ENVIRONMENT = "INVALID_ENVIRONMENT",  // Commented out - not currently used in library
+  INVALID_CONFIG = "INVALID_CONFIG",
+  MISSING_API_KEY = "MISSING_API_KEY",
+  INVALID_ENVIRONMENT = "INVALID_ENVIRONMENT",
   // Network errors
-  // NETWORK_ERROR = "NETWORK_ERROR",  // Commented out - not currently used in library
-  // TIMEOUT = "TIMEOUT",  // Commented out - not currently used in library
+  NETWORK_ERROR = "NETWORK_ERROR",
+  TIMEOUT = "TIMEOUT",
   // Provider-specific errors
-  // PROVIDER_ERROR = "PROVIDER_ERROR",  // Commented out - not currently used in library
-  // CASHFREE_ERROR = "CASHFREE_ERROR",  // Commented out - not currently used in library
-  // RAZORPAY_ERROR = "RAZORPAY_ERROR",  // Commented out - not currently used in library
+  PROVIDER_ERROR = "PROVIDER_ERROR",
+  CASHFREE_ERROR = "CASHFREE_ERROR",
+  RAZORPAY_ERROR = "RAZORPAY_ERROR",
 }

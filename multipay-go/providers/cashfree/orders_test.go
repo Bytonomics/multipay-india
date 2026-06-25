@@ -1,10 +1,25 @@
 package cashfree
 
 import (
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
+
+	cf "github.com/cashfree/cashfree-pg/v6"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 )
+
+// cfRoundTripFunc implements http.RoundTripper for mocking HTTP calls
+type cfRoundTripFunc func(req *http.Request) (*http.Response, error)
+
+// RoundTrip implements http.RoundTripper interface
+func (f cfRoundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
 
 // TestBuildCashfreeCheckout tests the buildCashfreeCheckout helper function.
 // It verifies that the checkout payload is constructed correctly with:
@@ -72,5 +87,133 @@ func TestBuildCashfreeCheckout(t *testing.T) {
 				t.Error("SessionID should not be empty when provided")
 			}
 		})
+	}
+}
+
+func TestCreateOrder_PopulatesCheckout(t *testing.T) {
+	// Create mock HTTP client that intercepts Cashfree SDK calls
+	mockHTTPClient := &http.Client{
+		Transport: cfRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+			// Construct proper OrderEntity struct (strong typing, no maps)
+			mockOrder := &cf.OrderEntity{
+				CfOrderId:        new(string),
+				OrderId:          new(string),
+				OrderAmount:      new(float32),
+				OrderCurrency:    new(string),
+				OrderStatus:      new(string),
+				PaymentSessionId: new(string),
+				Entity:           new(string),
+				CreatedAt:        new(string),
+				OrderExpiryTime:  new(string),
+			}
+			*mockOrder.CfOrderId = "cf_order_123456"
+			*mockOrder.OrderId = "order_123"
+			*mockOrder.OrderAmount = 500.0
+			*mockOrder.OrderCurrency = "INR"
+			*mockOrder.OrderStatus = "ACTIVE"
+			*mockOrder.PaymentSessionId = "payment_session_abc123"
+			*mockOrder.Entity = "order"
+			*mockOrder.CreatedAt = "1719342000"
+			*mockOrder.OrderExpiryTime = "1719428400"
+
+			// Marshal to JSON
+			jsonData, err := json.Marshal(mockOrder)
+			if err != nil {
+				return nil, err
+			}
+
+			header := make(http.Header)
+			header.Set("Content-Type", "application/json")
+			return &http.Response{
+				Status:        "200 OK",
+				StatusCode:    200,
+				Proto:         "HTTP/1.1",
+				ProtoMajor:    1,
+				ProtoMinor:    1,
+				Header:        header,
+				Body:          io.NopCloser(strings.NewReader(string(jsonData))),
+				ContentLength: int64(len(jsonData)),
+			}, nil
+		}),
+	}
+
+	// Setup test config with mocked HTTP client
+	cfg := &Config{
+		ClientID:     "test_client_id",
+		ClientSecret: "test_client_secret",
+		Environment:  domain.EnvironmentSandbox,
+		AccountID:    "test_account",
+		HTTPClient:   mockHTTPClient,
+	}
+
+	// Create adapter
+	adapter, err := NewAdapter(cfg)
+	if err != nil {
+		t.Fatalf("failed to create adapter: %v", err)
+	}
+
+	// Setup test request
+	req := &domain.CreateOrderRequest{
+		OrderID:     "order_123",
+		AmountMinor: 50000,
+		Currency:    domain.Currency("INR"),
+		Customer: &domain.CustomerInfo{
+			CustomerID: "cust_123",
+			Email:      "test@example.com",
+			Phone:      "+919876543210",
+		},
+	}
+
+	// Call CreateOrder
+	order, err := adapter.CreateOrder(context.Background(), req)
+	if err != nil {
+		t.Fatalf("failed to create order: %v", err)
+	}
+
+	// Assert checkout is populated
+	if order.Checkout == nil {
+		t.Fatal("expected order.Checkout to be populated, got nil")
+	}
+
+	// Assert Provider is ProviderCashfree
+	if order.Checkout.Provider != domain.ProviderCashfree {
+		t.Errorf("expected Provider %s, got %s", domain.ProviderCashfree, order.Checkout.Provider)
+	}
+
+	// Assert Environment is UPPERCASE (SANDBOX)
+	if order.Checkout.Environment != domain.EnvironmentSandbox {
+		t.Errorf("expected Environment %s, got %s", domain.EnvironmentSandbox, order.Checkout.Environment)
+	}
+
+	// Assert SessionID is populated and matches order.SessionID (mapped from payment_session_id)
+	if order.Checkout.SessionID == "" {
+		t.Error("expected SessionID to be non-empty")
+	}
+	if order.Checkout.SessionID != order.SessionID {
+		t.Errorf("expected SessionID %s to match order.SessionID %s", order.Checkout.SessionID, order.SessionID)
+	}
+	if order.Checkout.SessionID != "payment_session_abc123" {
+		t.Errorf("expected SessionID %s, got %s", "payment_session_abc123", order.Checkout.SessionID)
+	}
+
+	// Assert Razorpay-only fields are empty
+	if order.Checkout.OrderID != "" {
+		t.Errorf("expected OrderID to be empty (Razorpay-only), got %s", order.Checkout.OrderID)
+	}
+
+	if order.Checkout.PublicKey != "" {
+		t.Errorf("expected PublicKey to be empty (Razorpay-only), got %s", order.Checkout.PublicKey)
+	}
+
+	if order.Checkout.CallbackURL != "" {
+		t.Errorf("expected CallbackURL to be empty (Razorpay-only), got %s", order.Checkout.CallbackURL)
+	}
+
+	if order.Checkout.AmountMinor != 0 {
+		t.Errorf("expected AmountMinor to be empty (Razorpay-only), got %d", order.Checkout.AmountMinor)
+	}
+
+	if order.Checkout.Currency != "" {
+		t.Errorf("expected Currency to be empty (Razorpay-only), got %s", order.Checkout.Currency)
 	}
 }

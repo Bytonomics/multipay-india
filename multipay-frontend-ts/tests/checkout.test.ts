@@ -5,15 +5,19 @@ import { MultiPayError } from "../src/core/errors";
 import type { CheckoutPayload } from "../src/core/types";
 import { Provider, Environment } from "../src/core/types";
 
+// Mock script-loader at module level before any imports use it
+vi.mock("../src/core/script-loader", () => ({
+  loadScript: vi.fn(() => Promise.resolve()),
+}));
+
 describe("MultiPay.checkout", () => {
   describe("validation before side effects", () => {
-    it("should throw validation error before any DOM operations for malformed Cashfree payload", () => {
+    it("should throw validation error before any DOM operations for malformed Cashfree payload", async () => {
       const mpay = new MultiPay();
       const malformedPayload = {
         provider: Provider.CASHFREE,
         order_id: "order_123",
         environment: Environment.PRODUCTION,
-        amount: 500,
         currency: "INR",
         // session_id is missing
       } as CheckoutPayload;
@@ -22,8 +26,10 @@ describe("MultiPay.checkout", () => {
       const createElementSpy = vi.spyOn(document, "createElement");
       const loadScriptSpy = vi.fn();
 
-      expect(() => mpay.checkout(malformedPayload)).toThrow(MultiPayError);
-      expect(() => mpay.checkout(malformedPayload)).toThrow(
+      await expect(mpay.checkout(malformedPayload)).rejects.toThrow(
+        MultiPayError,
+      );
+      await expect(mpay.checkout(malformedPayload)).rejects.toThrow(
         "session_id is required for Cashfree",
       );
 
@@ -34,10 +40,11 @@ describe("MultiPay.checkout", () => {
       createElementSpy.mockRestore();
     });
 
-    it("should throw validation error before any DOM operations for malformed Razorpay payload", () => {
+    it("should throw validation error before any DOM operations for malformed Razorpay payload", async () => {
       const mpay = new MultiPay();
       const malformedPayload = {
         provider: Provider.RAZORPAY,
+        key_id: "key_123",
         order_id: "order_123",
         amount_minor: 50000,
         currency: "INR",
@@ -48,8 +55,10 @@ describe("MultiPay.checkout", () => {
       // Mock DOM operations to ensure they are never called
       const createElementSpy = vi.spyOn(document, "createElement");
 
-      expect(() => mpay.checkout(malformedPayload)).toThrow(MultiPayError);
-      expect(() => mpay.checkout(malformedPayload)).toThrow(
+      await expect(mpay.checkout(malformedPayload)).rejects.toThrow(
+        MultiPayError,
+      );
+      await expect(mpay.checkout(malformedPayload)).rejects.toThrow(
         "public_key is required for Razorpay",
       );
 
@@ -59,14 +68,16 @@ describe("MultiPay.checkout", () => {
       createElementSpy.mockRestore();
     });
 
-    it("should throw validation error before script loading for invalid provider", () => {
+    it("should throw validation error before script loading for invalid provider", async () => {
       const mpay = new MultiPay();
       const malformedPayload = {
         provider: "stripe" as unknown as "stripe" | "cashfree" | "razorpay",
       } as CheckoutPayload;
 
-      expect(() => mpay.checkout(malformedPayload)).toThrow(MultiPayError);
-      expect(() => mpay.checkout(malformedPayload)).toThrow(
+      await expect(mpay.checkout(malformedPayload)).rejects.toThrow(
+        MultiPayError,
+      );
+      await expect(mpay.checkout(malformedPayload)).rejects.toThrow(
         'Provider "stripe" is not yet supported',
       );
     });
@@ -75,20 +86,14 @@ describe("MultiPay.checkout", () => {
   describe("Razorpay checkout flow", () => {
     let mockForm: HTMLFormElement;
     let mockBody: HTMLBodyElement;
-    let createElementOriginal: typeof document.createElement;
-    let appendChildOriginal: typeof Node.prototype.appendChild;
 
     beforeEach(() => {
-      // Store original methods
-      createElementOriginal = document.createElement;
-      appendChildOriginal = Node.prototype.appendChild;
-
-      // Mock document.body
+      // Mock document.body with appendChild mock
       mockBody = {
         appendChild: vi.fn(),
       } as unknown as HTMLBodyElement;
 
-      // Mock form element
+      // Mock form element with non-recursive appendChild
       mockForm = {
         method: "",
         action: "",
@@ -102,7 +107,16 @@ describe("MultiPay.checkout", () => {
           if (tagName === "form") {
             return mockForm as unknown as HTMLElement;
           }
-          return createElementOriginal(tagName);
+          // For other tags, throw or return a minimal mock
+          if (tagName === "input") {
+            return {
+              type: "",
+              name: "",
+              value: "",
+            } as unknown as HTMLElement;
+          }
+          // Return a minimal mock for any other tag
+          return {} as unknown as HTMLElement;
         },
       );
 
@@ -116,16 +130,14 @@ describe("MultiPay.checkout", () => {
     afterEach(() => {
       // Restore original methods
       vi.restoreAllMocks();
-      document.createElement = createElementOriginal;
-      Node.prototype.appendChild = appendChildOriginal;
     });
 
     it("should build form POST to initiate Razorpay provider-hosted checkout", async () => {
       const mpay = new MultiPay();
       const payload: CheckoutPayload = {
         provider: Provider.RAZORPAY,
+        key_id: "rzp_live_xxx",
         order_id: "order_RZP123",
-        key_id: "key_abc123",
         public_key: "rzp_live_xxx",
         callback_url: "https://api.smriti.ai/v1/payments/callback/razorpay",
         amount_minor: 50000,
@@ -152,8 +164,8 @@ describe("MultiPay.checkout", () => {
       const mpay = new MultiPay();
       const payload: CheckoutPayload = {
         provider: Provider.RAZORPAY,
+        key_id: "rzp_live_xxx",
         order_id: "order_RZP123",
-        key_id: "key_abc123",
         public_key: "rzp_live_xxx",
         callback_url: "https://api.smriti.ai/v1/payments/callback/razorpay",
         amount_minor: 50000,
@@ -164,24 +176,24 @@ describe("MultiPay.checkout", () => {
       const inputElements: HTMLInputElement[] = [];
       let inputCount = 0;
 
-      // Track createElement calls for input elements
-      vi.spyOn(document, "createElement").mockImplementation(
-        (tagName: string) => {
-          if (tagName === "form") {
-            return mockForm as unknown as HTMLElement;
-          } else if (tagName === "input") {
-            const mockInput = {
-              type: "",
-              name: "",
-              value: "",
-            } as unknown as HTMLInputElement;
-            inputElements.push(mockInput);
-            inputCount++;
-            return mockInput as unknown as HTMLElement;
-          }
-          return createElementOriginal(tagName);
-        },
-      );
+      // Override the createElement mock to track inputs
+      const createElementMock = vi.spyOn(document, "createElement");
+      createElementMock.mockImplementation((tagName: string) => {
+        if (tagName === "form") {
+          return mockForm as unknown as HTMLElement;
+        } else if (tagName === "input") {
+          const mockInput = {
+            type: "",
+            name: "",
+            value: "",
+          } as unknown as HTMLInputElement;
+          inputElements.push(mockInput);
+          inputCount++;
+          return mockInput as unknown as HTMLElement;
+        }
+        // Return a minimal mock for any other tag
+        return {} as unknown as HTMLElement;
+      });
 
       await mpay.checkout(payload);
 
@@ -212,36 +224,14 @@ describe("MultiPay.checkout", () => {
       const mpay = new MultiPay();
       const payload: CheckoutPayload = {
         provider: Provider.RAZORPAY,
+        key_id: "rzp_live_xxx",
         order_id: "order_RZP123",
-        key_id: "key_abc123",
         public_key: "rzp_live_xxx",
         callback_url: "https://api.smriti.ai/v1/payments/callback/razorpay",
         amount_minor: 50000,
         currency: "INR",
         environment: Environment.PRODUCTION,
       };
-
-      // Track createElement calls to capture amount input
-      vi.spyOn(document, "createElement").mockImplementation(
-        (tagName: string) => {
-          if (tagName === "form") {
-            return mockForm as unknown as HTMLElement;
-          } else if (tagName === "input") {
-            const mockInput = {
-              type: "",
-              name: "",
-              value: "",
-            } as unknown as HTMLInputElement;
-            if (mockInput.name === "amount") {
-              (mockInput as unknown as { value: string }).value = String(
-                payload.amount_minor,
-              );
-            }
-            return mockInput as unknown as HTMLElement;
-          }
-          return createElementOriginal(tagName);
-        },
-      );
 
       await mpay.checkout(payload);
 
@@ -286,14 +276,9 @@ describe("MultiPay.checkout", () => {
         order_id: "order_CF123",
         session_id: "session_abc123",
         environment: Environment.PRODUCTION,
-        amount: 50000,
         currency: "INR",
+        amount: 500,
       };
-
-      // Mock loadScript to avoid actual network request
-      vi.doMock("../src/core/script-loader", () => ({
-        loadScript: vi.fn(() => Promise.resolve()),
-      }));
 
       await mpay.checkout(payload);
 
@@ -316,8 +301,8 @@ describe("MultiPay.checkout", () => {
         order_id: "order_CF123",
         session_id: "session_abc123",
         environment: Environment.SANDBOX,
-        amount: 50000,
         currency: "INR",
+        amount: 500,
       };
 
       await mpay.checkout(payload);

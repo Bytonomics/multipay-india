@@ -103,19 +103,27 @@ func TestVerifySignature_EmptyBody(t *testing.T) {
 func TestParseEvent_OrderPaid(t *testing.T) {
 	now := time.Now()
 	eventTimeStr := now.Format(time.RFC3339)
-	payload := map[string]interface{}{
-		"event_id":   "evt_order_paid_123",
-		"type":       "ORDER.PAID",
-		"event_time": eventTimeStr,
-		"data": map[string]interface{}{
-			"order_id": "order_123",
-			"amount":   500.0,
-		},
+
+	// Create data payload with minimal fields for ORDER.PAID
+	dataPayload := map[string]interface{}{
+		"order_id": "order_123",
+		"amount":   500.0,
+	}
+	dataJSON, err := json.Marshal(dataPayload)
+	if err != nil {
+		t.Fatalf("failed to marshal data: %v", err)
 	}
 
-	body, err := json.Marshal(payload)
+	envelope := cfWebhookEnvelope{
+		EventID:   "evt_order_paid_123",
+		Type:      "ORDER.PAID",
+		EventTime: eventTimeStr,
+		Data:      dataJSON,
+	}
+
+	body, err := json.Marshal(envelope)
 	if err != nil {
-		t.Fatalf("failed to marshal payload: %v", err)
+		t.Fatalf("failed to marshal envelope: %v", err)
 	}
 
 	event, err := parseEvent(context.Background(), body, nil)
@@ -144,18 +152,26 @@ func TestParseEvent_OrderPaid(t *testing.T) {
 func TestParseEvent_PaymentAuthorized(t *testing.T) {
 	now := time.Now()
 	eventTimeStr := now.Format(time.RFC3339)
-	payload := map[string]interface{}{
-		"event_id":   "evt_payment_auth_123",
-		"type":       "PAYMENT.AUTHORIZED",
-		"event_time": eventTimeStr,
-		"data": map[string]interface{}{
-			"payment_id": "payment_123",
-		},
+
+	// Create data payload with payment_id
+	dataPayload := map[string]interface{}{
+		"payment_id": "payment_123",
+	}
+	dataJSON, err := json.Marshal(dataPayload)
+	if err != nil {
+		t.Fatalf("failed to marshal data: %v", err)
 	}
 
-	body, err := json.Marshal(payload)
+	envelope := cfWebhookEnvelope{
+		EventID:   "evt_payment_auth_123",
+		Type:      "PAYMENT.AUTHORIZED",
+		EventTime: eventTimeStr,
+		Data:      dataJSON,
+	}
+
+	body, err := json.Marshal(envelope)
 	if err != nil {
-		t.Fatalf("failed to marshal payload: %v", err)
+		t.Fatalf("failed to marshal envelope: %v", err)
 	}
 
 	event, err := parseEvent(context.Background(), body, nil)
@@ -172,17 +188,28 @@ func TestParseEvent_PaymentAuthorized(t *testing.T) {
 func TestParseEvent_RefundProcessed(t *testing.T) {
 	now := time.Now()
 	eventTimeStr := now.Format(time.RFC3339)
-	payload := map[string]interface{}{
-		"event_id":   "evt_refund_123",
-		"type":       "REFUND.PROCESSED",
-		"event_time": eventTimeStr,
-		"data": map[string]interface{}{
-			"refund_id": "refund_123",
-			"amount":    100.0,
-		},
+
+	// Create data payload with refund details
+	dataPayload := map[string]interface{}{
+		"refund_id": "refund_123",
+		"amount":    100.0,
+	}
+	dataJSON, err := json.Marshal(dataPayload)
+	if err != nil {
+		t.Fatalf("failed to marshal data: %v", err)
 	}
 
-	body, _ := json.Marshal(payload)
+	envelope := cfWebhookEnvelope{
+		EventID:   "evt_refund_123",
+		Type:      "REFUND.PROCESSED",
+		EventTime: eventTimeStr,
+		Data:      dataJSON,
+	}
+
+	body, err := json.Marshal(envelope)
+	if err != nil {
+		t.Fatalf("failed to marshal envelope: %v", err)
+	}
 
 	event, err := parseEvent(context.Background(), body, nil)
 	if err != nil {
@@ -197,14 +224,18 @@ func TestParseEvent_RefundProcessed(t *testing.T) {
 // TestParseEvent_UnsupportedEventType verifies that unsupported event types gracefully map to EventUnknown.
 func TestParseEvent_UnsupportedEventType(t *testing.T) {
 	eventTimeStr := time.Now().Format(time.RFC3339)
-	payload := map[string]interface{}{
-		"event_id":   "evt_unknown_123",
-		"type":       "UNKNOWN.EVENT",
-		"event_time": eventTimeStr,
-		"data":       map[string]interface{}{},
+
+	envelope := cfWebhookEnvelope{
+		EventID:   "evt_unknown_123",
+		Type:      "UNKNOWN.EVENT",
+		EventTime: eventTimeStr,
+		Data:      json.RawMessage("{}"),
 	}
 
-	body, _ := json.Marshal(payload) //nolint:not-an-error
+	body, err := json.Marshal(envelope)
+	if err != nil {
+		t.Fatalf("failed to marshal envelope: %v", err)
+	}
 
 	event, err := parseEvent(context.Background(), body, nil)
 	if err != nil {
@@ -240,14 +271,17 @@ func TestParseEvent_EmptyBody(t *testing.T) {
 
 // TestParseEvent_DefaultTimestamp verifies that missing timestamp defaults to current time.
 func TestParseEvent_DefaultTimestamp(t *testing.T) {
-	payload := map[string]interface{}{
-		"event_id":   "evt_123",
-		"type":       "ORDER.PAID",
-		"event_time": "",
-		"data":       map[string]interface{}{},
+	envelope := cfWebhookEnvelope{
+		EventID:   "evt_123",
+		Type:      "ORDER.PAID",
+		EventTime: "",
+		Data:      json.RawMessage("{}"),
 	}
 
-	body, _ := json.Marshal(payload) //nolint:not-an-error
+	body, err := json.Marshal(envelope)
+	if err != nil {
+		t.Fatalf("failed to marshal envelope: %v", err)
+	}
 
 	before := time.Now()
 	event, err := parseEvent(context.Background(), body, nil)
@@ -311,16 +345,27 @@ func TestAdapterParseEvent(t *testing.T) {
 
 	now := time.Now()
 	eventTimeStr := now.Format(time.RFC3339)
-	payload := map[string]interface{}{
-		"event_id":   "evt_123",
-		"type":       "ORDER.PAID",
-		"event_time": eventTimeStr,
-		"data": map[string]interface{}{
-			"order_id": "order_123",
-		},
+
+	// Create data payload with order_id
+	dataPayload := map[string]interface{}{
+		"order_id": "order_123",
+	}
+	dataJSON, err := json.Marshal(dataPayload)
+	if err != nil {
+		t.Fatalf("failed to marshal data: %v", err)
 	}
 
-	body, _ := json.Marshal(payload) //nolint:not-an-error
+	envelope := cfWebhookEnvelope{
+		EventID:   "evt_123",
+		Type:      "ORDER.PAID",
+		EventTime: eventTimeStr,
+		Data:      dataJSON,
+	}
+
+	body, err := json.Marshal(envelope)
+	if err != nil {
+		t.Fatalf("failed to marshal envelope: %v", err)
+	}
 
 	event, err := adapter.ParseEvent(context.Background(), body, nil)
 	if err != nil {
@@ -359,19 +404,27 @@ func BenchmarkVerifySignature(b *testing.B) {
 // BenchmarkParseEvent benchmarks the event parsing.
 func BenchmarkParseEvent(b *testing.B) {
 	eventTimeStr := time.Now().Format(time.RFC3339)
-	payload := map[string]interface{}{
-		"event_id":   "evt_123",
-		"type":       "ORDER.PAID",
-		"event_time": eventTimeStr,
-		"data": map[string]interface{}{
-			"order_id": "order_123",
-			"amount":   500.0,
-		},
+
+	// Create data payload with order details
+	dataPayload := map[string]interface{}{
+		"order_id": "order_123",
+		"amount":   500.0,
+	}
+	dataJSON, err := json.Marshal(dataPayload)
+	if err != nil {
+		b.Fatalf("failed to marshal data: %v", err)
 	}
 
-	body, err := json.Marshal(payload)
+	envelope := cfWebhookEnvelope{
+		EventID:   "evt_123",
+		Type:      "ORDER.PAID",
+		EventTime: eventTimeStr,
+		Data:      dataJSON,
+	}
+
+	body, err := json.Marshal(envelope)
 	if err != nil {
-		b.Fatalf("failed to marshal payload: %v", err)
+		b.Fatalf("failed to marshal envelope: %v", err)
 	}
 
 	b.ResetTimer()
@@ -398,17 +451,25 @@ func TestCashfreeParseEvent_DirectSubscriptionEvents(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			payload := map[string]interface{}{
-				"type":       tt.eventType,
-				"event_id":   "evt_1",
-				"event_time": "2024-01-01T00:00:00Z",
-				"data": map[string]interface{}{
-					"subscription_details": map[string]interface{}{
-						"subscription_id": "sub_1",
-					},
-				},
+			eventData := cfSubscriptionEventData{}
+			eventData.SubscriptionDetails.SubscriptionID = "sub_1"
+
+			dataJSON, err := json.Marshal(eventData)
+			if err != nil {
+				t.Fatalf("failed to marshal event data: %v", err)
 			}
-			body, _ := json.Marshal(payload) //nolint:not-an-error
+
+			envelope := cfWebhookEnvelope{
+				Type:      tt.eventType,
+				EventID:   "evt_1",
+				EventTime: "2024-01-01T00:00:00Z",
+				Data:      dataJSON,
+			}
+
+			body, err := json.Marshal(envelope)
+			if err != nil {
+				t.Fatalf("failed to marshal envelope: %v", err)
+			}
 
 			event, err := parseEvent(context.Background(), body, nil)
 			if err != nil {
@@ -432,19 +493,25 @@ func TestCashfreeParseEvent_DirectSubscriptionEvents(t *testing.T) {
 // TestCashfreeParseEvent_CardExpiry tests SUBSCRIPTION_CARD_EXPIRY_REMINDER with its different
 // payload nesting (subscription_status_webhook instead of direct data).
 func TestCashfreeParseEvent_CardExpiry(t *testing.T) {
-	payload := map[string]interface{}{
-		"type":       "SUBSCRIPTION_CARD_EXPIRY_REMINDER",
-		"event_id":   "evt_1",
-		"event_time": "2024-01-01T00:00:00Z",
-		"data": map[string]interface{}{
-			"subscription_status_webhook": map[string]interface{}{
-				"subscription_details": map[string]interface{}{
-					"subscription_id": "sub_2",
-				},
-			},
-		},
+	cardExpiryData := cfCardExpiryData{}
+	cardExpiryData.SubscriptionStatusWebhook.SubscriptionDetails.SubscriptionID = "sub_2"
+
+	dataJSON, err := json.Marshal(cardExpiryData)
+	if err != nil {
+		t.Fatalf("failed to marshal card expiry data: %v", err)
 	}
-	body, _ := json.Marshal(payload) //nolint:not-an-error
+
+	envelope := cfWebhookEnvelope{
+		Type:      "SUBSCRIPTION_CARD_EXPIRY_REMINDER",
+		EventID:   "evt_1",
+		EventTime: "2024-01-01T00:00:00Z",
+		Data:      dataJSON,
+	}
+
+	body, err := json.Marshal(envelope)
+	if err != nil {
+		t.Fatalf("failed to marshal envelope: %v", err)
+	}
 
 	event, err := parseEvent(context.Background(), body, nil)
 	if err != nil {
@@ -487,18 +554,26 @@ func TestCashfreeParseEvent_StatusChanged_AllStatuses(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			payload := map[string]interface{}{
-				"type":       "SUBSCRIPTION_STATUS_CHANGED",
-				"event_id":   "evt_1",
-				"event_time": "2024-01-01T00:00:00Z",
-				"data": map[string]interface{}{
-					"subscription_details": map[string]interface{}{
-						"subscription_id":     "sub_1",
-						"subscription_status": tt.cfStatus,
-					},
-				},
+			statusData := cfSubscriptionStatusChangedData{}
+			statusData.SubscriptionDetails.SubscriptionID = "sub_1"
+			statusData.SubscriptionDetails.SubscriptionStatus = tt.cfStatus
+
+			dataJSON, err := json.Marshal(statusData)
+			if err != nil {
+				t.Fatalf("failed to marshal status data: %v", err)
 			}
-			body, _ := json.Marshal(payload) //nolint:not-an-error
+
+			envelope := cfWebhookEnvelope{
+				Type:      "SUBSCRIPTION_STATUS_CHANGED",
+				EventID:   "evt_1",
+				EventTime: "2024-01-01T00:00:00Z",
+				Data:      dataJSON,
+			}
+
+			body, err := json.Marshal(envelope)
+			if err != nil {
+				t.Fatalf("failed to marshal envelope: %v", err)
+			}
 
 			event, err := parseEvent(context.Background(), body, nil)
 			if err != nil {
@@ -527,17 +602,25 @@ func TestCashfreeParseEvent_StatusChanged_AllStatuses(t *testing.T) {
 // TestCashfreeParseEvent_ActiveNoResumeLogic ensures ACTIVE status always maps to
 // EventSubActivated regardless of context (no previous_status logic).
 func TestCashfreeParseEvent_ActiveNoResumeLogic(t *testing.T) {
-	payload := map[string]interface{}{
-		"type":       "SUBSCRIPTION_STATUS_CHANGED",
-		"event_id":   "evt_1",
-		"event_time": "2024-01-01T00:00:00Z",
-		"data": map[string]interface{}{
-			"subscription_details": map[string]interface{}{
-				"subscription_status": "ACTIVE",
-			},
-		},
+	statusData := cfSubscriptionStatusChangedData{}
+	statusData.SubscriptionDetails.SubscriptionStatus = "ACTIVE"
+
+	dataJSON, err := json.Marshal(statusData)
+	if err != nil {
+		t.Fatalf("failed to marshal status data: %v", err)
 	}
-	body, _ := json.Marshal(payload) //nolint:not-an-error
+
+	envelope := cfWebhookEnvelope{
+		Type:      "SUBSCRIPTION_STATUS_CHANGED",
+		EventID:   "evt_1",
+		EventTime: "2024-01-01T00:00:00Z",
+		Data:      dataJSON,
+	}
+
+	body, err := json.Marshal(envelope)
+	if err != nil {
+		t.Fatalf("failed to marshal envelope: %v", err)
+	}
 
 	event, err := parseEvent(context.Background(), body, nil)
 	if err != nil {
@@ -569,12 +652,16 @@ func TestCashfreeParseEvent_DirectOrderAndRefundEvents(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			payload := map[string]interface{}{
-				"type":     tt.eventType,
-				"event_id": "e1",
-				"data":     map[string]interface{}{},
+			envelope := cfWebhookEnvelope{
+				Type:    tt.eventType,
+				EventID: "e1",
+				Data:    json.RawMessage("{}"),
 			}
-			body, _ := json.Marshal(payload) //nolint:not-an-error
+
+			body, err := json.Marshal(envelope)
+			if err != nil {
+				t.Fatalf("failed to marshal envelope: %v", err)
+			}
 
 			event, err := parseEvent(context.Background(), body, nil)
 			if err != nil {
@@ -593,12 +680,16 @@ func TestCashfreeParseEvent_DirectOrderAndRefundEvents(t *testing.T) {
 // TestCashfreeParseEvent_UnknownType tests that an unknown event type returns EventUnknown
 // without error.
 func TestCashfreeParseEvent_UnknownType(t *testing.T) {
-	payload := map[string]interface{}{
-		"type":     "SOME_FUTURE_EVENT_TYPE",
-		"event_id": "e1",
-		"data":     map[string]interface{}{},
+	envelope := cfWebhookEnvelope{
+		Type:    "SOME_FUTURE_EVENT_TYPE",
+		EventID: "e1",
+		Data:    json.RawMessage("{}"),
 	}
-	body, _ := json.Marshal(payload) //nolint:not-an-error
+
+	body, err := json.Marshal(envelope)
+	if err != nil {
+		t.Fatalf("failed to marshal envelope: %v", err)
+	}
 
 	event, err := parseEvent(context.Background(), body, nil)
 	if err != nil {
@@ -617,18 +708,26 @@ func TestCashfreeParseEvent_UnknownType(t *testing.T) {
 // HTTP handler (ServeHTTP) populates it with the full verbatim body; that is covered by the
 // routing-level TestWebhookHandler_RawPayloadAndHeadersPopulated.
 func TestCashfreeParseEvent_D11Fields(t *testing.T) {
-	payload := map[string]interface{}{
-		"type":       "SUBSCRIPTION_STATUS_CHANGED",
-		"event_id":   "evt_1",
-		"event_time": "2024-01-01T00:00:00Z",
-		"data": map[string]interface{}{
-			"subscription_details": map[string]interface{}{
-				"subscription_id":     "sub_1",
-				"subscription_status": "ACTIVE",
-			},
-		},
+	statusData := cfSubscriptionStatusChangedData{}
+	statusData.SubscriptionDetails.SubscriptionID = "sub_1"
+	statusData.SubscriptionDetails.SubscriptionStatus = "ACTIVE"
+
+	dataJSON, err := json.Marshal(statusData)
+	if err != nil {
+		t.Fatalf("failed to marshal status data: %v", err)
 	}
-	body, _ := json.Marshal(payload) //nolint:not-an-error
+
+	envelope := cfWebhookEnvelope{
+		Type:      "SUBSCRIPTION_STATUS_CHANGED",
+		EventID:   "evt_1",
+		EventTime: "2024-01-01T00:00:00Z",
+		Data:      dataJSON,
+	}
+
+	body, err := json.Marshal(envelope)
+	if err != nil {
+		t.Fatalf("failed to marshal envelope: %v", err)
+	}
 
 	event, err := parseEvent(context.Background(), body, nil)
 	if err != nil {

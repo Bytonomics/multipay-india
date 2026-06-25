@@ -4,6 +4,7 @@
 export enum Provider {
   CASHFREE = "cashfree",
   RAZORPAY = "razorpay",
+  PAYU = "payu",
 }
 
 /**
@@ -15,101 +16,84 @@ export enum Environment {
 }
 
 /**
- * Payment providers supported by MultiPay India (type alias for backward compatibility)
+ * Cashfree JS SDK mode configuration
  */
-export type ProviderType = `${Provider}`;
-
-/**
- * Environment configuration for payment providers (type alias for backward compatibility)
- */
-export type EnvironmentType = `${Environment}`;
-
-/**
- * Provider status for UI components
- */
-export type ProviderStatus = "available" | "loading" | "error" | "disabled";
-
-/**
- * Payment provider for UI components (alias for backward compatibility)
- */
-export type PaymentProvider = Provider;
-
-/**
- * Picker provider identifiers - maps to internal provider selection
- */
-export type PickerProviderId = Provider | "multipay_default";
+export enum CashfreeMode {
+  PRODUCTION = "production",
+  SANDBOX = "sandbox",
+}
 
 /**
  * Picker visual variants
  */
-export type PickerVariant =
-  | "dynamic-stack"
-  | "interactive-matrix"
-  | "secure-vault"
-  | "neumorphic-flow";
+export enum PickerVariant {
+  DYNAMIC_STACK = "dynamic-stack",
+  INTERACTIVE_MATRIX = "interactive-matrix",
+  SECURE_VAULT = "secure-vault",
+  NEUMORPHIC_FLOW = "neumorphic-flow",
+}
 
 /**
- * Picker theme options
+ * Picker theme selection (user input, can be auto)
  */
-export type PickerTheme = "light" | "dark" | "auto";
+export enum PickerTheme {
+  LIGHT = "light",
+  DARK = "dark",
+  AUTO = "auto",
+}
+
+/**
+ * Resolved theme (the actual applied data-theme value, never AUTO)
+ */
+export enum ResolvedTheme {
+  LIGHT = "light",
+  DARK = "dark",
+}
+
+/**
+ * Cashfree-specific checkout payload
+ */
+export interface CashfreeCheckoutPayload {
+  provider: Provider.CASHFREE;
+  order_id: string;
+  session_id: string;
+  environment: Environment;
+  amount: number;
+  currency: string;
+  customer_id?: string;
+  customer_phone?: string;
+  customer_email?: string;
+}
+
+/**
+ * Razorpay-specific checkout payload
+ */
+export interface RazorpayCheckoutPayload {
+  provider: Provider.RAZORPAY;
+  order_id: string;
+  key_id: string;
+  public_key: string;
+  amount_minor: number;
+  currency: string;
+  environment: Environment;
+  customer_id?: string;
+  customer_phone?: string;
+  customer_email?: string;
+  callback_url?: string;
+}
 
 /**
  * Checkout payload union type - supports multiple provider-specific formats
  */
-export type CheckoutPayload =
-  | {
-      provider: Provider.CASHFREE;
-      order_id: string;
-      session_id: string;
-      environment: Environment;
-      amount: number;
-      currency: string;
-      customer_id?: string;
-      customer_phone?: string;
-      customer_email?: string;
-      metadata?: Record<string, string>;
-    }
-  | {
-      provider: Provider.RAZORPAY;
-      order_id: string;
-      key_id: string;
-      public_key: string;
-      amount_minor: number;
-      currency: string;
-      environment: Environment;
-      customer_id?: string;
-      customer_phone?: string;
-      customer_email?: string;
-      callback_url?: string;
-      metadata?: Record<string, string>;
-    };
+export type CheckoutPayload = CashfreeCheckoutPayload | RazorpayCheckoutPayload;
 
 /**
- * Cashfree-specific checkout payload type
+ * Razorpay form fields for POST-based redirect
  */
-export type CashfreeCheckoutPayload = Extract<
-  CheckoutPayload,
-  { provider: Provider.CASHFREE }
->;
-
-/**
- * Razorpay-specific checkout payload type
- */
-export type RazorpayCheckoutPayload = Extract<
-  CheckoutPayload,
-  { provider: Provider.RAZORPAY }
->;
-
-/**
- * Payment data returned after successful checkout
- */
-export interface CheckoutResultData {
-  provider: Provider;
-  transaction_id: string;
+export interface RazorpayFormFields {
+  key_id: string;
   order_id: string;
-  amount: number;
+  amount: string;
   currency: string;
-  status: "success" | "failed" | "pending";
-  metadata?: Record<string, string>;
-  timestamp: string;
+  callback_url: string;
 }

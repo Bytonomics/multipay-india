@@ -1,62 +1,41 @@
 import React from "react";
-import type { ProviderOption, PickerProviderId } from "../types";
+import type { PickerVariantProps } from "../types";
 import { Provider } from "../../core/types";
 import styles from "./neumorphic-flow.module.css";
+import { ProviderSlot } from "../ProviderSlot";
 
-export interface NeumorphicFlowProps {
-  providers: ProviderOption[];
-  selected?: PickerProviderId;
-  onSelect: (_provider: PickerProviderId) => void;
-  loadingRecord?: Record<Provider, boolean>;
-  errorRecord?: Record<Provider, string | undefined>;
-  formattedTotal: string;
-  taxNote: string;
-}
-
-export const NeumorphicFlow: React.FC<NeumorphicFlowProps> = ({
-  providers,
+export const NeumorphicFlow: React.FC<PickerVariantProps> = ({
+  views,
   selected,
   onSelect,
-  loadingRecord = {} as Record<Provider, boolean>,
-  errorRecord = {} as Record<Provider, string | undefined>,
-  formattedTotal,
-  taxNote,
 }) => {
-  // Filter providers: only show aggregators (Cashfree, Razorpay)
-  const visibleProviders = providers.filter(
-    (p) => (p.id === Provider.CASHFREE || p.id === Provider.RAZORPAY) && p.enabled,
-  );
-
-  if (visibleProviders.length === 0) {
+  if (views.length === 0) {
     return null;
   }
 
-  // Default to first provider if none selected
-  const activeProvider = selected || visibleProviders[0].id;
-  const activeProviderKey = activeProvider as Provider;
-  const isLoading = loadingRecord[activeProviderKey] || false;
-  const hasError = !!errorRecord[activeProviderKey];
+  // Get the selected view
+  const selectedView = views.find((v) => v.id === selected);
+  const isLoading = selectedView?.state.loading || false;
+  const hasError = !!selectedView?.state.error;
 
-  const handleSelect = (providerId: PickerProviderId): void => {
+  const handleSelect = (providerId: Provider): void => {
     if (!isLoading) {
-      onSelect(providerId);
+      void onSelect(providerId);
     }
   };
 
   return (
     <div className={styles.neumorphicFlow} data-theme="light">
-      {/* Recessed Total Pill */}
-      <div className={styles.totalPill}>
-        <span className={styles.totalLabel}>Total</span>
-        <span className={styles.totalAmount}>{formattedTotal}</span>
-      </div>
-
       {/* One-Tap Pay Primary Action */}
       <button
         type="button"
         className={styles.payButton}
-        disabled={isLoading || hasError}
-        onClick={() => handleSelect(activeProvider)}
+        disabled={
+          selectedView
+            ? selectedView.state.loading || !!selectedView.state.error
+            : false
+        }
+        onClick={() => selected && handleSelect(selected)}
       >
         <span className={styles.payButtonText}>
           {isLoading ? "Processing..." : hasError ? "Retry" : "One-Tap  Pay"}
@@ -74,40 +53,42 @@ export const NeumorphicFlow: React.FC<NeumorphicFlowProps> = ({
       >
         <div className={styles.toggleLabel}>pay via</div>
         <div className={styles.toggleSegments}>
-          {visibleProviders.map((provider) => {
-            const providerId = provider.id;
-            const isSelected = providerId === activeProvider;
-            const isDisabled = !provider.enabled;
+          {views.map((view) => {
+            const isSelected = view.id === selected;
+            const isDisabled = !view.entry.enabled;
 
             return (
               <button
-                key={providerId}
+                key={view.id}
                 type="button"
                 className={`${styles.segment} ${isSelected ? styles.segmentActive : ""} ${isDisabled ? styles.segmentDisabled : ""}`}
                 disabled={isDisabled || isLoading}
-                onClick={() => handleSelect(providerId)}
+                onClick={() => handleSelect(view.id)}
                 role="radio"
                 aria-checked={isSelected}
                 aria-disabled={isDisabled}
                 tabIndex={isSelected ? 0 : -1}
               >
                 <span className={styles.segmentContent}>
-                  {provider.icon && (
+                  {view.entry.icon && (
                     <span className={styles.segmentIcon}>
-                      {provider.icon as React.ReactNode}
+                      {view.entry.icon}
                     </span>
                   )}
-                  <span className={styles.segmentLabel}>{provider.label}</span>
+                  <span className={styles.segmentLabel}>
+                    {view.entry.label}
+                  </span>
                 </span>
+
+                <ProviderSlot
+                  view={view}
+                  isDisabled={isDisabled}
+                  isSelected={isSelected}
+                />
               </button>
             );
           })}
         </div>
-      </div>
-
-      {/* Tax Disclaimer */}
-      <div className={styles.taxDisclaimer}>
-        {taxNote || "Final taxes added at checkout (vendor)"}
       </div>
     </div>
   );

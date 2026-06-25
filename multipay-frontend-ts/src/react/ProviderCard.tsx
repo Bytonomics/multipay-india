@@ -1,27 +1,24 @@
-import type { ProviderOption } from "./types";
+import type { PickerProviderView } from "./types";
 import { Provider } from "../core/types";
 import styles from "./styles/card.module.css";
 
 interface ProviderCardProps {
-  option: ProviderOption;
+  view: PickerProviderView;
   selected: boolean;
-  loading: boolean;
-  error?: string;
   onClick: () => void;
   onRetry?: () => void;
 }
 
 export function ProviderCard({
-  option,
+  view,
   selected,
-  loading,
-  error,
   onClick,
   onRetry,
 }: ProviderCardProps): JSX.Element {
-  const isDisabled = !option.enabled || loading;
-  const disabledMessage =
-    option.disabledReason || "This provider is currently unavailable";
+  const { id, entry, state } = view;
+  const loading = state.loading;
+  const error = state.error;
+  const isDisabled = !entry.enabled || loading;
 
   const handleClick = (): void => {
     if (!isDisabled && !loading) {
@@ -36,13 +33,13 @@ export function ProviderCard({
     }
   };
 
-  // Built-in SVG icons for providers when option.icon is not provided
+  // Built-in SVG icons for providers when entry.icon is not provided
   const renderIcon = (): JSX.Element | null => {
-    if (option.icon) {
-      return option.icon as JSX.Element;
+    if (entry.icon) {
+      return entry.icon as JSX.Element;
     }
 
-    switch (option.id) {
+    switch (id) {
       case Provider.CASHFREE:
         return (
           <svg
@@ -79,7 +76,7 @@ export function ProviderCard({
             />
           </svg>
         );
-      case "multipay_default":
+      case Provider.PAYU:
         return (
           <svg
             className={styles.providerIcon}
@@ -88,7 +85,7 @@ export function ProviderCard({
             xmlns="http://www.w3.org/2000/svg"
             aria-hidden="true"
           >
-            <rect width="24" height="24" rx="4" fill="#6366f1" />
+            <rect width="24" height="24" rx="4" fill="#2C3E50" />
             <path
               d="M12 8l4 4-4 4M8 12h8"
               stroke="white"
@@ -112,8 +109,8 @@ export function ProviderCard({
       tabIndex={isDisabled ? -1 : 0}
       aria-pressed={selected}
       aria-disabled={isDisabled}
-      aria-label={option.label}
-      aria-describedby={error ? `${styles.error}-${option.id}` : undefined}
+      aria-label={entry.label}
+      aria-describedby={error ? `${styles.error}-${id}` : undefined}
       onClick={!isDisabled ? handleClick : undefined}
       onKeyDown={!isDisabled ? handleKeyDown : undefined}
     >
@@ -121,15 +118,15 @@ export function ProviderCard({
       {!loading && !error && !isDisabled && (
         <>
           <div className={styles.iconContainer}>
-            {renderIcon()}
-            {option.recommended && (
+            {entry.icon || renderIcon()}
+            {entry.recommended && (
               <span className={styles.recommendedBadge}>Recommended</span>
             )}
           </div>
           <div className={styles.content}>
-            <div className={styles.label}>{option.label}</div>
-            {option.description && (
-              <div className={styles.description}>{option.description}</div>
+            <div className={styles.label}>{entry.label}</div>
+            {entry.description && (
+              <div className={styles.description}>{entry.description}</div>
             )}
           </div>
           {selected && (
@@ -157,13 +154,19 @@ export function ProviderCard({
       {/* DISABLED State */}
       {isDisabled && !loading && (
         <>
-          <div className={styles.iconContainer}>{renderIcon()}</div>
+          <div className={styles.iconContainer}>
+            {entry.icon || renderIcon()}
+          </div>
           <div className={styles.content}>
-            <div className={styles.label}>{option.label}</div>
-            {option.description && (
-              <div className={styles.description}>{option.description}</div>
+            <div className={styles.label}>{entry.label}</div>
+            {entry.description && (
+              <div className={styles.description}>{entry.description}</div>
             )}
-            <div className={styles.disabledMessage}>{disabledMessage}</div>
+            {entry.disabledMessage && (
+              <div className={styles.disabledMessage}>
+                {entry.disabledMessage}
+              </div>
+            )}
           </div>
         </>
       )}
@@ -171,12 +174,14 @@ export function ProviderCard({
       {/* LOADING State */}
       {loading && !error && (
         <>
-          <div className={styles.iconContainer}>{renderIcon()}</div>
+          <div className={styles.iconContainer}>
+            {entry.icon || renderIcon()}
+          </div>
           <div className={styles.content}>
-            <div className={styles.label}>{option.label}</div>
+            <div className={styles.label}>{entry.label}</div>
             <div className={styles.loadingText}>
               <span className={styles.spinner} aria-hidden="true" />
-              Redirecting to {option.label}...
+              Redirecting to {entry.label}...
             </div>
           </div>
         </>
@@ -185,11 +190,13 @@ export function ProviderCard({
       {/* ERROR State */}
       {error && !loading && (
         <>
-          <div className={styles.iconContainer}>{renderIcon()}</div>
+          <div className={styles.iconContainer}>
+            {entry.icon || renderIcon()}
+          </div>
           <div className={styles.content}>
-            <div className={styles.label}>{option.label}</div>
+            <div className={styles.label}>{entry.label}</div>
             <div
-              id={`${styles.error}-${option.id}`}
+              id={`${styles.error}-${id}`}
               className={styles.errorMessage}
               role="alert"
               aria-live="polite"
@@ -204,7 +211,7 @@ export function ProviderCard({
                   onRetry();
                 }}
                 type="button"
-                aria-label={`Retry ${option.label}`}
+                aria-label={`Retry ${entry.label}`}
               >
                 Retry
               </button>

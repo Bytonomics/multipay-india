@@ -162,10 +162,16 @@ func parseEvent(ctx context.Context, body []byte, headers map[string]string) (*d
 					event.ParseError = derr.Error()
 					event.Subscription = nil
 				} else {
-					event.Subscription = mapSubscriptionFromResponse(typed, entityData)
-					// Set RawVendorStatus for subscription events (D11)
-					if typed.Status != "" {
-						event.RawVendorStatus = typed.Status
+					rawJSON, merr := json.Marshal(typed)
+					if merr != nil {
+						event.ParseError = fmt.Sprintf("failed to marshal subscription: %v", merr)
+						event.Subscription = nil
+					} else {
+						event.Subscription = mapSubscriptionFromResponse(typed, rawJSON)
+						// Set RawVendorStatus for subscription events (D11)
+						if typed.Status != "" {
+							event.RawVendorStatus = typed.Status
+						}
 					}
 				}
 			}

@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/razorpay/razorpay-go"
 
@@ -32,6 +34,11 @@ type Config struct {
 
 	// AccountID is the unique account ID for webhook routing.
 	AccountID string
+
+	// HTTPClient is an optional HTTP client. If nil, the adapter builds a default
+	// client it owns. Callers may inject their own tuned client (timeouts, transport,
+	// proxies) or a mock client for testing.
+	HTTPClient *http.Client
 }
 
 // Adapter implements the ProviderAdapter interface for Razorpay.
@@ -71,6 +78,12 @@ func NewAdapter(cfg *Config) (*Adapter, error) {
 
 	// Create Razorpay client with key and secret
 	rzClient := razorpay.NewClient(cfg.Key, cfg.Secret)
+
+	httpClient := cfg.HTTPClient
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 30 * time.Second}
+	}
+	rzClient.HTTPClient = httpClient
 
 	adapter := &Adapter{
 		client: rzClient,

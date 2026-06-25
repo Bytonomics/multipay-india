@@ -2,6 +2,7 @@ package razorpay
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
@@ -38,8 +39,14 @@ func (a *Adapter) GetPayment(ctx context.Context, req *domain.GetPaymentRequest)
 		return nil, err
 	}
 
+	// D17: Marshal typed struct to bytes for mapper
+	rawJSON, err := json.Marshal(typed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payment response: %w", err)
+	}
+
 	// D17: Map typed struct to canonical domain type
-	return mapPaymentFromResponse(typed, rawMapResponse(responseMap)), nil
+	return mapPaymentFromResponse(typed, rawJSON), nil
 }
 
 // ListPayments retrieves all payments for an order.
@@ -74,10 +81,16 @@ func (a *Adapter) ListPayments(ctx context.Context, req *domain.ListPaymentsRequ
 		return nil, err
 	}
 
+	// D17: Marshal typed list to bytes for mapper
+	rawJSON, err := json.Marshal(typed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payments response: %w", err)
+	}
+
 	// D17: Map each typed payment response to canonical domain type
 	payments := make([]*domain.Payment, 0, len(typed.Items))
 	for i := range typed.Items {
-		payment := mapPaymentFromResponse(&typed.Items[i], rawMapResponse(paymentsData))
+		payment := mapPaymentFromResponse(&typed.Items[i], rawJSON)
 		payments = append(payments, payment)
 	}
 
@@ -112,6 +125,12 @@ func (a *Adapter) CapturePayment(ctx context.Context, req *domain.CapturePayment
 		return nil, err
 	}
 
+	// D17: Marshal typed struct to bytes for mapper
+	rawJSON, err := json.Marshal(typed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payment response: %w", err)
+	}
+
 	// D17: Map typed struct to canonical domain type
-	return mapPaymentFromResponse(typed, rawMapResponse(responseMap)), nil
+	return mapPaymentFromResponse(typed, rawJSON), nil
 }

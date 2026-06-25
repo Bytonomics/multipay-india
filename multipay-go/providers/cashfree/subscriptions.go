@@ -52,15 +52,20 @@ func createSubscription(ctx context.Context, adapter *Adapter, req *domain.Creat
 	}
 
 	// Call Cashfree SDK
-	cfSub, _, err := adapter.cfClient.SubsCreateSubscriptionWithContext(
+	cfSub, httpResp, err := adapter.cfClient.SubsCreateSubscriptionWithContext(
 		ctx,
 		cfReq,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
-		nil, // httpClient (uses default)
+		adapter.httpClient,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create subscription on cashfree: %w", domain.ErrProviderError)
+	}
+	if httpResp != nil && httpResp.Body != nil {
+		if closeErr := httpResp.Body.Close(); closeErr != nil {
+			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+		}
 	}
 
 	if cfSub == nil {
@@ -97,15 +102,20 @@ func getSubscription(ctx context.Context, adapter *Adapter, req *domain.GetSubsc
 	}
 
 	// Call Cashfree SDK
-	cfSub, _, err := adapter.cfClient.SubsFetchSubscriptionWithContext(
+	cfSub, httpResp, err := adapter.cfClient.SubsFetchSubscriptionWithContext(
 		ctx,
 		req.SubscriptionID,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
-		nil, // httpClient (uses default)
+		adapter.httpClient,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch subscription from cashfree: %w", domain.ErrProviderError)
+	}
+	if httpResp != nil && httpResp.Body != nil {
+		if closeErr := httpResp.Body.Close(); closeErr != nil {
+			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+		}
 	}
 
 	if cfSub == nil {
@@ -130,16 +140,21 @@ func cancelSubscription(ctx context.Context, adapter *Adapter, req *domain.Cance
 	}
 
 	// Call Cashfree SDK
-	cfSub, _, err := adapter.cfClient.SubsManageSubscriptionWithContext(
+	cfSub, httpResp, err := adapter.cfClient.SubsManageSubscriptionWithContext(
 		ctx,
 		req.SubscriptionID,
 		cfReq,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
-		nil, // httpClient (uses default)
+		adapter.httpClient,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to cancel subscription on cashfree: %w", domain.ErrProviderError)
+	}
+	if httpResp != nil && httpResp.Body != nil {
+		if closeErr := httpResp.Body.Close(); closeErr != nil {
+			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+		}
 	}
 
 	if cfSub == nil {
@@ -164,16 +179,21 @@ func pauseSubscription(ctx context.Context, adapter *Adapter, req *domain.PauseS
 	}
 
 	// Call Cashfree SDK
-	cfSub, _, err := adapter.cfClient.SubsManageSubscriptionWithContext(
+	cfSub, httpResp, err := adapter.cfClient.SubsManageSubscriptionWithContext(
 		ctx,
 		req.SubscriptionID,
 		cfReq,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
-		nil, // httpClient (uses default)
+		adapter.httpClient,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to pause subscription on cashfree: %w", domain.ErrProviderError)
+	}
+	if httpResp != nil && httpResp.Body != nil {
+		if closeErr := httpResp.Body.Close(); closeErr != nil {
+			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+		}
 	}
 
 	if cfSub == nil {
@@ -198,16 +218,21 @@ func resumeSubscription(ctx context.Context, adapter *Adapter, req *domain.Resum
 	}
 
 	// Call Cashfree SDK
-	cfSub, _, err := adapter.cfClient.SubsManageSubscriptionWithContext(
+	cfSub, httpResp, err := adapter.cfClient.SubsManageSubscriptionWithContext(
 		ctx,
 		req.SubscriptionID,
 		cfReq,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
-		nil, // httpClient (uses default)
+		adapter.httpClient,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resume subscription on cashfree: %w", domain.ErrProviderError)
+	}
+	if httpResp != nil && httpResp.Body != nil {
+		if closeErr := httpResp.Body.Close(); closeErr != nil {
+			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+		}
 	}
 
 	if cfSub == nil {
@@ -245,16 +270,21 @@ func changePlan(ctx context.Context, adapter *Adapter, req *domain.ChangePlanReq
 	}
 
 	// Call Cashfree SDK
-	cfSub, _, err := adapter.cfClient.SubsManageSubscriptionWithContext(
+	cfSub, httpResp, err := adapter.cfClient.SubsManageSubscriptionWithContext(
 		ctx,
 		req.SubscriptionID,
 		cfReq,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
-		nil, // httpClient (uses default)
+		adapter.httpClient,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to change plan on cashfree: %w", domain.ErrProviderError)
+	}
+	if httpResp != nil && httpResp.Body != nil {
+		if closeErr := httpResp.Body.Close(); closeErr != nil {
+			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+		}
 	}
 
 	if cfSub == nil {
@@ -274,15 +304,20 @@ func getSubscriptionPayments(ctx context.Context, adapter *Adapter, req *domain.
 	}
 
 	// Fetch subscription to get currency
-	subEntity, _, ferr := adapter.cfClient.SubsFetchSubscriptionWithContext(
+	subEntity, subHttpResp, ferr := adapter.cfClient.SubsFetchSubscriptionWithContext(
 		ctx,
 		req.SubscriptionID,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
-		nil, // httpClient (uses default)
+		adapter.httpClient,
 	)
 	if ferr != nil {
 		return nil, fmt.Errorf("failed to fetch subscription for currency: %w", ferr)
+	}
+	if subHttpResp != nil && subHttpResp.Body != nil {
+		if closeErr := subHttpResp.Body.Close(); closeErr != nil {
+			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+		}
 	}
 
 	// Resolve currency
@@ -295,15 +330,20 @@ func getSubscriptionPayments(ctx context.Context, adapter *Adapter, req *domain.
 	}
 
 	// Call Cashfree SDK
-	cfPayments, _, err := adapter.cfClient.SubsFetchSubscriptionPaymentsWithContext(
+	cfPayments, httpResp, err := adapter.cfClient.SubsFetchSubscriptionPaymentsWithContext(
 		ctx,
 		req.SubscriptionID,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
-		nil, // httpClient (uses default)
+		adapter.httpClient,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch subscription payments from cashfree: %w", domain.ErrProviderError)
+	}
+	if httpResp != nil && httpResp.Body != nil {
+		if closeErr := httpResp.Body.Close(); closeErr != nil {
+			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+		}
 	}
 
 	// Map each payment entity to canonical type

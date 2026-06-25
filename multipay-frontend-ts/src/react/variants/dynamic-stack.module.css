@@ -51,7 +51,7 @@
 }
 
 /* Dark theme overrides */
-.dynamicStack[data-theme='dark'] {
+[data-theme='dark'] .dynamicStack {
   color: var(--mpay-ds-text-primary-dark);
   background-color: var(--mpay-ds-bg-dark);
 }
@@ -69,7 +69,7 @@
   margin-bottom: 16px;
 }
 
-.primaryCard[data-theme='dark'] {
+[data-theme='dark'] .primaryCard {
   background: var(--mpay-ds-surface-elevated-dark);
   border-color: var(--mpay-ds-border-dark);
   box-shadow: var(--mpay-ds-shadow-dark);
@@ -81,7 +81,7 @@
   box-shadow: var(--mpay-ds-shadow-lg-light);
 }
 
-.primaryCard[data-theme='dark']:hover:not(:disabled) {
+[data-theme='dark'] .primaryCard:hover:not(:disabled) {
   border-color: var(--mpay-ds-primary-dark);
   box-shadow: var(--mpay-ds-shadow-lg-dark);
 }
@@ -92,7 +92,7 @@
   box-shadow: 0 0 0 4px var(--mpay-ds-glow-strong-light), var(--mpay-ds-shadow-lg-light);
 }
 
-.primaryCardSelected[data-theme='dark'] {
+[data-theme='dark'] .primaryCardSelected {
   border-color: var(--mpay-ds-primary-dark);
   background: linear-gradient(135deg, var(--mpay-ds-surface-elevated-dark) 0%, var(--mpay-ds-glow-dark) 100%);
   box-shadow: 0 0 0 4px var(--mpay-ds-glow-strong-dark), var(--mpay-ds-shadow-lg-dark);
@@ -122,7 +122,7 @@
   border: 1px solid var(--mpay-ds-border-subtle-light);
 }
 
-.iconWrapper[data-theme='dark'] {
+[data-theme='dark'] .iconWrapper {
   background: var(--mpay-ds-surface-dark);
   border-color: var(--mpay-ds-border-subtle-dark);
 }
@@ -140,7 +140,7 @@
   word-break: break-word;
 }
 
-.providerLabel[data-theme='dark'] {
+[data-theme='dark'] .providerLabel {
   color: var(--mpay-ds-text-primary-dark);
 }
 
@@ -152,7 +152,7 @@
   word-break: break-word;
 }
 
-.providerDescription[data-theme='dark'] {
+[data-theme='dark'] .providerDescription {
   color: var(--mpay-ds-text-secondary-dark);
 }
 
@@ -169,7 +169,7 @@
   margin-left: auto;
 }
 
-.recommendedBadge[data-theme='dark'] {
+[data-theme='dark'] .recommendedBadge {
   background: var(--mpay-ds-success-bg-dark);
   color: var(--mpay-ds-success-dark);
 }
@@ -181,45 +181,8 @@
   font-style: italic;
 }
 
-.disabledMessage[data-theme='dark'] {
+[data-theme='dark'] .disabledMessage {
   color: var(--mpay-ds-text-muted-dark);
-}
-
-.selectedDetails {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--mpay-ds-border-subtle-light);
-}
-
-.selectedDetails[data-theme='dark'] {
-  border-top-color: var(--mpay-ds-border-subtle-dark);
-}
-
-.successRate {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.successRateLabel {
-  font-size: 13px;
-  color: var(--mpay-ds-text-secondary-light);
-  font-weight: 500;
-}
-
-.successRateLabel[data-theme='dark'] {
-  color: var(--mpay-ds-text-secondary-dark);
-}
-
-.successRateValue {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--mpay-ds-success-light);
-}
-
-.successRateValue[data-theme='dark'] {
-  color: var(--mpay-ds-success-dark);
 }
 
 .pricingDetails {
@@ -234,7 +197,7 @@
   color: var(--mpay-ds-text-primary-light);
 }
 
-.totalAmount[data-theme='dark'] {
+[data-theme='dark'] .totalAmount {
   color: var(--mpay-ds-text-primary-dark);
 }
 
@@ -244,7 +207,7 @@
   line-height: 1.3;
 }
 
-.taxNote[data-theme='dark'] {
+[data-theme='dark'] .taxNote {
   color: var(--mpay-ds-text-muted-dark);
 }
 
@@ -271,7 +234,7 @@
   animation: pulse 2s ease-in-out infinite;
 }
 
-.glow[data-theme='dark'] {
+[data-theme='dark'] .glow {
   background: var(--mpay-ds-primary-dark);
 }
 
@@ -302,7 +265,7 @@
   box-shadow: 0 2px 8px rgba(14, 165, 233, 0.4);
 }
 
-.checkmark[data-theme='dark'] {
+[data-theme='dark'] .checkmark {
   background: var(--mpay-ds-primary-dark);
   box-shadow: 0 2px 8px rgba(56, 189, 248, 0.4);
 }
@@ -328,7 +291,7 @@
   transition: all 0.2s ease;
 }
 
-.accordionTrigger[data-theme='dark'] {
+[data-theme='dark'] .accordionTrigger {
   background: var(--mpay-ds-surface-dark);
   border-color: var(--mpay-ds-border-dark);
   color: var(--mpay-ds-text-primary-dark);
@@ -339,7 +302,7 @@
   border-color: var(--mpay-ds-primary-light);
 }
 
-.accordionTrigger[data-theme='dark']:hover {
+[data-theme='dark'] .accordionTrigger:hover {
   background: var(--mpay-ds-surface-elevated-dark);
   border-color: var(--mpay-ds-primary-dark);
 }
@@ -376,7 +339,7 @@
   box-shadow: var(--mpay-ds-shadow-light);
 }
 
-.alternativeCard[data-theme='dark'] {
+[data-theme='dark'] .alternativeCard {
   background: var(--mpay-ds-surface-elevated-dark);
   border-color: var(--mpay-ds-border-dark);
   box-shadow: var(--mpay-ds-shadow-dark);
@@ -387,7 +350,7 @@
   transform: translateY(-1px);
 }
 
-.alternativeCard[data-theme='dark']:hover:not(:disabled) {
+[data-theme='dark'] .alternativeCard:hover:not(:disabled) {
   border-color: var(--mpay-ds-primary-dark);
 }
 
@@ -396,7 +359,7 @@
   background: linear-gradient(135deg, var(--mpay-ds-surface-elevated-light) 0%, var(--mpay-ds-glow-light) 100%);
 }
 
-.alternativeCardSelected[data-theme='dark'] {
+[data-theme='dark'] .alternativeCardSelected {
   border-color: var(--mpay-ds-primary-dark);
   background: linear-gradient(135deg, var(--mpay-ds-surface-elevated-dark) 0%, var(--mpay-ds-glow-dark) 100%);
 }
@@ -448,7 +411,7 @@
   box-shadow: var(--mpay-ds-shadow-light);
 }
 
-.ctaButton[data-theme='dark'] {
+[data-theme='dark'] .ctaButton {
   background: var(--mpay-ds-primary-dark);
   box-shadow: var(--mpay-ds-shadow-dark);
 }
@@ -459,7 +422,7 @@
   box-shadow: var(--mpay-ds-shadow-lg-light);
 }
 
-.ctaButton[data-theme='dark']:hover:not(:disabled) {
+[data-theme='dark'] .ctaButton:hover:not(:disabled) {
   background: var(--mpay-ds-primary-hover-dark);
   box-shadow: var(--mpay-ds-shadow-lg-dark);
 }

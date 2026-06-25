@@ -5,6 +5,7 @@
 
 /**
  * Convert minor units to a localized currency string.
+ * Uses ISO 4217 exponent to determine the correct divisor.
  * @param amountMinor - Amount in minor units (paisa, cents, etc.)
  * @param currency - ISO 4217 currency code (e.g., 'INR', 'USD')
  * @param locale - BCP 47 language tag (default: 'en-IN')
@@ -15,7 +16,6 @@ export function formatMinor(
   currency: string,
   locale: string = "en-IN",
 ): string {
-  // Get the number of decimal places for this currency
   const formatter = new Intl.NumberFormat(locale, {
     style: "currency",
     currency: currency,
@@ -23,17 +23,21 @@ export function formatMinor(
     maximumFractionDigits: 2,
   });
 
-  // Convert minor units to major units and format
-  // Most currencies use 100 minor units = 1 major unit
-  // JPY uses 1:1, some Gulf currencies use 1000:1
-  // Intl.NumberFormat handles this automatically with the currency code
-  const amountMajor = amountMinor / 100;
+  // Get the ISO 4217 exponent (decimal places) for this currency
+  // exponent 0: 1 minor = 1 major (JPY, KRW, VND)
+  // exponent 2: 100 minor = 1 major (INR, USD, EUR, GBP)
+  // exponent 3: 1000 minor = 1 major (BHD, KWD, OMR)
+  const exponent: number =
+    formatter.resolvedOptions().maximumFractionDigits ?? 2;
+  const divisor: number = 10 ** exponent;
+  const amountMajor: number = amountMinor / divisor;
 
   return formatter.format(amountMajor);
 }
 
 /**
  * Format currency amount with custom precision.
+ * Uses ISO 4217 exponent to determine the correct divisor.
  * @param amountMinor - Amount in minor units
  * @param currency - ISO 4217 currency code
  * @param fractionDigits - Number of decimal places (default: 2)
@@ -53,6 +57,11 @@ export function formatMinorWithPrecision(
     maximumFractionDigits: fractionDigits,
   });
 
-  const amountMajor = amountMinor / 100;
+  // Get the ISO 4217 exponent (decimal places) for this currency
+  const exponent: number =
+    formatter.resolvedOptions().maximumFractionDigits ?? 2;
+  const divisor: number = 10 ** exponent;
+  const amountMajor: number = amountMinor / divisor;
+
   return formatter.format(amountMajor);
 }

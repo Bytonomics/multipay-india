@@ -6,6 +6,11 @@
 /**
  * Registry of in-flight script loading promises keyed by script URL
  * Prevents duplicate requests for the same script
+ *
+ * ALLOWED-EXCEPTION: This is the ONLY Map permitted in the library.
+ * A generic URL→promise memoization cache (unbounded keys) is correctly
+ * implemented as a Map. This pattern must NOT be copied elsewhere; use
+ * named-field interfaces for all other domain-keyed data.
  */
 const scriptRegistry = new Map<string, Promise<void>>();
 

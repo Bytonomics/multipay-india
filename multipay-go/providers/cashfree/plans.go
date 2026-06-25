@@ -38,15 +38,20 @@ func createPlan(ctx context.Context, a *Adapter, req *domain.CreatePlanRequest) 
 	}
 
 	// Call Cashfree SDK
-	cfPlan, _, err := a.cfClient.SubsCreatePlanWithContext(
+	cfPlan, httpResp, err := a.cfClient.SubsCreatePlanWithContext(
 		ctx,
 		cfReq,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
-		nil, // httpClient (uses default)
+		a.httpClient,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create plan: %w", err)
+	}
+	if httpResp != nil && httpResp.Body != nil {
+		if closeErr := httpResp.Body.Close(); closeErr != nil {
+			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+		}
 	}
 
 	if cfPlan == nil {
@@ -86,12 +91,12 @@ func getPlan(ctx context.Context, adapter *Adapter, req *domain.GetPlanRequest) 
 	}
 
 	// Call Cashfree SDK to fetch plan
-	cfPlan, _, err := adapter.cfClient.SubsFetchPlanWithContext(
+	cfPlan, httpResp, err := adapter.cfClient.SubsFetchPlanWithContext(
 		ctx,
 		req.PlanID,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
-		nil, // httpClient (uses default)
+		adapter.httpClient,
 	)
 	if err != nil {
 		// Check if error is 404 plan not found
@@ -99,6 +104,11 @@ func getPlan(ctx context.Context, adapter *Adapter, req *domain.GetPlanRequest) 
 			return nil, fmt.Errorf("plan %s not found: %w", req.PlanID, domain.ErrProviderError)
 		}
 		return nil, fmt.Errorf("failed to fetch plan from Cashfree: %w", err)
+	}
+	if httpResp != nil && httpResp.Body != nil {
+		if closeErr := httpResp.Body.Close(); closeErr != nil {
+			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+		}
 	}
 
 	if cfPlan == nil {

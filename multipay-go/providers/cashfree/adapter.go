@@ -3,6 +3,8 @@ package cashfree
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"time"
 
 	cf "github.com/cashfree/cashfree-pg/v6"
 
@@ -27,12 +29,17 @@ type Config struct {
 
 	// Environment specifies the Cashfree deployment environment (Sandbox or Production).
 	Environment domain.Environment
+
+	// HTTPClient is an optional HTTP client. If nil, the adapter builds a default
+	// client it owns. Callers may inject their own tuned client or a mock for testing.
+	HTTPClient *http.Client
 }
 
 // Adapter implements the ProviderAdapter interface for Cashfree payments.
 type Adapter struct {
-	config   *Config
-	cfClient *cf.Cashfree
+	config     *Config
+	cfClient   *cf.Cashfree
+	httpClient *http.Client
 }
 
 // Compile-time assertion that Adapter implements ProviderAdapter interface.
@@ -70,9 +77,15 @@ func NewAdapter(config *Config) (*Adapter, error) {
 		XEnableErrorAnalytics: new(bool), // disable Sentry side effects
 	}
 
+	httpClient := config.HTTPClient
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 30 * time.Second}
+	}
+
 	return &Adapter{
-		config:   config,
-		cfClient: cfClient,
+		config:     config,
+		cfClient:   cfClient,
+		httpClient: httpClient,
 	}, nil
 }
 

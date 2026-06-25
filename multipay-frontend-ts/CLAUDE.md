@@ -2,6 +2,63 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in the `multipay-frontend-ts` TypeScript library.
 
+---
+
+## ⚠️ MANDATORY Strong-Typing Compliance Checkpoints (NON-NEGOTIABLE)
+
+> Treat this TypeScript library as if it were **Go or Java**: every fixed value set is an enum, every
+> shape is a named interface, nothing is loosely typed, nothing is defined more than once. These
+> checkpoints are **authoritative** and **supersede any older example elsewhere in this file**. Code
+> review **rejects** any violation — there is no discount.
+
+**CP-1 — Enums for every fixed value set. Zero string-literal unions.**
+- BANNED: `type X = "a" | "b"`, inline `field: "a" | "b"`, `useState<"a" | "b">`, `param: "a" | "b"`, `x as "literal"`.
+- Every fixed set of string values is an `enum`, **defined once** in `src/core/types.ts`, imported everywhere.
+- Canonical enums (the only definitions; never re-declare or alias):
+  - `enum Provider { CASHFREE="cashfree", RAZORPAY="razorpay", PAYU="payu" }` — lowercase wire values (match Go).
+  - `enum Environment { SANDBOX="SANDBOX", PRODUCTION="PRODUCTION" }` — UPPERCASE (match Go).
+  - `enum PickerVariant { DYNAMIC_STACK="dynamic-stack", INTERACTIVE_MATRIX="interactive-matrix", SECURE_VAULT="secure-vault", NEUMORPHIC_FLOW="neumorphic-flow" }`
+  - `enum PickerTheme { LIGHT="light", DARK="dark", AUTO="auto" }` — appearance INPUT.
+  - `enum ResolvedTheme { LIGHT="light", DARK="dark" }` — the APPLIED `data-theme` + variant prop (never AUTO).
+  - `enum CashfreeMode { PRODUCTION="production", SANDBOX="sandbox" }` — Cashfree JS SDK boundary value.
+
+**CP-2 — No `Map`/`Record` for domain data. Named-field interfaces only.**
+- BANNED for any provider-/domain-keyed data: `Map<…>`, `Record<…>`, index signatures `{ [k: string]: T }`.
+- Provider-keyed data is a **fixed named-field interface** with one field per provider — never an indexed map:
+  - `interface ProviderEntry { label: string; visible: boolean; enabled: boolean; disabledMessage?: string; description?: string; icon?: ReactNode; recommended?: boolean }`
+  - `interface PickerProviders { cashfree: ProviderEntry; razorpay: ProviderEntry; payu: ProviderEntry }`
+  - `interface ProviderRuntimeState { loading: boolean; error?: string }`
+  - `interface PickerRuntimeState { cashfree: ProviderRuntimeState; razorpay: ProviderRuntimeState; payu: ProviderRuntimeState }`
+  - `interface RazorpayFormFields { key_id: string; order_id: string; amount: string; currency: string; callback_url: string }`
+- Adding a provider later = extend the enum + these interfaces (a compile-time, type-safe change). That is the intended cost.
+- **Arrays** are allowed ONLY as ordered render lists of a typed interface, e.g. `PickerProviderView[]` where
+  `interface PickerProviderView { id: Provider; entry: ProviderEntry; state: ProviderRuntimeState }`.
+- **SINGLE ALLOWED EXCEPTION:** `src/core/script-loader.ts` keeps `Map<string, Promise<void>>` — a generic
+  URL→promise memoization cache (genuinely unbounded keys; the Go/Java-idiomatic structure). It MUST carry an
+  in-code comment stating it is an explicitly-allowed exception and **must not** be copied as a pattern. No other
+  `Map`/`Record` is permitted anywhere.
+
+**CP-3 — No `any`; one typed boundary.** External/untyped data (browser globals, JSON from backend) is converted at
+exactly one explicit `as unknown as <Interface>` boundary. Never `any`, never scattered casts.
+
+**CP-4 — Define once, reuse everywhere.** No duplicate type aliases, no per-component re-declared prop interfaces.
+All four variants and `PaymentPicker` consume the **one** shared `interface PickerVariantProps`
+(`{ providers: PickerProviders; runtime: PickerRuntimeState; selected: Provider; onSelect: (p: Provider) => void; theme: ResolvedTheme; formattedTotal: string; taxNote: string }`).
+
+**CP-5 — PayU is a first-class `Provider`.** No placeholder enum, no `PickerProviderId`, no `"multipay_default"`.
+It is hidden/disabled **only** via props (`ProviderEntry.visible` / `enabled`); default is visible + enabled. The
+"coming soon"/disabled text is **data-driven** via `ProviderEntry.disabledMessage` — never hardcoded in a component.
+(Checkout/payment for PayU is added later by appending a `Provider.PAYU` member to the `CheckoutPayload` union + a
+`payu.ts` redirect — zero picker changes.)
+
+**CP-6 — Pre-selection is `PaymentData.default: Provider`** (a canonical enum value), not a loose string.
+
+**CP-7 — Deleted (must not reappear):** `PickerProviderId`, `ProviderType`, `EnvironmentType`, `PaymentProvider`,
+`ProviderStatus`, `CheckoutResultData`, `"multipay_default"`, the `ProviderOption[]` array model, and all
+`loadingRecord`/`errorRecord` `Record`/`Map` shapes.
+
+---
+
 ## What This Project Is
 
 `multipay-frontend-ts` is a TypeScript/React npm library that provides two independent features:

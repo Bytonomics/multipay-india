@@ -2,6 +2,7 @@ package razorpay
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -58,7 +59,12 @@ func createPlan(ctx context.Context, a *Adapter, req *domain.CreatePlanRequest) 
 		return nil, err
 	}
 
-	return mapPlanFromResponse(typed, responseMap), nil
+	rawJSON, err := json.Marshal(typed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal plan response: %w", err)
+	}
+
+	return mapPlanFromResponse(typed, rawJSON), nil
 }
 
 // getPlan retrieves an existing plan from the Razorpay payment gateway.
@@ -87,5 +93,10 @@ func getPlan(ctx context.Context, a *Adapter, req *domain.GetPlanRequest) (*doma
 		return nil, err
 	}
 
-	return mapPlanFromResponse(typed, responseMap), nil
+	rawJSON, err := json.Marshal(typed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal plan response: %w", err)
+	}
+
+	return mapPlanFromResponse(typed, rawJSON), nil
 }

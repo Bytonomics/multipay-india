@@ -9,14 +9,9 @@ import (
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 )
 
-// rawMapResponse converts a map to a RawProviderResponse (JSON bytes).
-func rawMapResponse(m map[string]any) domain.RawProviderResponse {
-	data, err := json.Marshal(m)
-	if err != nil {
-		// If marshaling fails, return empty response
-		return domain.RawProviderResponse{}
-	}
-	return domain.RawProviderResponse(data)
+// rawMapResponse converts bytes to a RawProviderResponse.
+func rawMapResponse(b []byte) domain.RawProviderResponse {
+	return domain.RawProviderResponse(b)
 }
 
 // isNotFoundError checks if an error indicates a "not found" condition.
@@ -198,7 +193,7 @@ func mapSubscriptionStatusFromRazorpay(status string) domain.SubscriptionStatus 
 
 // PART E: New struct-based mappers
 
-func mapPlanFromResponse(r *razorpayPlanResponse, raw map[string]any) *domain.Plan {
+func mapPlanFromResponse(r *razorpayPlanResponse, rawJSON []byte) *domain.Plan {
 	return &domain.Plan{
 		PlanID:         r.ID,
 		PlanName:       r.Item.Name,
@@ -211,11 +206,11 @@ func mapPlanFromResponse(r *razorpayPlanResponse, raw map[string]any) *domain.Pl
 		Note:           r.Notes["note"],
 		Status:         "",
 		Provider:       domain.ProviderRazorpay,
-		Raw:            rawMapResponse(raw),
+		Raw:            rawMapResponse(rawJSON),
 	}
 }
 
-func mapSubscriptionFromResponse(r *razorpaySubscriptionResponse, raw map[string]any) *domain.Subscription {
+func mapSubscriptionFromResponse(r *razorpaySubscriptionResponse, rawJSON []byte) *domain.Subscription {
 	return &domain.Subscription{
 		SubscriptionID:         r.ID,
 		ProviderSubscriptionID: r.ID,
@@ -228,11 +223,11 @@ func mapSubscriptionFromResponse(r *razorpaySubscriptionResponse, raw map[string
 		CustomerEmail:          "",
 		CustomerPhone:          "",
 		Provider:               domain.ProviderRazorpay,
-		Raw:                    rawMapResponse(raw),
+		Raw:                    rawMapResponse(rawJSON),
 	}
 }
 
-func mapInvoiceToSubscriptionPayment(inv *razorpayInvoiceResponse, subscriptionID string, raw map[string]any) *domain.SubscriptionPayment {
+func mapInvoiceToSubscriptionPayment(inv *razorpayInvoiceResponse, subscriptionID string, rawJSON []byte) *domain.SubscriptionPayment {
 	// PaymentType and RetryAttempts: not available from Razorpay invoices. Always zero.
 	return &domain.SubscriptionPayment{
 		PaymentID:      inv.PaymentID,
@@ -242,6 +237,6 @@ func mapInvoiceToSubscriptionPayment(inv *razorpayInvoiceResponse, subscriptionI
 		ScheduledDate:  unixPtr(inv.CreatedAt),
 		InitiatedDate:  unixPtr(inv.PaidAt),
 		Provider:       domain.ProviderRazorpay,
-		Raw:            rawMapResponse(raw),
+		Raw:            rawMapResponse(rawJSON),
 	}
 }

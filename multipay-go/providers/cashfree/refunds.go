@@ -33,16 +33,21 @@ func createRefund(ctx context.Context, adapter *Adapter, req *domain.CreateRefun
 	}
 
 	// Call Cashfree SDK to create refund
-	cfRefund, _, err := adapter.cfClient.PGOrderCreateRefundWithContext(
+	cfRefund, httpResp, err := adapter.cfClient.PGOrderCreateRefundWithContext(
 		ctx,
 		req.OrderID,
 		cfReq,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
-		nil, // httpClient (uses default)
+		adapter.httpClient,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create refund on cashfree: %w", domain.ErrProviderError)
+	}
+	if httpResp != nil && httpResp.Body != nil {
+		if closeErr := httpResp.Body.Close(); closeErr != nil {
+			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+		}
 	}
 
 	if cfRefund == nil {
@@ -71,13 +76,13 @@ func getRefund(ctx context.Context, adapter *Adapter, req *domain.GetRefundReque
 	}
 
 	// Call Cashfree SDK to fetch refund
-	cfRefund, _, err := adapter.cfClient.PGOrderFetchRefundWithContext(
+	cfRefund, httpResp, err := adapter.cfClient.PGOrderFetchRefundWithContext(
 		ctx,
 		req.OrderID,
 		req.RefundID,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
-		nil, // httpClient (uses default)
+		adapter.httpClient,
 	)
 	if err != nil {
 		// Check if error is 404 refund not found
@@ -85,6 +90,11 @@ func getRefund(ctx context.Context, adapter *Adapter, req *domain.GetRefundReque
 			return nil, fmt.Errorf("refund %s not found: %w", req.RefundID, domain.ErrRefundNotFound)
 		}
 		return nil, fmt.Errorf("failed to fetch refund from Cashfree: %w", domain.ErrProviderError)
+	}
+	if httpResp != nil && httpResp.Body != nil {
+		if closeErr := httpResp.Body.Close(); closeErr != nil {
+			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+		}
 	}
 
 	if cfRefund == nil {
@@ -108,12 +118,12 @@ func listRefunds(ctx context.Context, adapter *Adapter, req *domain.ListRefundsR
 	}
 
 	// Call Cashfree SDK to fetch refunds for the order
-	cfRefunds, _, err := adapter.cfClient.PGOrderFetchRefundsWithContext(
+	cfRefunds, httpResp, err := adapter.cfClient.PGOrderFetchRefundsWithContext(
 		ctx,
 		req.OrderID,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
-		nil, // httpClient (uses default)
+		adapter.httpClient,
 	)
 	if err != nil {
 		// Check if error is 404 order not found
@@ -121,6 +131,11 @@ func listRefunds(ctx context.Context, adapter *Adapter, req *domain.ListRefundsR
 			return nil, fmt.Errorf("order %s not found: %w", req.OrderID, domain.ErrOrderNotFound)
 		}
 		return nil, fmt.Errorf("failed to fetch refunds from Cashfree: %w", domain.ErrProviderError)
+	}
+	if httpResp != nil && httpResp.Body != nil {
+		if closeErr := httpResp.Body.Close(); closeErr != nil {
+			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+		}
 	}
 
 	if cfRefunds == nil {

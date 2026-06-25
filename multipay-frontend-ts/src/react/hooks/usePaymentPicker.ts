@@ -1,80 +1,57 @@
 import { useCallback, useState } from "react";
 import { Provider } from "../../core/types";
 
-interface ProviderState {
+export interface ProviderRuntimeState {
   loading: boolean;
   error?: string;
 }
 
-interface PaymentPickerState {
-  loadingRecord: Record<Provider, boolean>;
-  errorRecord: Record<Provider, string | undefined>;
+export interface PickerRuntimeState {
+  cashfree: ProviderRuntimeState;
+  razorpay: ProviderRuntimeState;
+}
+
+export interface PaymentPickerControls {
+  setLoading: (provider: Provider, loading: boolean) => void;
+  setError: (provider: Provider, error?: string) => void;
+  clearError: (provider: Provider) => void;
 }
 
 export function usePaymentPicker(): {
-  loadingRecord: PaymentPickerState["loadingRecord"];
-  errorRecord: PaymentPickerState["errorRecord"];
-  controls: {
-    setLoading: (_provider: Provider, _loading: boolean) => void;
-    setError: (_provider: Provider, _error?: string) => void;
-    clearError: (_provider: Provider) => void;
-  };
+  runtime: PickerRuntimeState;
+  controls: PaymentPickerControls;
 } {
-  const [providerStates, setProviderStates] = useState<
-    Map<Provider, ProviderState>
-  >(() => {
-    const initialStates = new Map<Provider, ProviderState>();
-    initialStates.set(Provider.CASHFREE, { loading: false });
-    initialStates.set(Provider.RAZORPAY, { loading: false });
-    return initialStates;
-  });
+  const [runtime, setRuntime] = useState<PickerRuntimeState>(() => ({
+    cashfree: { loading: false },
+    razorpay: { loading: false },
+  }));
 
-  const setLoading = useCallback(
-    (provider: Provider, loading: boolean) => {
-      setProviderStates((prev) => {
-        const next = new Map(prev);
-        const existing = next.get(provider) || { loading: false };
-        next.set(provider, { ...existing, loading });
-        return next;
-      });
-    },
-    [],
-  );
+  const setLoading = useCallback((provider: Provider, loading: boolean) => {
+    setRuntime((prev) => ({
+      ...prev,
+      [provider]: { ...prev[provider as keyof PickerRuntimeState], loading },
+    }));
+  }, []);
 
   const setError = useCallback((provider: Provider, error?: string) => {
-    setProviderStates((prev) => {
-      const next = new Map(prev);
-      const existing = next.get(provider) || { loading: false };
-      next.set(provider, { ...existing, error });
-      return next;
-    });
+    setRuntime((prev) => ({
+      ...prev,
+      [provider]: { ...prev[provider as keyof PickerRuntimeState], error },
+    }));
   }, []);
 
   const clearError = useCallback((provider: Provider) => {
-    setProviderStates((prev) => {
-      const next = new Map(prev);
-      const existing = next.get(provider);
-      if (existing) {
-        next.set(provider, { ...existing, error: undefined });
-      }
-      return next;
-    });
+    setRuntime((prev) => ({
+      ...prev,
+      [provider]: {
+        ...prev[provider as keyof PickerRuntimeState],
+        error: undefined,
+      },
+    }));
   }, []);
 
-  // Derive loadingRecord and errorRecord from providerStates
-  const loadingRecord: Record<Provider, boolean> = {
-    [Provider.CASHFREE]: providerStates.get(Provider.CASHFREE)?.loading || false,
-    [Provider.RAZORPAY]: providerStates.get(Provider.RAZORPAY)?.loading || false,
-  };
-
-  const errorRecord: Record<Provider, string | undefined> = {
-    [Provider.CASHFREE]: providerStates.get(Provider.CASHFREE)?.error,
-    [Provider.RAZORPAY]: providerStates.get(Provider.RAZORPAY)?.error,
-  };
-
   return {
-    loadingRecord,
-    errorRecord,
+    runtime,
     controls: {
       setLoading,
       setError,

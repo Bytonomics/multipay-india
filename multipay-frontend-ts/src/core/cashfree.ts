@@ -1,10 +1,14 @@
 import type { CashfreeCheckoutPayload } from "./types";
+import { CashfreeMode, Environment } from "./types";
 import { loadScript } from "./script-loader";
 
 export async function checkoutCashfree(
   payload: CashfreeCheckoutPayload,
 ): Promise<void> {
-  const mode = payload.environment === "PRODUCTION" ? "production" : "sandbox";
+  const mode: CashfreeMode =
+    payload.environment === Environment.PRODUCTION
+      ? CashfreeMode.PRODUCTION
+      : CashfreeMode.SANDBOX;
   await loadScript("https://sdk.cashfree.com/js/v3/cashfree.js");
 
   interface CashfreeInstance {
@@ -14,7 +18,7 @@ export async function checkoutCashfree(
     }): void;
   }
   interface CashfreeGlobal {
-    Cashfree(_opts: { mode: "production" | "sandbox" }): CashfreeInstance;
+    Cashfree(_opts: { mode: CashfreeMode }): CashfreeInstance;
   }
   const cf = (window as unknown as CashfreeGlobal).Cashfree({ mode });
   cf.checkout({

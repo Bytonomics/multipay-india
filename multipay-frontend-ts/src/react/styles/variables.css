@@ -3,8 +3,7 @@
  * Complete token system for light and dark themes
  */
 
-:root,
-[data-theme="light"] {
+.mpay-picker[data-theme="light"] {
   /* Neutral Colors - Light Theme */
   --mpay-neutral-50: #fafafa;
   --mpay-neutral-100: #f5f5f5;
@@ -211,9 +210,26 @@
   --mpay-breakpoint-lg: 1024px;
   --mpay-breakpoint-xl: 1280px;
   --mpay-breakpoint-2xl: 1536px;
+
+  /* Component Tokens - Light Theme */
+  --mpay-bg: #ffffff;
+  --mpay-card-bg: #f5f5f5;
+  --mpay-card-border: #e5e5e5;
+  --mpay-card-hover-bg: #ebebeb;
+  --mpay-card-selected-bg: #dbeafe;
+  --mpay-card-selected-border: #3b82f6;
+  --mpay-text-primary: #171717;
+  --mpay-text-secondary: #525252;
+  --mpay-text-tertiary: #a3a3a3;
+  --mpay-border-default: #e5e5e5;
+  --mpay-border-focus: #3b82f6;
+  --mpay-accent: #3b82f6;
+  --mpay-error: #ef4444;
+  --mpay-badge-bg: #eff6ff;
+  --mpay-badge-text: #1e40af;
 }
 
-[data-theme="dark"] {
+.mpay-picker[data-theme="dark"] {
   /* Neutral Colors - Dark Theme */
   --mpay-neutral-50: #0a0a0a;
   --mpay-neutral-100: #171717;
@@ -420,4 +436,21 @@
   --mpay-breakpoint-lg: 1024px;
   --mpay-breakpoint-xl: 1280px;
   --mpay-breakpoint-2xl: 1536px;
+
+  /* Component Tokens - Dark Theme */
+  --mpay-bg: #0a0a0a;
+  --mpay-card-bg: #171717;
+  --mpay-card-border: #262626;
+  --mpay-card-hover-bg: #262626;
+  --mpay-card-selected-bg: #1e40af;
+  --mpay-card-selected-border: #60a5fa;
+  --mpay-text-primary: #f5f5f5;
+  --mpay-text-secondary: #a3a3a3;
+  --mpay-text-tertiary: #525252;
+  --mpay-border-default: #404040;
+  --mpay-border-focus: #60a5fa;
+  --mpay-accent: #60a5fa;
+  --mpay-error: #f87171;
+  --mpay-badge-bg: #1e3a8a;
+  --mpay-badge-text: #dbeafe;
 }

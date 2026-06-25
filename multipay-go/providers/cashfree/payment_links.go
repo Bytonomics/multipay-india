@@ -33,15 +33,21 @@ func createPaymentLink(ctx context.Context, adapter *Adapter, req *domain.Create
 	}
 
 	// Call Cashfree SDK
-	cfLink, _, err := adapter.cfClient.PGCreateLinkWithContext(
+	cfLink, httpResp, err := adapter.cfClient.PGCreateLinkWithContext(
 		ctx,
 		cfReq,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
-		nil, // httpClient (uses default)
+		adapter.httpClient,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payment link on cashfree: %w", domain.ErrProviderError)
+	}
+
+	if httpResp != nil && httpResp.Body != nil {
+		if closeErr := httpResp.Body.Close(); closeErr != nil {
+			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+		}
 	}
 
 	if cfLink == nil {
@@ -66,12 +72,12 @@ func getPaymentLink(ctx context.Context, adapter *Adapter, req *domain.GetPaymen
 	}
 
 	// Call Cashfree SDK to fetch payment link
-	cfLink, _, err := adapter.cfClient.PGFetchLinkWithContext(
+	cfLink, httpResp, err := adapter.cfClient.PGFetchLinkWithContext(
 		ctx,
 		req.LinkID,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
-		nil, // httpClient (uses default)
+		adapter.httpClient,
 	)
 	if err != nil {
 		// Check if error is 404 link not found
@@ -79,6 +85,11 @@ func getPaymentLink(ctx context.Context, adapter *Adapter, req *domain.GetPaymen
 			return nil, fmt.Errorf("payment link %s not found: %w", req.LinkID, domain.ErrPaymentLinkNotFound)
 		}
 		return nil, fmt.Errorf("failed to fetch payment link from Cashfree: %w", domain.ErrProviderError)
+	}
+	if httpResp != nil && httpResp.Body != nil {
+		if closeErr := httpResp.Body.Close(); closeErr != nil {
+			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+		}
 	}
 
 	if cfLink == nil {
@@ -103,15 +114,20 @@ func cancelPaymentLink(ctx context.Context, adapter *Adapter, req *domain.Cancel
 	}
 
 	// Call Cashfree SDK to cancel payment link
-	cfLink, _, err := adapter.cfClient.PGCancelLinkWithContext(
+	cfLink, httpResp, err := adapter.cfClient.PGCancelLinkWithContext(
 		ctx,
 		req.LinkID,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
-		nil, // httpClient (uses default)
+		adapter.httpClient,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to cancel payment link on cashfree: %w", domain.ErrProviderError)
+	}
+	if httpResp != nil && httpResp.Body != nil {
+		if closeErr := httpResp.Body.Close(); closeErr != nil {
+			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+		}
 	}
 
 	if cfLink == nil {

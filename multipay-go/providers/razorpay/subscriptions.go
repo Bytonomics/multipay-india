@@ -2,6 +2,7 @@ package razorpay
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
@@ -92,7 +93,11 @@ func createSubscription(ctx context.Context, adapter *Adapter, req *domain.Creat
 	if err != nil {
 		return nil, err
 	}
-	return mapSubscriptionFromResponse(typed, subResp), nil
+	rawJSON, err := json.Marshal(typed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal subscription response: %w", err)
+	}
+	return mapSubscriptionFromResponse(typed, rawJSON), nil
 }
 
 // getSubscription retrieves an existing subscription from Razorpay.
@@ -118,7 +123,11 @@ func getSubscription(ctx context.Context, adapter *Adapter, req *domain.GetSubsc
 	if err != nil {
 		return nil, err
 	}
-	return mapSubscriptionFromResponse(typed, subResp), nil
+	rawJSON, err := json.Marshal(typed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal subscription response: %w", err)
+	}
+	return mapSubscriptionFromResponse(typed, rawJSON), nil
 }
 
 // cancelSubscription cancels a subscription on Razorpay.
@@ -142,7 +151,11 @@ func cancelSubscription(ctx context.Context, adapter *Adapter, req *domain.Cance
 	if err != nil {
 		return nil, err
 	}
-	return mapSubscriptionFromResponse(typed, subResp), nil
+	rawJSON, err := json.Marshal(typed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal subscription response: %w", err)
+	}
+	return mapSubscriptionFromResponse(typed, rawJSON), nil
 }
 
 // pauseSubscription pauses a subscription on Razorpay.
@@ -166,7 +179,11 @@ func pauseSubscription(ctx context.Context, adapter *Adapter, req *domain.PauseS
 	if err != nil {
 		return nil, err
 	}
-	return mapSubscriptionFromResponse(typed, subResp), nil
+	rawJSON, err := json.Marshal(typed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal subscription response: %w", err)
+	}
+	return mapSubscriptionFromResponse(typed, rawJSON), nil
 }
 
 // resumeSubscription resumes a subscription on Razorpay.
@@ -190,7 +207,11 @@ func resumeSubscription(ctx context.Context, adapter *Adapter, req *domain.Resum
 	if err != nil {
 		return nil, err
 	}
-	return mapSubscriptionFromResponse(typed, subResp), nil
+	rawJSON, err := json.Marshal(typed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal subscription response: %w", err)
+	}
+	return mapSubscriptionFromResponse(typed, rawJSON), nil
 }
 
 // changePlan changes the plan of a subscription on Razorpay.
@@ -228,7 +249,11 @@ func changePlan(ctx context.Context, adapter *Adapter, req *domain.ChangePlanReq
 	if err != nil {
 		return nil, err
 	}
-	return mapSubscriptionFromResponse(typed, subResp), nil
+	rawJSON, err := json.Marshal(typed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal subscription response: %w", err)
+	}
+	return mapSubscriptionFromResponse(typed, rawJSON), nil
 }
 
 // getSubscriptionPayments retrieves all payments for a subscription on Razorpay.

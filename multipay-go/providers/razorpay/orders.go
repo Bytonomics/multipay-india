@@ -2,6 +2,7 @@ package razorpay
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
@@ -62,7 +63,11 @@ func (a *Adapter) CreateOrder(ctx context.Context, req *domain.CreateOrderReques
 	}
 
 	// D17: Map typed struct to canonical domain type
-	order := mapOrderFromResponse(typed, responseMap)
+	rawJSON, err := json.Marshal(typed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal order response: %w", err)
+	}
+	order := mapOrderFromResponse(typed, rawJSON)
 	order.Checkout = buildRazorpayCheckout(a.config, req, order)
 	return order, nil
 }
@@ -107,7 +112,11 @@ func (a *Adapter) GetOrder(ctx context.Context, req *domain.GetOrderRequest) (*d
 	}
 
 	// D17: Map typed struct to canonical domain type
-	return mapOrderFromResponse(typed, responseMap), nil
+	rawJSON, err := json.Marshal(typed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal order response: %w", err)
+	}
+	return mapOrderFromResponse(typed, rawJSON), nil
 }
 
 // D17: Typed response struct for Razorpay Payment API responses (used in list responses).
@@ -180,9 +189,13 @@ func (a *Adapter) ListOrderPayments(ctx context.Context, req *domain.ListOrderPa
 	}
 
 	// D17: Map each typed payment response to canonical domain type
+	rawJSON, err := json.Marshal(typed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payments response: %w", err)
+	}
 	payments := make([]*domain.Payment, 0, len(typed.Items))
 	for i := range typed.Items {
-		payment := mapPaymentFromResponse(&typed.Items[i], rawMapResponse(paymentsData))
+		payment := mapPaymentFromResponse(&typed.Items[i], rawJSON)
 		payments = append(payments, payment)
 	}
 
@@ -190,7 +203,7 @@ func (a *Adapter) ListOrderPayments(ctx context.Context, req *domain.ListOrderPa
 }
 
 // D17: Typed struct mapper for order response
-func mapOrderFromResponse(r *razorpayOrderResponse, raw map[string]any) *domain.Order {
+func mapOrderFromResponse(r *razorpayOrderResponse, rawJSON []byte) *domain.Order {
 	return &domain.Order{
 		ProviderOrderID: r.ID,
 		OrderID:         r.Receipt,
@@ -198,7 +211,7 @@ func mapOrderFromResponse(r *razorpayOrderResponse, raw map[string]any) *domain.
 		Currency:        domain.Currency(r.Currency),
 		Status:          mapOrderStatus(r.Status),
 		CreatedAt:       unixPtr(r.CreatedAt),
-		Raw:             rawMapResponse(raw),
+		Raw:             domain.RawProviderResponse(rawJSON),
 		ProviderDetails: &domain.OrderProviderDetail{
 			Razorpay: &domain.RazorpayOrderDetail{
 				Entity:     r.Entity,
@@ -213,7 +226,7 @@ func mapOrderFromResponse(r *razorpayOrderResponse, raw map[string]any) *domain.
 }
 
 // D17: Typed struct mapper for payment response
-func mapPaymentFromResponse(r *razorpayPaymentResponse, raw domain.RawProviderResponse) *domain.Payment {
+func mapPaymentFromResponse(r *razorpayPaymentResponse, rawJSON []byte) *domain.Payment {
 	payment := &domain.Payment{
 		ProviderPaymentID: r.ID,
 		OrderID:           r.OrderID,
@@ -226,7 +239,7 @@ func mapPaymentFromResponse(r *razorpayPaymentResponse, raw domain.RawProviderRe
 		ErrorCode:         r.ErrorCode,
 		ErrorMessage:      r.ErrorDescription,
 		PaymentTime:       unixPtr(r.CreatedAt),
-		Raw:               raw,
+		Raw:               domain.RawProviderResponse(rawJSON),
 		ProviderDetails: &domain.PaymentProviderDetail{
 			Razorpay: &domain.RazorpayPaymentDetail{
 				Entity:         r.Entity,

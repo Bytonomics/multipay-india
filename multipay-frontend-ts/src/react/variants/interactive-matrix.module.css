@@ -205,142 +205,71 @@
   text-align: center;
 }
 
-/* DARK MODE PALETTE */
-@media (prefers-color-scheme: dark) {
-  .card {
-    background: #25292e;
-    border-color: #3a3f46;
-    color: #e2e8f0;
-  }
-
-  .card:hover:not(:disabled) {
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
-  }
-
-  .cardSelected {
-    background: #1a2f3d;
-    border-color: #4d9bff;
-    box-shadow: 0 0 0 4px rgba(77, 155, 255, 0.2), 0 8px 24px rgba(77, 155, 255, 0.4);
-  }
-
-  .cardDim {
-    opacity: 0.4;
-    filter: grayscale(0.4);
-  }
-
-  .cardDisabled {
-    background: #2d3239;
-    border-color: #3a3f46;
-    opacity: 0.5;
-  }
-
-  .logo {
-    background: linear-gradient(135deg, #2d3239 0%, #3a3f46 100%);
-    color: #94a3b8;
-    border-color: #4a5059;
-  }
-
-  .cardSelected .logo {
-    background: linear-gradient(135deg, #4d9bff 0%, #3b82f6 100%);
-    color: #ffffff;
-    border-color: #3b82f6;
-  }
-
-  .providerName {
-    color: #e2e8f0;
-  }
-
-  .description {
-    color: #94a3b8;
-  }
-
-  .summary {
-    background: #25292e;
-    border-color: #3a3f46;
-  }
-
-  .total {
-    color: #e2e8f0;
-  }
-
-  .taxNote {
-    color: #94a3b8;
-  }
-
-  .disabledOverlay {
-    background: rgba(37, 41, 46, 0.85);
-  }
-
-  .spinner {
-    color: #94a3b8;
-  }
-}
-
-/* Dark mode class override for systems without prefers-color-scheme */
-:global(.dark) .card {
+/* DARK MODE PALETTE - using data-theme attribute selector */
+[data-theme='dark'] .card {
   background: #25292e;
   border-color: #3a3f46;
   color: #e2e8f0;
 }
 
-:global(.dark) .card:hover:not(:disabled) {
+[data-theme='dark'] .card:hover:not(:disabled) {
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
 }
 
-:global(.dark) .cardSelected {
+[data-theme='dark'] .cardSelected {
   background: #1a2f3d;
   border-color: #4d9bff;
   box-shadow: 0 0 0 4px rgba(77, 155, 255, 0.2), 0 8px 24px rgba(77, 155, 255, 0.4);
 }
 
-:global(.dark) .cardDim {
+[data-theme='dark'] .cardDim {
   opacity: 0.4;
   filter: grayscale(0.4);
 }
 
-:global(.dark) .cardDisabled {
+[data-theme='dark'] .cardDisabled {
   background: #2d3239;
   border-color: #3a3f46;
   opacity: 0.5;
 }
 
-:global(.dark) .logo {
+[data-theme='dark'] .logo {
   background: linear-gradient(135deg, #2d3239 0%, #3a3f46 100%);
   color: #94a3b8;
   border-color: #4a5059;
 }
 
-:global(.dark) .cardSelected .logo {
+[data-theme='dark'] .cardSelected .logo {
   background: linear-gradient(135deg, #4d9bff 0%, #3b82f6 100%);
   color: #ffffff;
   border-color: #3b82f6;
 }
 
-:global(.dark) .providerName {
+[data-theme='dark'] .providerName {
   color: #e2e8f0;
 }
 
-:global(.dark) .description {
+[data-theme='dark'] .description {
   color: #94a3b8;
 }
 
-:global(.dark) .summary {
+[data-theme='dark'] .summary {
   background: #25292e;
   border-color: #3a3f46;
 }
 
-:global(.dark) .total {
+[data-theme='dark'] .total {
   color: #e2e8f0;
 }
 
-:global(.dark) .taxNote {
+[data-theme='dark'] .taxNote {
   color: #94a3b8;
 }
 
-:global(.dark) .disabledOverlay {
+[data-theme='dark'] .disabledOverlay {
   background: rgba(37, 41, 46, 0.85);
 }
 
-:global(.dark) .spinner {
+[data-theme='dark'] .spinner {
   color: #94a3b8;
 }

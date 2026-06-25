@@ -12,17 +12,18 @@ const planFixtureJSON = `{"id":"plan_00000000000001","entity":"plan","interval":
 const subFixtureJSON = `{"id":"sub_00000000000001","entity":"subscription","plan_id":"plan_00000000000001","status":"created","charge_at":1580453311,"start_at":1580626111,"end_at":1583433000,"total_count":6,"paid_count":0,"created_at":1580280581,"expire_by":1580626111,"short_url":"https://rzp.io/i/z3b1R61A9","remaining_count":5}`
 
 func TestMapPlanFromResponse_ItemNesting(t *testing.T) {
-	m := map[string]any{}
-	if err := json.Unmarshal([]byte(planFixtureJSON), &m); err != nil {
+	var plan razorpayPlanResponse
+	if err := json.Unmarshal([]byte(planFixtureJSON), &plan); err != nil {
 		t.Fatalf("failed to unmarshal plan fixture: %v", err)
 	}
 
-	typed, err := decodeResponse[razorpayPlanResponse](m)
+	// Marshal plan to bytes for mapper
+	planBytes, err := json.Marshal(plan)
 	if err != nil {
-		t.Fatalf("failed to decode plan response: %v", err)
+		t.Fatalf("failed to marshal plan: %v", err)
 	}
 
-	p := mapPlanFromResponse(typed, m)
+	p := mapPlanFromResponse(&plan, planBytes)
 
 	if p.PlanName != "Test plan - Weekly" {
 		t.Fatalf("expected PlanName='Test plan - Weekly', got '%s'", p.PlanName)
@@ -44,7 +45,13 @@ func TestMapPlanFromResponse_NotesFromMap(t *testing.T) {
 		Item:  razorpayItem{Name: "x"},
 	}
 
-	p := mapPlanFromResponse(r, map[string]any{})
+	// Marshal plan to bytes for mapper
+	rawBytes, err := json.Marshal(r)
+	if err != nil {
+		t.Fatalf("failed to marshal plan: %v", err)
+	}
+
+	p := mapPlanFromResponse(r, rawBytes)
 
 	if p.Note != "hello" {
 		t.Fatalf("expected Note='hello', got '%s'", p.Note)
@@ -52,17 +59,18 @@ func TestMapPlanFromResponse_NotesFromMap(t *testing.T) {
 }
 
 func TestMapSubscriptionFromResponse_AuthLinkAndCharge(t *testing.T) {
-	m := map[string]any{}
-	if err := json.Unmarshal([]byte(subFixtureJSON), &m); err != nil {
+	var sub razorpaySubscriptionResponse
+	if err := json.Unmarshal([]byte(subFixtureJSON), &sub); err != nil {
 		t.Fatalf("failed to unmarshal subscription fixture: %v", err)
 	}
 
-	typed, err := decodeResponse[razorpaySubscriptionResponse](m)
+	// Marshal subscription to bytes for mapper
+	subBytes, err := json.Marshal(sub)
 	if err != nil {
-		t.Fatalf("failed to decode subscription response: %v", err)
+		t.Fatalf("failed to marshal subscription: %v", err)
 	}
 
-	s := mapSubscriptionFromResponse(typed, m)
+	s := mapSubscriptionFromResponse(&sub, subBytes)
 
 	if s.AuthLink != "https://rzp.io/i/z3b1R61A9" {
 		t.Fatalf("expected AuthLink='https://rzp.io/i/z3b1R61A9', got '%s'", s.AuthLink)

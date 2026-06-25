@@ -2,6 +2,7 @@ package razorpay
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
@@ -94,8 +95,14 @@ func (a *Adapter) CreatePaymentLink(ctx context.Context, req *domain.CreatePayme
 		return nil, err
 	}
 
+	// D17: Marshal typed struct to bytes for mapper
+	rawJSON, err := json.Marshal(typed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payment link response: %w", err)
+	}
+
 	// D17: Map typed struct to canonical domain type
-	return mapPaymentLinkFromResponse(typed, responseMap), nil
+	return mapPaymentLinkFromResponse(typed, rawJSON), nil
 }
 
 // GetPaymentLink retrieves an existing payment link.
@@ -125,8 +132,14 @@ func (a *Adapter) GetPaymentLink(ctx context.Context, req *domain.GetPaymentLink
 		return nil, err
 	}
 
+	// D17: Marshal typed struct to bytes for mapper
+	rawJSON, err := json.Marshal(typed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payment link response: %w", err)
+	}
+
 	// D17: Map typed struct to canonical domain type
-	return mapPaymentLinkFromResponse(typed, responseMap), nil
+	return mapPaymentLinkFromResponse(typed, rawJSON), nil
 }
 
 // CancelPaymentLink cancels an existing payment link.
@@ -156,12 +169,18 @@ func (a *Adapter) CancelPaymentLink(ctx context.Context, req *domain.CancelPayme
 		return nil, err
 	}
 
+	// D17: Marshal typed struct to bytes for mapper
+	rawJSON, err := json.Marshal(typed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payment link response: %w", err)
+	}
+
 	// D17: Map typed struct to canonical domain type
-	return mapPaymentLinkFromResponse(typed, responseMap), nil
+	return mapPaymentLinkFromResponse(typed, rawJSON), nil
 }
 
 // D17: Typed struct mapper for payment link response
-func mapPaymentLinkFromResponse(r *razorpayPaymentLinkResponse, raw map[string]any) *domain.PaymentLink {
+func mapPaymentLinkFromResponse(r *razorpayPaymentLinkResponse, rawJSON []byte) *domain.PaymentLink {
 	linkResponse := &domain.PaymentLink{
 		ProviderLinkID: r.ID,
 		LinkID:         r.ID,
@@ -172,7 +191,7 @@ func mapPaymentLinkFromResponse(r *razorpayPaymentLinkResponse, raw map[string]a
 		Purpose:        r.Description,
 		Status:         domain.PaymentLinkStatus(r.Status),
 		CreatedAt:      unixPtr(r.CreatedAt),
-		Raw:            rawMapResponse(raw),
+		Raw:            domain.RawProviderResponse(rawJSON),
 		ProviderDetails: &domain.PaymentLinkProviderDetail{
 			Razorpay: &domain.RazorpayPaymentLinkDetail{
 				Entity:          r.Entity,

@@ -1,78 +1,51 @@
 import React from "react";
 import styles from "./interactive-matrix.module.css";
-import type { ProviderOption, PickerProviderId } from "../types";
-import { Provider } from "../../core/types";
+import type { PickerVariantProps } from "../types";
+import { ProviderSlot } from "../ProviderSlot";
 
-interface InteractiveMatrixProps {
-  providers: ProviderOption[];
-  selected?: PickerProviderId;
-  onSelect: (_provider: PickerProviderId) => void;
-  loadingRecord: Record<Provider, boolean>;
-  errorRecord: Record<Provider, string | undefined>;
-}
-
-const PROVIDER_DISPLAY: Record<
-  Provider,
-  { name: string; logo: string; description: string }
-> = {
-  [Provider.CASHFREE]: {
-    name: "Cashfree",
-    logo: "CF",
-    description: "UPI, Cards, Wallets, Netbanking",
-  },
-  [Provider.RAZORPAY]: {
-    name: "Razorpay",
-    logo: "RZ",
-    description: "UPI, Cards, Wallets, EMI",
-  },
-};
-
-export const InteractiveMatrix: React.FC<InteractiveMatrixProps> = ({
-  providers,
+export const InteractiveMatrix: React.FC<PickerVariantProps> = ({
+  views,
   selected,
   onSelect,
-  loadingRecord,
-  errorRecord,
 }) => {
-  // Filter providers - only show enabled Cashfree and Razorpay
-  const visibleProviders = providers.filter(
-    (p) => (p.id === Provider.CASHFREE || p.id === Provider.RAZORPAY) && p.enabled,
-  );
-
-  // Default select Cashfree if no selection
-  React.useEffect(() => {
-    if (!selected && visibleProviders.some((p) => p.id === Provider.CASHFREE)) {
-      onSelect(Provider.CASHFREE);
-    }
-  }, [selected, visibleProviders, onSelect]);
-
   return (
     <div className={styles.container}>
       <div className={styles.grid}>
-        {visibleProviders.map((provider) => {
-          const providerKey = provider.id as Provider;
-          const displayName = PROVIDER_DISPLAY[providerKey];
-          const isLoading = loadingRecord[providerKey] || false;
-          const hasError = !!errorRecord[providerKey];
-          const isSelected = selected === provider.id;
-          const isDisabled = isLoading || hasError || !provider.enabled;
+        {views.map((view) => {
+          const isSelected = view.id === selected;
+          const isDisabled =
+            !view.entry.enabled ||
+            view.state.loading ||
+            view.state.error !== undefined;
 
           return (
             <button
-              key={provider.id}
+              key={view.id}
               role="button"
               className={`${styles.card} ${isSelected ? styles.cardSelected : ""} ${!isSelected && selected ? styles.cardDim : ""} ${isDisabled ? styles.cardDisabled : ""}`}
-              onClick={() => !isDisabled && onSelect(provider.id)}
-              disabled={!!isDisabled}
+              onClick={() => {
+                if (!isDisabled) {
+                  void onSelect(view.id);
+                }
+              }}
+              disabled={isDisabled}
               aria-pressed={isSelected}
-              aria-disabled={!!isDisabled}
+              aria-disabled={isDisabled}
             >
               <div className={styles.cardInner}>
-                <div className={styles.logo}>{displayName.logo}</div>
-                <div className={styles.providerName}>{displayName.name}</div>
-                <div className={styles.description}>
-                  {displayName.description}
-                </div>
+                <div className={styles.logo}>{view.entry.icon}</div>
+                <div className={styles.providerName}>{view.entry.label}</div>
+                {view.entry.description && (
+                  <div className={styles.description}>
+                    {view.entry.description}
+                  </div>
+                )}
+
+                <ProviderSlot
+                  view={view}
+                  isDisabled={isDisabled}
+                  isSelected={isSelected}
+                />
 
                 {isSelected && (
                   <div className={styles.checkmark} aria-hidden="true">
@@ -91,7 +64,7 @@ export const InteractiveMatrix: React.FC<InteractiveMatrixProps> = ({
 
               {isDisabled && (
                 <div className={styles.disabledOverlay}>
-                  {isLoading && (
+                  {view.state.loading && (
                     <div className={styles.spinner} aria-hidden="true">
                       <svg
                         width={16}
@@ -110,7 +83,9 @@ export const InteractiveMatrix: React.FC<InteractiveMatrixProps> = ({
                       </svg>
                     </div>
                   )}
-                  {hasError && <span className={styles.errorIcon}>⚠</span>}
+                  {view.state.error && (
+                    <span className={styles.errorIcon}>⚠</span>
+                  )}
                 </div>
               )}
             </button>

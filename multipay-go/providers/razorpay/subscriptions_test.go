@@ -10,17 +10,18 @@ import (
 const invoiceFixtureJSON = `{"id":"inv_1","entity":"invoice","payment_id":"pay_1","amount":100,"currency":"INR","status":"paid","order_id":"order_1","paid_at":1481541600,"created_at":1481541534}`
 
 func TestMapInvoiceToSubscriptionPayment(t *testing.T) {
-	m := map[string]any{}
-	if err := json.Unmarshal([]byte(invoiceFixtureJSON), &m); err != nil {
+	var invoice razorpayInvoiceResponse
+	if err := json.Unmarshal([]byte(invoiceFixtureJSON), &invoice); err != nil {
 		t.Fatalf("failed to unmarshal invoice fixture: %v", err)
 	}
 
-	typed, err := decodeResponse[razorpayInvoiceResponse](m)
+	// Marshal invoice to bytes for mapper
+	invoiceBytes, err := json.Marshal(invoice)
 	if err != nil {
-		t.Fatalf("failed to decode invoice response: %v", err)
+		t.Fatalf("failed to marshal invoice: %v", err)
 	}
 
-	pmt := mapInvoiceToSubscriptionPayment(typed, "sub_1", m)
+	pmt := mapInvoiceToSubscriptionPayment(&invoice, "sub_1", invoiceBytes)
 
 	if pmt.PaymentID != "pay_1" {
 		t.Fatalf("expected PaymentID='pay_1', got '%s'", pmt.PaymentID)

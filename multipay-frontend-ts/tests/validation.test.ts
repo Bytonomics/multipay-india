@@ -11,7 +11,6 @@ describe("validatePayload", () => {
         provider: Provider.CASHFREE,
         order_id: "order_123",
         environment: Environment.PRODUCTION,
-        amount: 500,
         currency: "INR",
         // session_id is missing
       } as CheckoutPayload;
@@ -28,8 +27,8 @@ describe("validatePayload", () => {
         order_id: "order_123",
         session_id: "session_abc123",
         environment: Environment.PRODUCTION,
-        amount: 500,
         currency: "INR",
+        amount: 500,
       };
 
       expect(() => validatePayload(payload)).not.toThrow();
@@ -41,8 +40,8 @@ describe("validatePayload", () => {
         order_id: "order_cf_123",
         session_id: "session_abc123",
         environment: Environment.PRODUCTION,
-        amount: 50000,
         currency: "INR",
+        amount: 500,
       };
 
       expect(() => validatePayload(payload)).not.toThrow();
@@ -70,8 +69,8 @@ describe("validatePayload", () => {
     it("should throw when public_key is missing", () => {
       const payload = {
         provider: Provider.RAZORPAY,
-        order_id: "order_123",
         key_id: "key_123",
+        order_id: "order_123",
         amount_minor: 50000,
         currency: "INR",
         environment: Environment.PRODUCTION,
@@ -87,8 +86,8 @@ describe("validatePayload", () => {
     it("should throw when callback_url is missing", () => {
       const payload = {
         provider: Provider.RAZORPAY,
-        order_id: "order_123",
         key_id: "key_123",
+        order_id: "order_123",
         public_key: "public_key_123",
         amount_minor: 50000,
         currency: "INR",
@@ -105,8 +104,8 @@ describe("validatePayload", () => {
     it("should throw when currency is missing", () => {
       const payload = {
         provider: Provider.RAZORPAY,
-        order_id: "order_123",
         key_id: "key_123",
+        order_id: "order_123",
         public_key: "public_key_123",
         callback_url: "https://example.com/callback",
         amount_minor: 50000,
@@ -123,8 +122,8 @@ describe("validatePayload", () => {
     it("should throw when amount_minor is missing", () => {
       const payload = {
         provider: Provider.RAZORPAY,
-        order_id: "order_123",
         key_id: "key_123",
+        order_id: "order_123",
         public_key: "public_key_123",
         callback_url: "https://example.com/callback",
         currency: "INR",
@@ -141,8 +140,8 @@ describe("validatePayload", () => {
     it("should throw when amount_minor is zero", () => {
       const payload: CheckoutPayload = {
         provider: Provider.RAZORPAY,
-        order_id: "order_123",
         key_id: "key_123",
+        order_id: "order_123",
         public_key: "public_key_123",
         callback_url: "https://example.com/callback",
         amount_minor: 0,
@@ -159,8 +158,8 @@ describe("validatePayload", () => {
     it("should throw when amount_minor is negative", () => {
       const payload: CheckoutPayload = {
         provider: Provider.RAZORPAY,
-        order_id: "order_123",
         key_id: "key_123",
+        order_id: "order_123",
         public_key: "public_key_123",
         callback_url: "https://example.com/callback",
         amount_minor: -100,
@@ -177,8 +176,8 @@ describe("validatePayload", () => {
     it("should not throw for valid Razorpay payload", () => {
       const payload: CheckoutPayload = {
         provider: Provider.RAZORPAY,
-        order_id: "order_123",
         key_id: "key_123",
+        order_id: "order_123",
         public_key: "public_key_123",
         callback_url: "https://example.com/callback",
         amount_minor: 50000,
@@ -192,8 +191,8 @@ describe("validatePayload", () => {
     it("should not throw for valid Razorpay payload matching golden vector", () => {
       const payload: CheckoutPayload = {
         provider: Provider.RAZORPAY,
+        key_id: "rzp_key_123",
         order_id: "order_RZP123",
-        key_id: "key_123",
         public_key: "rzp_live_xxx",
         callback_url: "https://api.smriti.ai/v1/payments/callback/razorpay",
         amount_minor: 50000,

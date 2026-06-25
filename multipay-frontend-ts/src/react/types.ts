@@ -1,42 +1,55 @@
 import type { ReactNode } from "react";
 import type {
-  PickerProviderId,
   PickerVariant,
   PickerTheme,
+  ResolvedTheme,
   Provider,
 } from "../core/types";
 
 // Re-export core types for convenience
-export type { PickerProviderId, PickerVariant, PickerTheme, Provider };
+export type { PickerVariant, PickerTheme, ResolvedTheme, Provider };
 
 /**
- * Branding configuration for picker header and footer
- * React-specific type that lives in the react module
+ * Configuration for a single provider entry (Cashfree, Razorpay, or PayU)
  */
-export interface PickerBranding {
-  logo?: ReactNode;
-  title?: string;
-  subtitle?: string;
-  footerText?: string;
-}
-
-/**
- * Provider option for the payment picker UI
- * React-specific type with icon support
- */
-export interface ProviderOption {
-  id: PickerProviderId;
+export interface ProviderEntry {
   label: string;
   description?: string;
   icon?: ReactNode;
   recommended?: boolean;
+  visible: boolean;
   enabled: boolean;
-  disabledReason?: string;
+  disabledMessage?: string;
+}
+
+/**
+ * Provider configuration with fixed named fields (one per provider)
+ */
+export interface PickerProviders {
+  cashfree: ProviderEntry;
+  razorpay: ProviderEntry;
+  payu: ProviderEntry;
+}
+
+/**
+ * Runtime state for a single provider
+ */
+export interface ProviderRuntimeState {
+  loading: boolean;
+  error?: string;
+}
+
+/**
+ * Runtime state with fixed named fields (one per provider)
+ */
+export interface PickerRuntimeState {
+  cashfree: ProviderRuntimeState;
+  razorpay: ProviderRuntimeState;
+  payu: ProviderRuntimeState;
 }
 
 /**
  * Payment data for the picker
- * React-specific type with provider options
  */
 export interface PaymentData {
   /**
@@ -50,19 +63,28 @@ export interface PaymentData {
   currency: string;
 
   /**
-   * Available provider options
+   * Provider configurations
    */
-  providers: ProviderOption[];
+  providers: PickerProviders;
 
   /**
-   * Default selected provider ID
+   * Default selected provider (a canonical Provider enum value)
    */
-  defaultSelected?: PickerProviderId;
+  default: Provider;
+}
+
+/**
+ * Branding configuration for picker header and footer
+ */
+export interface PickerBranding {
+  logo?: ReactNode;
+  title?: string;
+  subtitle?: string;
+  footerText?: string;
 }
 
 /**
  * Visual appearance configuration for the payment picker
- * React-specific type with branding
  */
 export interface PickerAppearance {
   variant?: PickerVariant;
@@ -70,19 +92,39 @@ export interface PickerAppearance {
   primaryColor?: string;
   borderRadius?: number;
   fontFamily?: string;
-  customStyles?: Record<string, string>;
   branding?: PickerBranding;
   className?: string;
   taxNote?: string;
 }
 
 /**
+ * Combined view of a provider entry + its runtime state
+ */
+export interface PickerProviderView {
+  id: Provider;
+  entry: ProviderEntry;
+  state: ProviderRuntimeState;
+}
+
+/**
+ * Props consumed by all picker variants
+ * Single shared props interface for the four visual variants
+ */
+export interface PickerVariantProps {
+  views: PickerProviderView[];
+  selected: Provider;
+  onSelect: (provider: Provider) => void | Promise<void>;
+  theme: ResolvedTheme;
+  formattedTotal: string;
+  taxNote: string;
+}
+
+/**
  * Props for the PaymentPicker component
- * React-specific component props
  */
 export interface PaymentPickerProps {
   /**
-   * Payment data (amount, currency, providers)
+   * Payment data (amount, currency, providers, default)
    */
   payment: PaymentData;
 
@@ -92,38 +134,37 @@ export interface PaymentPickerProps {
   appearance?: PickerAppearance;
 
   /**
-   * Selection callback (only emits canonical Provider types)
+   * Selection callback (emits canonical Provider enum values)
    */
-  onSelect: (_provider: Provider) => void | Promise<void>;
+  onSelect: (provider: Provider) => void | Promise<void>;
 }
 
 /**
  * Control methods for programmatic picker control
- * React-specific imperative API
  */
 export interface PickerControls {
   /**
    * Select a provider programmatically
    */
-  selectProvider: (_providerId: PickerProviderId) => void;
+  selectProvider: (providerId: Provider) => void;
 
   /**
    * Get the currently selected provider
    */
-  getSelectedProvider: () => PickerProviderId;
+  getSelectedProvider: () => Provider;
 
   /**
    * Check if a specific provider is currently selected
    */
-  isSelected: (_providerId: PickerProviderId) => boolean;
+  isSelected: (providerId: Provider) => boolean;
 
   /**
-   * Enable or disable a specific provider option
+   * Enable or disable a specific provider
    */
   setProviderDisabled: (
-    _providerId: PickerProviderId,
-    _disabled: boolean,
-    _reason?: string,
+    providerId: Provider,
+    disabled: boolean,
+    reason?: string,
   ) => void;
 
   /**

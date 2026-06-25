@@ -24,13 +24,13 @@ func getInstrument(ctx context.Context, adapter *Adapter, req *domain.GetInstrum
 	}
 
 	// Call Cashfree SDK to fetch instrument
-	cfInstrument, _, err := adapter.cfClient.PGCustomerFetchInstrumentWithContext(
+	cfInstrument, httpResp, err := adapter.cfClient.PGCustomerFetchInstrumentWithContext(
 		ctx,
 		req.CustomerID,
 		req.InstrumentID,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
-		nil, // httpClient (uses default)
+		adapter.httpClient,
 	)
 	if err != nil {
 		// Check if error is 404 instrument not found
@@ -38,6 +38,11 @@ func getInstrument(ctx context.Context, adapter *Adapter, req *domain.GetInstrum
 			return nil, fmt.Errorf("instrument %s not found: %w", req.InstrumentID, domain.ErrInstrumentNotFound)
 		}
 		return nil, fmt.Errorf("failed to fetch instrument from Cashfree: %w", domain.ErrProviderError)
+	}
+	if httpResp != nil && httpResp.Body != nil {
+		if closeErr := httpResp.Body.Close(); closeErr != nil {
+			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+		}
 	}
 
 	if cfInstrument == nil {
@@ -61,13 +66,13 @@ func listInstruments(ctx context.Context, adapter *Adapter, req *domain.ListInst
 	}
 
 	// Call Cashfree SDK to fetch instruments for the customer
-	cfInstruments, _, err := adapter.cfClient.PGCustomerFetchInstrumentsWithContext(
+	cfInstruments, httpResp, err := adapter.cfClient.PGCustomerFetchInstrumentsWithContext(
 		ctx,
 		req.CustomerID,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
 		nil, // instrumentType (optional filter)
-		nil, // httpClient (uses default)
+		adapter.httpClient,
 	)
 	if err != nil {
 		// Check if error is 404 customer not found
@@ -75,6 +80,11 @@ func listInstruments(ctx context.Context, adapter *Adapter, req *domain.ListInst
 			return nil, fmt.Errorf("customer %s not found: %w", req.CustomerID, domain.ErrInstrumentNotFound)
 		}
 		return nil, fmt.Errorf("failed to fetch instruments from Cashfree: %w", domain.ErrProviderError)
+	}
+	if httpResp != nil && httpResp.Body != nil {
+		if closeErr := httpResp.Body.Close(); closeErr != nil {
+			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+		}
 	}
 
 	if cfInstruments == nil {
@@ -110,13 +120,13 @@ func deleteInstrument(ctx context.Context, adapter *Adapter, req *domain.DeleteI
 	}
 
 	// Call Cashfree SDK to delete instrument
-	_, _, err := adapter.cfClient.PGCustomerDeleteInstrumentWithContext(
+	_, httpResp, err := adapter.cfClient.PGCustomerDeleteInstrumentWithContext(
 		ctx,
 		req.CustomerID,
 		req.InstrumentID,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
-		nil, // httpClient (uses default)
+		adapter.httpClient,
 	)
 	if err != nil {
 		// Check if error is 404 instrument not found
@@ -124,6 +134,11 @@ func deleteInstrument(ctx context.Context, adapter *Adapter, req *domain.DeleteI
 			return nil, fmt.Errorf("instrument %s not found: %w", req.InstrumentID, domain.ErrInstrumentNotFound)
 		}
 		return nil, fmt.Errorf("failed to delete instrument on Cashfree: %w", domain.ErrProviderError)
+	}
+	if httpResp != nil && httpResp.Body != nil {
+		if closeErr := httpResp.Body.Close(); closeErr != nil {
+			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+		}
 	}
 
 	// Return the deleted instrument (constructed from request data)

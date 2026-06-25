@@ -2,6 +2,7 @@ package razorpay
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
@@ -82,8 +83,14 @@ func (a *Adapter) CreateRefund(ctx context.Context, req *domain.CreateRefundRequ
 		return nil, err
 	}
 
+	// D17: Marshal typed struct to bytes for mapper
+	rawJSON, err := json.Marshal(typed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal refund response: %w", err)
+	}
+
 	// D17: Map typed struct to canonical domain type
-	return mapRefundFromResponse(typed, responseMap), nil
+	return mapRefundFromResponse(typed, rawJSON), nil
 }
 
 // GetRefund retrieves an existing refund.
@@ -112,8 +119,14 @@ func (a *Adapter) GetRefund(ctx context.Context, req *domain.GetRefundRequest) (
 		return nil, err
 	}
 
+	// D17: Marshal typed struct to bytes for mapper
+	rawJSON, err := json.Marshal(typed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal refund response: %w", err)
+	}
+
 	// D17: Map typed struct to canonical domain type
-	return mapRefundFromResponse(typed, responseMap), nil
+	return mapRefundFromResponse(typed, rawJSON), nil
 }
 
 // ListRefunds retrieves all refunds for an order.
@@ -149,10 +162,16 @@ func (a *Adapter) ListRefunds(ctx context.Context, req *domain.ListRefundsReques
 		return nil, err
 	}
 
+	// D17: Marshal typed list to bytes for mapper
+	rawJSON, err := json.Marshal(typed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal refunds response: %w", err)
+	}
+
 	// D17: Map each typed refund response to canonical domain type
 	refunds := make([]*domain.Refund, 0, len(typed.Items))
 	for i := range typed.Items {
-		refund := mapRefundFromResponse(&typed.Items[i], refundsData)
+		refund := mapRefundFromResponse(&typed.Items[i], rawJSON)
 		refunds = append(refunds, refund)
 	}
 
@@ -160,7 +179,7 @@ func (a *Adapter) ListRefunds(ctx context.Context, req *domain.ListRefundsReques
 }
 
 // D17: Typed struct mapper for refund response
-func mapRefundFromResponse(r *razorpayRefundResponse, raw map[string]any) *domain.Refund {
+func mapRefundFromResponse(r *razorpayRefundResponse, rawJSON []byte) *domain.Refund {
 	refund := &domain.Refund{
 		ProviderRefundID: r.ID,
 		PaymentID:        r.PaymentID,
@@ -172,7 +191,7 @@ func mapRefundFromResponse(r *razorpayRefundResponse, raw map[string]any) *domai
 		Status:           mapRefundStatus(r.Status),
 		CreatedAt:        unixPtr(r.CreatedAt),
 		ProcessedAt:      unixPtr(r.ReceiptTime),
-		Raw:              rawMapResponse(raw),
+		Raw:              domain.RawProviderResponse(rawJSON),
 		ProviderDetails: &domain.RefundProviderDetail{
 			Razorpay: &domain.RazorpayRefundDetail{
 				Entity:         r.Entity,

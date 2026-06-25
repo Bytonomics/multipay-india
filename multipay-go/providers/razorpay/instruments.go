@@ -2,6 +2,7 @@ package razorpay
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
@@ -57,8 +58,14 @@ func (a *Adapter) GetInstrument(ctx context.Context, req *domain.GetInstrumentRe
 		return nil, err
 	}
 
+	// D17: Marshal typed struct to bytes for mapper
+	rawJSON, err := json.Marshal(typed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal instrument response: %w", err)
+	}
+
 	// D17: Map typed struct to canonical domain type
-	return mapInstrumentFromResponse(typed, responseMap), nil
+	return mapInstrumentFromResponse(typed, rawJSON), nil
 }
 
 // ListInstruments retrieves all instruments for a customer (called "tokens" in Razorpay).
@@ -88,10 +95,16 @@ func (a *Adapter) ListInstruments(ctx context.Context, req *domain.ListInstrumen
 		return nil, err
 	}
 
+	// D17: Marshal typed list to bytes for mapper
+	rawJSON, err := json.Marshal(typed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal instruments response: %w", err)
+	}
+
 	// D17: Map each typed instrument response to canonical domain type
 	instruments := make([]*domain.Instrument, 0, len(typed.Items))
 	for i := range typed.Items {
-		instrument := mapInstrumentFromResponse(&typed.Items[i], tokensData)
+		instrument := mapInstrumentFromResponse(&typed.Items[i], rawJSON)
 		instruments = append(instruments, instrument)
 	}
 
@@ -128,12 +141,18 @@ func (a *Adapter) DeleteInstrument(ctx context.Context, req *domain.DeleteInstru
 		return nil, err
 	}
 
+	// D17: Marshal typed struct to bytes for mapper
+	rawJSON, err := json.Marshal(typed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal instrument response: %w", err)
+	}
+
 	// D17: Map typed struct to canonical domain type
-	return mapInstrumentFromResponse(typed, responseMap), nil
+	return mapInstrumentFromResponse(typed, rawJSON), nil
 }
 
 // D17: Typed struct mapper for instrument response
-func mapInstrumentFromResponse(r *razorpayInstrumentResponse, raw map[string]any) *domain.Instrument {
+func mapInstrumentFromResponse(r *razorpayInstrumentResponse, rawJSON []byte) *domain.Instrument {
 	return &domain.Instrument{
 		InstrumentID:   r.ID,
 		CustomerID:     r.CustomerID,
@@ -141,7 +160,7 @@ func mapInstrumentFromResponse(r *razorpayInstrumentResponse, raw map[string]any
 		DisplayValue:   r.DisplayValue,
 		Status:         r.Status,
 		CreatedAt:      unixPtr(r.CreatedAt),
-		Raw:            rawMapResponse(raw),
+		Raw:            domain.RawProviderResponse(rawJSON),
 		ProviderDetails: &domain.InstrumentProviderDetail{
 			Razorpay: &domain.RazorpayInstrumentDetail{
 				Entity:           r.Entity,

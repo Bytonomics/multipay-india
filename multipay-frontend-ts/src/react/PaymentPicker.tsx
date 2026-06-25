@@ -5,8 +5,13 @@ import {
   useState,
   useCallback,
 } from "react";
-import type { PaymentPickerProps, PickerProviderId } from "./types";
-import { Provider } from "../core/types";
+import type {
+  PaymentPickerProps,
+  PickerControls,
+  PickerProviderView,
+} from "./types";
+import { Provider, PickerVariant, ResolvedTheme } from "../core/types";
+import { PickerTheme } from "../core/types";
 import { PickerHeader } from "./PickerHeader";
 import { PickerFooter } from "./PickerFooter";
 import { LoadingOverlay } from "./LoadingOverlay";
@@ -21,6 +26,16 @@ import styles from "./styles/picker.module.css";
 import "./styles/variables.css";
 
 /**
+ * Provider order for building the picker view array.
+ * Controls the order in which providers are rendered.
+ */
+const PROVIDER_ORDER: readonly Provider[] = [
+  Provider.CASHFREE,
+  Provider.RAZORPAY,
+  Provider.PAYU,
+];
+
+/**
  * PaymentPicker Component
  *
  * A comprehensive payment provider selection component with multiple visual variants,
@@ -32,15 +47,16 @@ import "./styles/variables.css";
  *   payment={{
  *     amountMinor: 50000,
  *     currency: 'INR',
- *     providers: [
- *       { id: 'cashfree', label: 'Cashfree', enabled: true },
- *       { id: 'razorpay', label: 'Razorpay', enabled: true },
- *     ],
- *     defaultSelected: 'cashfree',
+ *     providers: {
+ *       cashfree: { label: 'Cashfree', visible: true, enabled: true },
+ *       razorpay: { label: 'Razorpay', visible: true, enabled: true },
+ *       payu: { label: 'PayU', visible: false, enabled: false },
+ *     },
+ *     default: Provider.CASHFREE,
  *   }}
  *   appearance={{
- *     variant: 'interactive-matrix',
- *     theme: 'auto',
+ *     variant: PickerVariant.INTERACTIVE_MATRIX,
+ *     theme: PickerTheme.AUTO,
  *   }}
  *   onSelect={(provider) => {
  *     // Handle provider selection
@@ -48,274 +64,252 @@ import "./styles/variables.css";
  * />
  * ```
  */
-export const PaymentPicker = forwardRef<
-  {
-    selectProvider: (_providerId: PickerProviderId) => void;
-    getSelectedProvider: () => PickerProviderId;
-    isSelected: (_providerId: PickerProviderId) => boolean;
-    setProviderDisabled: (
-      _providerId: PickerProviderId,
-      _disabled: boolean,
-      _reason?: string,
-    ) => void;
-    focus: () => void;
-    blur: () => void;
-  },
-  PaymentPickerProps
->((props, ref) => {
-  const { payment, appearance = {}, onSelect } = props;
+export const PaymentPicker = forwardRef<PickerControls, PaymentPickerProps>(
+  (props, ref) => {
+    const { payment, appearance = {}, onSelect } = props;
 
-  // Apply defaults to appearance
-  const variant = appearance.variant || "interactive-matrix";
-  const theme = appearance.theme || "auto";
-  const branding = appearance.branding;
-  const className = appearance.className;
-  const taxNote = appearance.taxNote;
+    // Validate required payment fields
+    if (!payment.amountMinor || payment.amountMinor <= 0) {
+      throw new Error(
+        "payment.amountMinor is required and must be greater than 0",
+      );
+    }
+    if (!payment.currency) {
+      throw new Error("payment.currency is required");
+    }
 
-  // Validate required payment fields
-  if (
-    typeof payment.amountMinor !== "number" ||
-    isNaN(payment.amountMinor) ||
-    !payment.currency ||
-    !payment.providers ||
-    payment.providers.length === 0
-  ) {
-    throw new Error(
-      "PaymentPicker requires payment.amountMinor (valid number), payment.currency, and payment.providers (non-empty array)",
-    );
-  }
+    // Apply defaults to appearance
+    const variant = appearance.variant ?? PickerVariant.INTERACTIVE_MATRIX;
+    const theme = appearance.theme ?? PickerTheme.AUTO;
+    const branding = appearance.branding;
+    const className = appearance.className;
 
-  // Local state for provider selection
-  const [selectedProvider, setSelectedProvider] = useState<PickerProviderId>(
-    () => {
-      // Default to first enabled provider or defaultSelected if valid
-      const defaultProvider = payment.defaultSelected;
+    // Build PickerProviderView[] from named-field providers + runtime state
+    const { runtime, controls } = usePaymentPicker();
+
+    const views: PickerProviderView[] = PROVIDER_ORDER.map((id) => ({
+      id,
+      entry: payment.providers[id],
+      state: runtime[id as keyof typeof runtime] || { loading: false },
+    })).filter((view) => view.entry.visible);
+
+    // Local state for provider selection (canonical Provider enum value)
+    const [selected, setSelected] = useState<Provider>(() => {
+      // Validate default is enabled and visible
+      const defaultEntry = payment.default
+        ? payment.providers[payment.default]
+        : null;
       const isValidDefault =
-        defaultProvider &&
-        payment.providers.some(
-          (p) => p.id === defaultProvider && p.enabled !== false,
-        );
+        payment.default &&
+        defaultEntry &&
+        defaultEntry.visible &&
+        defaultEntry.enabled;
 
       if (isValidDefault) {
-        return defaultProvider as PickerProviderId;
+        return payment.default;
       }
 
-      // Fallback to first enabled provider
-      const firstEnabled = payment.providers.find((p) => p.enabled !== false);
-      return firstEnabled?.id || payment.providers[0]?.id || "multipay_default";
-    },
-  );
+      // Emit warning if default was provided but invalid/disabled/absent
+      if (payment.default && !isValidDefault) {
+        console.warn(
+          `[PaymentPicker] Invalid/disabled/absent default provider: ${payment.default}. Falling back to first enabled provider.`,
+        );
+      }
 
-  // Local state for provider options (to support dynamic disabling)
-  const [providerOptions, setProviderOptions] = useState(payment.providers);
+      // Fallback to first visible & enabled provider
+      const firstValid = views.find((v) => v.entry.enabled);
+      return firstValid?.id || views[0]?.id || Provider.CASHFREE;
+    });
 
-  // Theme state for 'auto' mode
-  const [currentTheme, setCurrentTheme] = useState<"light" | "dark">(() => {
-    if (theme === "auto") {
-      return window.matchMedia("(prefers-color-scheme: dark)").matches
-        ? "dark"
-        : "light";
-    }
-    return theme;
-  });
+    // Resolve theme: handle 'auto' with media query
+    const [currentTheme, setCurrentTheme] = useState<ResolvedTheme>(() => {
+      if (theme === PickerTheme.AUTO) {
+        return window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? ResolvedTheme.DARK
+          : ResolvedTheme.LIGHT;
+      }
+      return theme === PickerTheme.DARK
+        ? ResolvedTheme.DARK
+        : ResolvedTheme.LIGHT;
+    });
 
-  // Handle theme changes for 'auto' mode
-  useEffect(() => {
-    if (theme !== "auto") return;
-
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const handleChange = (_e: MediaQueryListEvent): void => {
-      setCurrentTheme(_e.matches ? "dark" : "light");
-    };
-
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, [theme]);
-
-  // Get loading and error states from hook
-  const { loadingRecord, errorRecord, controls } = usePaymentPicker();
-
-  // Filter providers - only show enabled ones
-  const visibleProviders = providerOptions.filter((provider) => {
-    // Cashfree and Razorpay are shown by default
-    if (provider.id === Provider.CASHFREE || provider.id === Provider.RAZORPAY) {
-      return provider.enabled !== false;
-    }
-    // PayU and others are NOT shown by default
-    return false;
-  });
-
-  // Handle provider selection with guard
-  const handleProviderSelect = useCallback(
-    async (providerId: PickerProviderId) => {
-      const provider = providerOptions.find((p) => p.id === providerId);
-
-      // Guard: Only allow selection of enabled canonical providers
-      if (!provider || provider.enabled === false) {
+    // Update theme when 'auto' changes based on system preference
+    useEffect(() => {
+      if (theme !== PickerTheme.AUTO) {
+        const resolved =
+          theme === PickerTheme.DARK ? ResolvedTheme.DARK : ResolvedTheme.LIGHT;
+        setCurrentTheme(resolved);
         return;
       }
 
-      // Only emit canonical Provider types (cashfree, razorpay), not placeholders like payu
-      const canonicalProviders: Provider[] = [
-        Provider.CASHFREE,
-        Provider.RAZORPAY,
-      ];
-      if (!canonicalProviders.includes(providerId as Provider)) {
-        return;
-      }
+      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+      const handleChange = (e: MediaQueryListEvent): void => {
+        setCurrentTheme(e.matches ? ResolvedTheme.DARK : ResolvedTheme.LIGHT);
+      };
 
-      setSelectedProvider(providerId);
+      mediaQuery.addEventListener("change", handleChange);
+      return () => mediaQuery.removeEventListener("change", handleChange);
+    }, [theme]);
 
-      // Set loading state (providerId is guaranteed to be Provider after validation above)
-      controls.setLoading(providerId as Provider, true);
+    // Format total amount using ISO 4217 exponent
+    const formattedTotal = formatMinor(payment.amountMinor, payment.currency);
 
-      try {
-        await onSelect(providerId as Provider);
-      } catch (error) {
-        controls.setError(
-          providerId as Provider,
-          error instanceof Error ? error.message : "Payment failed",
-        );
-      } finally {
-        controls.setLoading(providerId as Provider, false);
-      }
-    },
-    [providerOptions, onSelect, controls],
-  );
+    // Tax note text with default (PRE-TAX ONLY: final taxes added at checkout by vendor)
+    const taxNoteText =
+      appearance.taxNote ??
+      "Final taxes are added at checkout by the payment provider.";
 
-  // Imperative API via ref
-  useImperativeHandle(
-    ref,
-    () => ({
-      selectProvider: (providerId: PickerProviderId) => {
-        void handleProviderSelect(providerId);
+    // Handle provider selection
+    const handleProviderSelect = useCallback(
+      async (selectedProvider: Provider) => {
+        const entry = payment.providers[selectedProvider];
+
+        // Guard: reject if not enabled
+        if (!entry.enabled) {
+          return;
+        }
+
+        setSelected(selectedProvider);
+        controls.setLoading(selectedProvider, true);
+
+        try {
+          await onSelect(selectedProvider);
+        } catch (_error) {
+          controls.setError(
+            selectedProvider,
+            _error instanceof Error ? _error.message : "Payment failed",
+          );
+        } finally {
+          controls.setLoading(selectedProvider, false);
+        }
       },
-      getSelectedProvider: () => selectedProvider,
-      isSelected: (providerId: PickerProviderId) =>
-        selectedProvider === providerId,
-      setProviderDisabled: (
-        providerId: PickerProviderId,
-        disabled: boolean,
-        reason?: string,
-      ) => {
-        setProviderOptions((prev) =>
-          prev.map((p) =>
-            p.id === providerId
-              ? {
-                  ...p,
-                  enabled: !disabled,
-                  disabledReason: disabled ? reason : undefined,
-                }
-              : p,
-          ),
-        );
-      },
-      focus: () => {
-        // Focus the first provider card
-        const firstCard = document.querySelector(
-          `[role="button"]`,
-        ) as HTMLElement;
-        firstCard?.focus();
-      },
-      blur: () => {
-        // Blur the focused element
-        const focused = document.activeElement as HTMLElement;
-        focused?.blur();
-      },
-    }),
-    [selectedProvider, handleProviderSelect],
-  );
+      [payment.providers, onSelect, controls],
+    );
 
-  // Determine which variant component to render
-  const renderVariant = (): JSX.Element => {
-    const commonProps = {
-      providers: visibleProviders,
-      selected: selectedProvider,
+    // Imperative API via ref
+    useImperativeHandle(
+      ref,
+      () => ({
+        selectProvider: (provider: Provider) => {
+          void handleProviderSelect(provider);
+        },
+        getSelectedProvider: () => selected,
+        isSelected: (provider: Provider) => selected === provider,
+        setProviderDisabled: (
+          providerId: Provider,
+          disabled: boolean,
+          reason?: string,
+        ) => {
+          void providerId;
+          void disabled;
+          void reason;
+        },
+        focus: () => {
+          const firstCard = document.querySelector(
+            '[role="button"]',
+          ) as HTMLElement;
+          firstCard?.focus();
+        },
+        blur: () => {
+          const focused = document.activeElement as HTMLElement;
+          focused?.blur();
+        },
+      }),
+      [selected, handleProviderSelect],
+    );
+
+    // Render variant with shared PickerVariantProps
+    const variantProps = {
+      views,
+      selected,
       onSelect: handleProviderSelect,
-      loadingRecord,
-      errorRecord,
+      theme: currentTheme,
+      formattedTotal,
+      taxNote: taxNoteText,
     };
+
+    let variantComponent: JSX.Element;
 
     switch (variant) {
-      case "dynamic-stack":
-        return <DynamicStack {...commonProps} loadingRecord={loadingRecord} errorRecord={errorRecord} />;
-      case "interactive-matrix":
-        return <InteractiveMatrix {...commonProps} loadingRecord={loadingRecord} errorRecord={errorRecord} />;
-      case "secure-vault":
-        return <SecureVault {...commonProps} loadingRecord={loadingRecord} errorRecord={errorRecord} />;
-      case "neumorphic-flow":
-        return <NeumorphicFlow {...commonProps} loadingRecord={loadingRecord} errorRecord={errorRecord} formattedTotal={formattedTotal} taxNote={taxNoteText} />;
-      default:
-        return <InteractiveMatrix {...commonProps} loadingRecord={loadingRecord} errorRecord={errorRecord} />;
+      case PickerVariant.DYNAMIC_STACK:
+        variantComponent = <DynamicStack {...variantProps} />;
+        break;
+
+      case PickerVariant.INTERACTIVE_MATRIX:
+        variantComponent = <InteractiveMatrix {...variantProps} />;
+        break;
+
+      case PickerVariant.SECURE_VAULT:
+        variantComponent = <SecureVault {...variantProps} />;
+        break;
+
+      case PickerVariant.NEUMORPHIC_FLOW:
+        variantComponent = <NeumorphicFlow {...variantProps} />;
+        break;
+
+      default: {
+        // Exhaustive check: TypeScript will error if any variant is missing
+        const _exhaustiveCheck: never = variant;
+        return _exhaustiveCheck;
+      }
     }
-  };
 
-  // Format total amount
-  const formattedTotal = formatMinor(payment.amountMinor, payment.currency);
+    return (
+      <div
+        className={`mpay-picker ${styles.picker} ${className || ""}`}
+        data-theme={currentTheme}
+        role="region"
+        aria-label="Payment provider selection"
+      >
+        {/* Header with branding */}
+        {branding && <PickerHeader branding={branding} />}
 
-  // Tax note text
-  const taxNoteText = taxNote || "Total amount inclusive of all taxes";
+        {/* Total amount display */}
+        <div className={styles.totalSection}>
+          <div className={styles.totalLabel}>Total Amount</div>
+          <div className={styles.totalAmount}>{formattedTotal}</div>
+          <div className={styles.taxNote}>{taxNoteText}</div>
+        </div>
 
-  return (
-    <div
-      className={`${styles.picker} ${className || ""}`}
-      data-theme={currentTheme}
-      style={{
-        fontFamily: appearance.fontFamily || "var(--mpay-font-family, inherit)",
-      }}
-      role="region"
-      aria-label="Payment provider selection"
-    >
-      {/* Header with branding */}
-      {branding && <PickerHeader branding={branding} />}
+        {/* Provider grid/stack based on variant */}
+        <div className={styles.providersSection}>{variantComponent}</div>
 
-      {/* Total amount display */}
-      <div className={styles.totalSection}>
-        <div className={styles.totalLabel}>Total Amount</div>
-        <div className={styles.totalAmount}>{formattedTotal}</div>
-        <div className={styles.taxNote}>{taxNoteText}</div>
-      </div>
+        {/* Footer with branding */}
+        {branding && branding.footerText && (
+          <PickerFooter footerText={branding.footerText} />
+        )}
 
-      {/* Provider grid/stack based on variant */}
-      <div className={styles.providersSection}>{renderVariant()}</div>
-
-      {/* Footer with branding */}
-      {branding && branding.footerText && (
-        <PickerFooter footerText={branding.footerText} />
-      )}
-
-      {/* Loading overlay */}
-      {Object.values(loadingRecord).some((loading) => loading) && (
-        <LoadingOverlay
-          provider={
-            visibleProviders.find((p) => p.id === selectedProvider)?.label ||
-            "payment provider"
-          }
-        />
-      )}
-
-      {/* Error banner */}
-      {Object.values(errorRecord).some((error) => error) && (
-        <ErrorBanner
-          message={
-            Object.values(errorRecord).find((error) => error) ||
-            "Payment failed"
-          }
-          onRetry={() => {
-            const providerWithErrors = Object.entries(errorRecord)
-              .filter(([, error]) => error)
-              .map(([providerId]) => providerId);
-
-            if (providerWithErrors.length > 0) {
-              void handleProviderSelect(
-                providerWithErrors[0] as PickerProviderId,
-              );
+        {/* Loading overlay */}
+        {Object.values(runtime).some((state) => state.loading) && (
+          <LoadingOverlay
+            provider={
+              views.find((v) => v.id === selected)?.entry.label ||
+              "payment provider"
             }
-          }}
-        />
-      )}
-    </div>
-  );
-});
+          />
+        )}
+
+        {/* Error banner */}
+        {Object.values(runtime).some((state) => state.error) && (
+          <ErrorBanner
+            message={
+              Object.values(runtime).find((state) => state.error)?.error ||
+              "Payment failed"
+            }
+            onRetry={() => {
+              const errorEntries = Object.entries(runtime).filter(
+                ([, state]) => state.error,
+              );
+              if (errorEntries.length > 0) {
+                const [providerId] = errorEntries[0];
+                void handleProviderSelect(providerId as Provider);
+              }
+            }}
+          />
+        )}
+      </div>
+    );
+  },
+);
 
 PaymentPicker.displayName = "PaymentPicker";

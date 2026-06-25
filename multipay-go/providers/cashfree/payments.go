@@ -24,13 +24,13 @@ func getPayment(ctx context.Context, adapter *Adapter, req *domain.GetPaymentReq
 	}
 
 	// Call Cashfree SDK to fetch payment
-	cfPayment, _, err := adapter.cfClient.PGOrderFetchPaymentWithContext(
+	cfPayment, httpResp, err := adapter.cfClient.PGOrderFetchPaymentWithContext(
 		ctx,
 		req.OrderID,
 		req.PaymentID,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
-		nil, // httpClient (uses default)
+		adapter.httpClient,
 	)
 	if err != nil {
 		// Check if error is 404 payment not found
@@ -38,6 +38,11 @@ func getPayment(ctx context.Context, adapter *Adapter, req *domain.GetPaymentReq
 			return nil, fmt.Errorf("payment %s not found: %w", req.PaymentID, domain.ErrPaymentNotFound)
 		}
 		return nil, fmt.Errorf("failed to fetch payment from Cashfree: %w", domain.ErrProviderError)
+	}
+	if httpResp != nil && httpResp.Body != nil {
+		if closeErr := httpResp.Body.Close(); closeErr != nil {
+			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+		}
 	}
 
 	if cfPayment == nil {
@@ -61,12 +66,12 @@ func listPayments(ctx context.Context, adapter *Adapter, req *domain.ListPayment
 	}
 
 	// Call Cashfree SDK to fetch payments for the order
-	cfPayments, _, err := adapter.cfClient.PGOrderFetchPaymentsWithContext(
+	cfPayments, httpResp, err := adapter.cfClient.PGOrderFetchPaymentsWithContext(
 		ctx,
 		req.OrderID,
 		nil, // xRequestId
 		nil, // xIdempotencyKey
-		nil, // httpClient (uses default)
+		adapter.httpClient,
 	)
 	if err != nil {
 		// Check if error is 404 order not found
@@ -74,6 +79,11 @@ func listPayments(ctx context.Context, adapter *Adapter, req *domain.ListPayment
 			return nil, fmt.Errorf("order %s not found: %w", req.OrderID, domain.ErrOrderNotFound)
 		}
 		return nil, fmt.Errorf("failed to fetch payments from Cashfree: %w", domain.ErrProviderError)
+	}
+	if httpResp != nil && httpResp.Body != nil {
+		if closeErr := httpResp.Body.Close(); closeErr != nil {
+			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+		}
 	}
 
 	if cfPayments == nil {

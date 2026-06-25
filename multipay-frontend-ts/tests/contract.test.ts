@@ -44,11 +44,14 @@ describe("Contract: golden vectors", () => {
     });
 
     it("should have session_id field (snake_case, not sessionId)", () => {
-      const payload = vector as Record<string, unknown>;
-      expect("session_id" in payload).toBe(true);
-      expect(payload.session_id).toBe("session_abc123");
+      const payload = vector as CheckoutPayload;
+      const keys = Object.keys(vector as object);
+      expect(keys.includes("session_id")).toBe(true);
+      if (payload.provider === "cashfree") {
+        expect(payload.session_id).toBe("session_abc123");
+      }
       // NOT camelCase — the golden vector uses snake_case
-      expect("sessionId" in payload).toBe(false);
+      expect(keys.includes("sessionId")).toBe(false);
     });
 
     it("should be accepted by validatePayload", () => {
@@ -90,37 +93,47 @@ describe("Contract: golden vectors", () => {
     });
 
     it("should have amount_minor field (snake_case, not amountMinor)", () => {
-      const payload = vector as Record<string, unknown>;
-      expect("amount_minor" in payload).toBe(true);
-      expect(payload.amount_minor).toBe(50000);
+      const payload = vector as CheckoutPayload;
+      const keys = Object.keys(vector as object);
+      expect(keys.includes("amount_minor")).toBe(true);
+      if (payload.provider === "razorpay") {
+        expect(payload.amount_minor).toBe(50000);
+      }
       // NOT camelCase — the golden vector uses snake_case
-      expect("amountMinor" in payload).toBe(false);
+      expect(keys.includes("amountMinor")).toBe(false);
     });
 
     it("should have public_key field (snake_case, not publicKey)", () => {
-      const payload = vector as Record<string, unknown>;
-      expect("public_key" in payload).toBe(true);
-      expect(payload.public_key).toBe("rzp_live_xxx");
+      const payload = vector as CheckoutPayload;
+      const keys = Object.keys(vector as object);
+      expect(keys.includes("public_key")).toBe(true);
+      if (payload.provider === "razorpay") {
+        expect(payload.public_key).toBe("rzp_live_xxx");
+      }
       // NOT camelCase — the golden vector uses snake_case
-      expect("publicKey" in payload).toBe(false);
+      expect(keys.includes("publicKey")).toBe(false);
     });
 
     it("should have order_id field (snake_case, not orderId)", () => {
-      const payload = vector as Record<string, unknown>;
-      expect("order_id" in payload).toBe(true);
+      const payload = vector as CheckoutPayload;
+      const keys = Object.keys(vector as object);
+      expect(keys.includes("order_id")).toBe(true);
       expect(payload.order_id).toBe("order_RZP123");
       // NOT camelCase — the golden vector uses snake_case
-      expect("orderId" in payload).toBe(false);
+      expect(keys.includes("orderId")).toBe(false);
     });
 
     it("should have callback_url field (snake_case, not callbackUrl)", () => {
-      const payload = vector as Record<string, unknown>;
-      expect("callback_url" in payload).toBe(true);
-      expect(payload.callback_url).toBe(
-        "https://api.smriti.ai/v1/payments/callback/razorpay",
-      );
+      const payload = vector as CheckoutPayload;
+      const keys = Object.keys(vector as object);
+      expect(keys.includes("callback_url")).toBe(true);
+      if (payload.provider === "razorpay") {
+        expect(payload.callback_url).toBe(
+          "https://api.smriti.ai/v1/payments/callback/razorpay",
+        );
+      }
       // NOT camelCase — the golden vector uses snake_case
-      expect("callbackUrl" in payload).toBe(false);
+      expect(keys.includes("callbackUrl")).toBe(false);
     });
 
     it("should be accepted by validatePayload", () => {
@@ -158,22 +171,22 @@ describe("Contract: golden vectors", () => {
         "../../contract/checkout/vectors/cashfree.checkout.json",
       );
       const cashfreeData = readFileSync(cashfreePath, "utf-8");
-      const cashfree: Record<string, unknown> = JSON.parse(cashfreeData);
+      const cashfreeKeys = Object.keys(JSON.parse(cashfreeData) as object);
 
       const razorpayPath = resolve(
         __dirname,
         "../../contract/checkout/vectors/razorpay.checkout.json",
       );
       const razorpayData = readFileSync(razorpayPath, "utf-8");
-      const razorpay: Record<string, unknown> = JSON.parse(razorpayData);
+      const razorpayKeys = Object.keys(JSON.parse(razorpayData) as object);
 
       // Cashfree should use snake_case
-      expect(Object.keys(cashfree)).toEqual(
+      expect(cashfreeKeys).toEqual(
         expect.arrayContaining(["provider", "environment", "session_id"]),
       );
 
       // Razorpay should use snake_case
-      expect(Object.keys(razorpay)).toEqual(
+      expect(razorpayKeys).toEqual(
         expect.arrayContaining([
           "provider",
           "environment",

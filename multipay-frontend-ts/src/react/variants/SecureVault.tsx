@@ -1,16 +1,6 @@
-import type { ProviderOption, PickerProviderId } from "../types";
-import { Provider } from "../../core/types";
+import type { PickerVariantProps } from "../types";
 import styles from "./secure-vault.module.css";
-
-interface SecureVaultProps {
-  providers: ProviderOption[];
-  selected?: PickerProviderId;
-  onSelect: (_provider: PickerProviderId) => void;
-  loadingRecord?: Record<Provider, boolean>;
-  errorRecord?: Record<Provider, string | undefined>;
-  formattedTotal?: string;
-  taxNote?: string;
-}
+import { ProviderSlot } from "../ProviderSlot";
 
 /**
  * SecureVault - V3 Trust & security/banking/vault variant
@@ -20,27 +10,16 @@ interface SecureVaultProps {
  * - Selected slot has green inner-glow + shield/verification badge
  * - Lock + circuit motifs for security aesthetic
  * - Dark-optimized design with full light palette support
- * - One slot per AGGREGATOR (Cashfree default-selected + Razorpay; PayU NOT shown)
+ * - One slot per AGGREGATOR (visible providers only)
  */
 export function SecureVault({
-  providers,
+  views,
   selected,
   onSelect,
-  loadingRecord = {} as Record<Provider, boolean>,
-  errorRecord = {} as Record<Provider, string | undefined>,
-  formattedTotal,
-  taxNote,
-}: SecureVaultProps): JSX.Element {
-  // Filter to only show cashfree and razorpay (PayU is excluded)
-  const visibleProviders = providers.filter(
-    (p) => (p.id === Provider.CASHFREE || p.id === Provider.RAZORPAY) && p.enabled,
-  );
-
-  // Default to cashfree if nothing selected
-  const selectedProvider = selected || Provider.CASHFREE;
-
+  theme,
+}: PickerVariantProps): JSX.Element {
   return (
-    <div className={styles.secureVault}>
+    <div className={styles.secureVault} data-theme={theme}>
       <div className={styles.vaultFrame}>
         {/* Vault header with lock motif */}
         <div className={styles.vaultHeader}>
@@ -64,20 +43,22 @@ export function SecureVault({
 
         {/* Vault slots container */}
         <div className={styles.vaultSlots}>
-          {visibleProviders.map((provider) => {
-            const isSelected = provider.id === selectedProvider;
-            const providerKey = provider.id as Provider;
-            const isLoading = loadingRecord[providerKey];
-            const hasError = !!errorRecord[providerKey];
+          {views.map((view) => {
+            const isSelected = view.id === selected;
+            const isDisabled = !view.entry.enabled || view.state.loading;
 
             return (
               <button
-                key={provider.id}
-                className={`${styles.vaultSlot} ${isSelected ? styles.selected : ""} ${isLoading ? styles.loading : ""} ${hasError ? styles.error : ""}`}
-                onClick={() => onSelect(provider.id)}
-                disabled={isLoading}
+                key={view.id}
+                className={`${styles.vaultSlot} ${isSelected ? styles.selected : ""} ${view.state.loading ? styles.loading : ""} ${view.state.error ? styles.error : ""}`}
+                onClick={() => {
+                  if (view.entry.enabled && !view.state.loading) {
+                    void onSelect(view.id);
+                  }
+                }}
+                disabled={isDisabled}
                 aria-selected={isSelected}
-                aria-busy={isLoading}
+                aria-busy={view.state.loading}
               >
                 {/* Selection glow */}
                 {isSelected && (
@@ -108,23 +89,14 @@ export function SecureVault({
                 )}
 
                 {/* Provider label */}
-                <span className={styles.providerLabel}>
-                  {provider.id === Provider.CASHFREE ? "Cashfree" : "Razorpay"}
-                </span>
+                <span className={styles.providerLabel}>{view.entry.label}</span>
 
-                {/* Loading indicator */}
-                {isLoading && (
-                  <div className={styles.slotLoading} aria-hidden="true">
-                    <span className={styles.spinner} />
-                  </div>
-                )}
-
-                {/* Error indicator */}
-                {hasError && !isLoading && (
-                  <div className={styles.errorIndicator} aria-hidden="true">
-                    <span>!</span>
-                  </div>
-                )}
+                {/* Shared state rendering */}
+                <ProviderSlot
+                  view={view}
+                  isDisabled={isDisabled}
+                  isSelected={isSelected}
+                />
 
                 {/* Circuit pattern decoration */}
                 <div className={styles.circuitPattern} aria-hidden="true">
@@ -142,24 +114,6 @@ export function SecureVault({
             );
           })}
         </div>
-
-        {/* Vault footer with total and tax note */}
-        {(formattedTotal || taxNote) && (
-          <div className={styles.vaultFooter}>
-            {formattedTotal && (
-              <div className={styles.totalDisplay}>
-                <span className={styles.totalLabel}>Total Amount</span>
-                <span className={styles.totalValue}>{formattedTotal}</span>
-              </div>
-            )}
-            {taxNote && (
-              <div className={styles.taxNote}>
-                <span className={styles.taxNoteIcon}>ℹ</span>
-                <span>{taxNote}</span>
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

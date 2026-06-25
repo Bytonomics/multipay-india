@@ -346,8 +346,8 @@ type Order struct {
     AmountMinor      AmountMinor
     Currency         Currency
     Metadata         Metadata
-    ProviderDetails  *OrderProviderDetail  // NEW: provider-specific fields
-    Checkout         *Checkout              // NEW: canonical checkout session data
+    ProviderDetails  *OrderProviderDetail   // NEW: provider-specific fields
+    Checkout         *CheckoutPayload       // NEW: canonical checkout session data
     Raw              RawProviderResponse
 }
 
