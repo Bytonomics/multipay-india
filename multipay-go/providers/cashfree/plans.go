@@ -45,14 +45,14 @@ func createPlan(ctx context.Context, a *Adapter, req *domain.CreatePlanRequest) 
 		nil, // xIdempotencyKey
 		a.httpClient,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create plan: %w", err)
-	}
 	defer func() {
 		if httpResp != nil && httpResp.Body != nil {
 			_ = httpResp.Body.Close()
 		}
 	}()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create plan: %w", err)
+	}
 
 	if cfPlan == nil {
 		return nil, fmt.Errorf("cashfree returned nil plan: %w", domain.ErrProviderError)
@@ -101,6 +101,11 @@ func getPlan(ctx context.Context, adapter *Adapter, req *domain.GetPlanRequest) 
 		nil, // xIdempotencyKey
 		adapter.httpClient,
 	)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
+		}
+	}()
 	if err != nil {
 		// Check if error is 404 plan not found
 		if isNotFoundError(err) {
@@ -108,11 +113,6 @@ func getPlan(ctx context.Context, adapter *Adapter, req *domain.GetPlanRequest) 
 		}
 		return nil, fmt.Errorf("failed to fetch plan from Cashfree: %w", err)
 	}
-	defer func() {
-		if httpResp != nil && httpResp.Body != nil {
-			_ = httpResp.Body.Close()
-		}
-	}()
 
 	if cfPlan == nil {
 		return nil, fmt.Errorf("cashfree returned nil plan: %w", domain.ErrProviderError)

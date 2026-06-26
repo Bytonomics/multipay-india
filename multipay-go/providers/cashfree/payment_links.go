@@ -40,15 +40,14 @@ func createPaymentLink(ctx context.Context, adapter *Adapter, req *domain.Create
 		nil, // xIdempotencyKey
 		adapter.httpClient,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create payment link on cashfree: %w", domain.ErrProviderError)
-	}
-
 	defer func() {
 		if httpResp != nil && httpResp.Body != nil {
 			_ = httpResp.Body.Close()
 		}
 	}()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create payment link on cashfree: %w", domain.ErrProviderError)
+	}
 
 	if cfLink == nil {
 		return nil, fmt.Errorf("cashfree returned nil payment link: %w", domain.ErrProviderError)
@@ -82,6 +81,11 @@ func getPaymentLink(ctx context.Context, adapter *Adapter, req *domain.GetPaymen
 		nil, // xIdempotencyKey
 		adapter.httpClient,
 	)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
+		}
+	}()
 	if err != nil {
 		// Check if error is 404 link not found
 		if isNotFoundError(err) {
@@ -89,11 +93,6 @@ func getPaymentLink(ctx context.Context, adapter *Adapter, req *domain.GetPaymen
 		}
 		return nil, fmt.Errorf("failed to fetch payment link from Cashfree: %w", domain.ErrProviderError)
 	}
-	defer func() {
-		if httpResp != nil && httpResp.Body != nil {
-			_ = httpResp.Body.Close()
-		}
-	}()
 
 	if cfLink == nil {
 		return nil, fmt.Errorf("cashfree returned nil payment link: %w", domain.ErrProviderError)
@@ -127,14 +126,14 @@ func cancelPaymentLink(ctx context.Context, adapter *Adapter, req *domain.Cancel
 		nil, // xIdempotencyKey
 		adapter.httpClient,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to cancel payment link on cashfree: %w", domain.ErrProviderError)
-	}
 	defer func() {
 		if httpResp != nil && httpResp.Body != nil {
 			_ = httpResp.Body.Close()
 		}
 	}()
+	if err != nil {
+		return nil, fmt.Errorf("failed to cancel payment link on cashfree: %w", domain.ErrProviderError)
+	}
 
 	if cfLink == nil {
 		return nil, fmt.Errorf("cashfree returned nil payment link: %w", domain.ErrProviderError)

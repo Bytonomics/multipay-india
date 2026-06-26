@@ -134,17 +134,17 @@ func deleteInstrument(ctx context.Context, adapter *Adapter, req *domain.DeleteI
 		nil, // xIdempotencyKey
 		adapter.httpClient,
 	)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
+		}
+	}()
 	if err != nil {
 		// Check if error is 404 instrument not found
 		if isNotFoundError(err) {
 			return nil, fmt.Errorf("instrument %s not found: %w", req.InstrumentID, domain.ErrInstrumentNotFound)
 		}
 		return nil, fmt.Errorf("failed to delete instrument on Cashfree: %w", domain.ErrProviderError)
-	}
-	if httpResp != nil && httpResp.Body != nil {
-		if closeErr := httpResp.Body.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
-		}
 	}
 
 	// Return the deleted instrument (constructed from request data)

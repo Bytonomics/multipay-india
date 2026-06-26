@@ -7,6 +7,7 @@ export const DynamicStack: React.FC<PickerVariantProps> = ({
   views,
   selected,
   onSelect,
+  theme,
 }) => {
   const [showAlternatives, setShowAlternatives] = React.useState(false);
 
@@ -19,7 +20,7 @@ export const DynamicStack: React.FC<PickerVariantProps> = ({
   const alternativeViews = views.slice(1);
 
   return (
-    <div className={styles.dynamicStack} data-theme="light">
+    <div className={styles.dynamicStack} data-theme={theme}>
       {/* Optimized Route Card - Primary Card */}
       <button
         role="button"

@@ -1,3 +1,4 @@
+import type { KeyboardEvent, ReactNode } from "react";
 import type { PickerProviderView } from "./types";
 import { Provider } from "../core/types";
 import styles from "./styles/card.module.css";
@@ -26,7 +27,7 @@ export function ProviderCard({
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent): void => {
+  const handleKeyDown = (e: KeyboardEvent): void => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       handleClick();
@@ -34,9 +35,9 @@ export function ProviderCard({
   };
 
   // Built-in SVG icons for providers when entry.icon is not provided
-  const renderIcon = (): JSX.Element | null => {
+  const renderIcon = (): ReactNode => {
     if (entry.icon) {
-      return entry.icon as JSX.Element;
+      return entry.icon;
     }
 
     switch (id) {

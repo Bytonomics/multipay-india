@@ -10,6 +10,8 @@ import type {
   PaymentPickerProps,
   PickerControls,
   PickerProviderView,
+  ProviderEntry,
+  ProviderRuntimeState,
 } from "./types";
 import { Provider, PickerVariant, ResolvedTheme } from "../core/types";
 import { PickerTheme } from "../core/types";
@@ -89,17 +91,42 @@ export const PaymentPicker = forwardRef<PickerControls, PaymentPickerProps>(
     // Build PickerProviderView[] from named-field providers + runtime state
     const { runtime, controls } = usePaymentPicker();
 
+    const getProviderEntry = useCallback(
+      (id: Provider): ProviderEntry => {
+        switch (id) {
+          case Provider.CASHFREE:
+            return payment.providers.cashfree;
+          case Provider.RAZORPAY:
+            return payment.providers.razorpay;
+          case Provider.PAYU:
+            return payment.providers.payu;
+        }
+      },
+      [payment.providers],
+    );
+
+    const getRuntimeState = (id: Provider): ProviderRuntimeState => {
+      switch (id) {
+        case Provider.CASHFREE:
+          return runtime.cashfree;
+        case Provider.RAZORPAY:
+          return runtime.razorpay;
+        case Provider.PAYU:
+          return runtime.payu;
+      }
+    };
+
     const views: PickerProviderView[] = PROVIDER_ORDER.map((id) => ({
       id,
-      entry: payment.providers[id],
-      state: runtime[id as keyof typeof runtime] || { loading: false },
+      entry: getProviderEntry(id),
+      state: getRuntimeState(id) || { loading: false },
     })).filter((view) => view.entry.visible);
 
     // Local state for provider selection (canonical Provider enum value)
     const [selected, setSelected] = useState<Provider>(() => {
       // Validate default is enabled and visible
       const defaultEntry = payment.default
-        ? payment.providers[payment.default]
+        ? getProviderEntry(payment.default)
         : null;
       const isValidDefault =
         payment.default &&
@@ -164,7 +191,7 @@ export const PaymentPicker = forwardRef<PickerControls, PaymentPickerProps>(
     // Handle provider selection
     const handleProviderSelect = useCallback(
       async (selectedProvider: Provider) => {
-        const entry = payment.providers[selectedProvider];
+        const entry = getProviderEntry(selectedProvider);
 
         // Guard: reject if not enabled
         if (!entry.enabled) {
@@ -185,7 +212,7 @@ export const PaymentPicker = forwardRef<PickerControls, PaymentPickerProps>(
           controls.setLoading(selectedProvider, false);
         }
       },
-      [payment.providers, onSelect, controls],
+      [getProviderEntry, onSelect, controls],
     );
 
     // Imperative API via ref

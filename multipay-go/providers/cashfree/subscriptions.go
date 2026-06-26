@@ -59,14 +59,14 @@ func createSubscription(ctx context.Context, adapter *Adapter, req *domain.Creat
 		nil, // xIdempotencyKey
 		adapter.httpClient,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create subscription on cashfree: %w", domain.ErrProviderError)
-	}
 	defer func() {
 		if httpResp != nil && httpResp.Body != nil {
 			_ = httpResp.Body.Close()
 		}
 	}()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create subscription on cashfree: %w", domain.ErrProviderError)
+	}
 
 	if cfSub == nil {
 		return nil, fmt.Errorf("cashfree returned nil subscription: %w", domain.ErrProviderError)
@@ -112,14 +112,14 @@ func getSubscription(ctx context.Context, adapter *Adapter, req *domain.GetSubsc
 		nil, // xIdempotencyKey
 		adapter.httpClient,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch subscription from cashfree: %w", domain.ErrProviderError)
-	}
 	defer func() {
 		if httpResp != nil && httpResp.Body != nil {
 			_ = httpResp.Body.Close()
 		}
 	}()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch subscription from cashfree: %w", domain.ErrProviderError)
+	}
 
 	if cfSub == nil {
 		return nil, fmt.Errorf("cashfree returned nil subscription: %w", domain.ErrProviderError)
@@ -154,14 +154,14 @@ func cancelSubscription(ctx context.Context, adapter *Adapter, req *domain.Cance
 		nil, // xIdempotencyKey
 		adapter.httpClient,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to cancel subscription on cashfree: %w", domain.ErrProviderError)
-	}
 	defer func() {
 		if httpResp != nil && httpResp.Body != nil {
 			_ = httpResp.Body.Close()
 		}
 	}()
+	if err != nil {
+		return nil, fmt.Errorf("failed to cancel subscription on cashfree: %w", domain.ErrProviderError)
+	}
 
 	if cfSub == nil {
 		return nil, fmt.Errorf("cashfree returned nil subscription: %w", domain.ErrProviderError)
@@ -196,14 +196,14 @@ func pauseSubscription(ctx context.Context, adapter *Adapter, req *domain.PauseS
 		nil, // xIdempotencyKey
 		adapter.httpClient,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to pause subscription on cashfree: %w", domain.ErrProviderError)
-	}
 	defer func() {
 		if httpResp != nil && httpResp.Body != nil {
 			_ = httpResp.Body.Close()
 		}
 	}()
+	if err != nil {
+		return nil, fmt.Errorf("failed to pause subscription on cashfree: %w", domain.ErrProviderError)
+	}
 
 	if cfSub == nil {
 		return nil, fmt.Errorf("cashfree returned nil subscription: %w", domain.ErrProviderError)
@@ -238,14 +238,14 @@ func resumeSubscription(ctx context.Context, adapter *Adapter, req *domain.Resum
 		nil, // xIdempotencyKey
 		adapter.httpClient,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resume subscription on cashfree: %w", domain.ErrProviderError)
-	}
 	defer func() {
 		if httpResp != nil && httpResp.Body != nil {
 			_ = httpResp.Body.Close()
 		}
 	}()
+	if err != nil {
+		return nil, fmt.Errorf("failed to resume subscription on cashfree: %w", domain.ErrProviderError)
+	}
 
 	if cfSub == nil {
 		return nil, fmt.Errorf("cashfree returned nil subscription: %w", domain.ErrProviderError)
@@ -293,14 +293,14 @@ func changePlan(ctx context.Context, adapter *Adapter, req *domain.ChangePlanReq
 		nil, // xIdempotencyKey
 		adapter.httpClient,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to change plan on cashfree: %w", domain.ErrProviderError)
-	}
 	defer func() {
 		if httpResp != nil && httpResp.Body != nil {
 			_ = httpResp.Body.Close()
 		}
 	}()
+	if err != nil {
+		return nil, fmt.Errorf("failed to change plan on cashfree: %w", domain.ErrProviderError)
+	}
 
 	if cfSub == nil {
 		return nil, fmt.Errorf("cashfree returned nil subscription: %w", domain.ErrProviderError)
@@ -329,13 +329,13 @@ func getSubscriptionPayments(ctx context.Context, adapter *Adapter, req *domain.
 		nil, // xIdempotencyKey
 		adapter.httpClient,
 	)
+	defer func() {
+		if subHttpResp != nil && subHttpResp.Body != nil {
+			_ = subHttpResp.Body.Close()
+		}
+	}()
 	if ferr != nil {
 		return nil, fmt.Errorf("failed to fetch subscription for currency: %w", ferr)
-	}
-	if subHttpResp != nil && subHttpResp.Body != nil {
-		if closeErr := subHttpResp.Body.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
-		}
 	}
 
 	// Resolve currency
@@ -355,14 +355,14 @@ func getSubscriptionPayments(ctx context.Context, adapter *Adapter, req *domain.
 		nil, // xIdempotencyKey
 		adapter.httpClient,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch subscription payments from cashfree: %w", domain.ErrProviderError)
-	}
 	defer func() {
 		if httpResp != nil && httpResp.Body != nil {
 			_ = httpResp.Body.Close()
 		}
 	}()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch subscription payments from cashfree: %w", domain.ErrProviderError)
+	}
 
 	// Map each payment entity to canonical type
 	payments := make([]*domain.SubscriptionPayment, 0, len(cfPayments))

@@ -19,27 +19,42 @@ export function usePaymentPicker(): {
   }));
 
   const setLoading = useCallback((provider: Provider, loading: boolean) => {
-    setRuntime((prev) => ({
-      ...prev,
-      [provider]: { ...prev[provider as keyof PickerRuntimeState], loading },
-    }));
+    setRuntime((prev) => {
+      switch (provider) {
+        case Provider.CASHFREE:
+          return { ...prev, cashfree: { ...prev.cashfree, loading } };
+        case Provider.RAZORPAY:
+          return { ...prev, razorpay: { ...prev.razorpay, loading } };
+        case Provider.PAYU:
+          return { ...prev, payu: { ...prev.payu, loading } };
+      }
+    });
   }, []);
 
   const setError = useCallback((provider: Provider, error?: string) => {
-    setRuntime((prev) => ({
-      ...prev,
-      [provider]: { ...prev[provider as keyof PickerRuntimeState], error },
-    }));
+    setRuntime((prev) => {
+      switch (provider) {
+        case Provider.CASHFREE:
+          return { ...prev, cashfree: { ...prev.cashfree, error } };
+        case Provider.RAZORPAY:
+          return { ...prev, razorpay: { ...prev.razorpay, error } };
+        case Provider.PAYU:
+          return { ...prev, payu: { ...prev.payu, error } };
+      }
+    });
   }, []);
 
   const clearError = useCallback((provider: Provider) => {
-    setRuntime((prev) => ({
-      ...prev,
-      [provider]: {
-        ...prev[provider as keyof PickerRuntimeState],
-        error: undefined,
-      },
-    }));
+    setRuntime((prev) => {
+      switch (provider) {
+        case Provider.CASHFREE:
+          return { ...prev, cashfree: { ...prev.cashfree, error: undefined } };
+        case Provider.RAZORPAY:
+          return { ...prev, razorpay: { ...prev.razorpay, error: undefined } };
+        case Provider.PAYU:
+          return { ...prev, payu: { ...prev.payu, error: undefined } };
+      }
+    });
   }, []);
 
   return {
