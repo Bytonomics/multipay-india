@@ -118,7 +118,9 @@ describe("Contract: golden vectors", () => {
       const payload = vector as CheckoutPayload;
       const keys = Object.keys(vector as object);
       expect(keys.includes("order_id")).toBe(true);
-      expect(payload.order_id).toBe("order_RZP123");
+      if (payload.provider === "razorpay") {
+        expect((payload as { order_id: string }).order_id).toBe("order_RZP123");
+      }
       // NOT camelCase — the golden vector uses snake_case
       expect(keys.includes("orderId")).toBe(false);
     });

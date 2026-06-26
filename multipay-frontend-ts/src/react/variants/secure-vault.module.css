@@ -35,6 +35,36 @@
 }
 
 /* ============================================
+   DARK THEME — EXPLICIT RULE
+   ============================================ */
+
+[data-theme="dark"] .secureVault {
+  --mpay-bg-primary: #0b1220;
+  --mpay-bg-card: #1a1f26;
+  --mpay-bg-card-hover: #2a313b;
+  --mpay-bg-slot: #151922;
+  --mpay-bg-slot-selected: #1a2028;
+
+  --mpay-border-primary: #2a313b;
+  --mpay-border-slot: #1e2630;
+  --mpay-border-slot-selected: #22c55e;
+
+  --mpay-text-primary: #e2e8f0;
+  --mpay-text-secondary: #94a3b8;
+  --mpay-text-muted: #64748b;
+
+  --mpay-glow-selected: #22c55e;
+  --mpay-shield-bg: #22c55e;
+  --mpay-shield-icon: #ffffff;
+
+  --mpay-error: #ef4444;
+  --mpay-warning: #f59e0b;
+
+  --mpay-accent-green: #34d399;
+  --mpay-accent-circuit: #0ea5e9;
+}
+
+/* ============================================
    LIGHT THEME OVERRIDES — ANCESTOR SELECTORS
    ============================================ */
 

@@ -2,6 +2,7 @@ import {
   forwardRef,
   useEffect,
   useImperativeHandle,
+  useRef,
   useState,
   useCallback,
 } from "react";
@@ -67,6 +68,7 @@ const PROVIDER_ORDER: readonly Provider[] = [
 export const PaymentPicker = forwardRef<PickerControls, PaymentPickerProps>(
   (props, ref) => {
     const { payment, appearance = {}, onSelect } = props;
+    const pickerRootRef = useRef<HTMLDivElement>(null);
 
     // Validate required payment fields
     if (!payment.amountMinor || payment.amountMinor <= 0) {
@@ -195,19 +197,10 @@ export const PaymentPicker = forwardRef<PickerControls, PaymentPickerProps>(
         },
         getSelectedProvider: () => selected,
         isSelected: (provider: Provider) => selected === provider,
-        setProviderDisabled: (
-          providerId: Provider,
-          disabled: boolean,
-          reason?: string,
-        ) => {
-          void providerId;
-          void disabled;
-          void reason;
-        },
         focus: () => {
-          const firstCard = document.querySelector(
+          const firstCard = pickerRootRef.current?.querySelector(
             '[role="button"]',
-          ) as HTMLElement;
+          ) as HTMLElement | null;
           firstCard?.focus();
         },
         blur: () => {
@@ -256,6 +249,7 @@ export const PaymentPicker = forwardRef<PickerControls, PaymentPickerProps>(
 
     return (
       <div
+        ref={pickerRootRef}
         className={`mpay-picker ${styles.picker} ${className || ""}`}
         data-theme={currentTheme}
         role="region"
@@ -280,7 +274,9 @@ export const PaymentPicker = forwardRef<PickerControls, PaymentPickerProps>(
         )}
 
         {/* Loading overlay */}
-        {Object.values(runtime).some((state) => state.loading) && (
+        {(runtime.cashfree.loading ||
+          runtime.razorpay.loading ||
+          runtime.payu.loading) && (
           <LoadingOverlay
             provider={
               views.find((v) => v.id === selected)?.entry.label ||
@@ -290,19 +286,23 @@ export const PaymentPicker = forwardRef<PickerControls, PaymentPickerProps>(
         )}
 
         {/* Error banner */}
-        {Object.values(runtime).some((state) => state.error) && (
+        {(runtime.cashfree.error ||
+          runtime.razorpay.error ||
+          runtime.payu.error) && (
           <ErrorBanner
             message={
-              Object.values(runtime).find((state) => state.error)?.error ||
+              runtime.cashfree.error ||
+              runtime.razorpay.error ||
+              runtime.payu.error ||
               "Payment failed"
             }
             onRetry={() => {
-              const errorEntries = Object.entries(runtime).filter(
-                ([, state]) => state.error,
-              );
-              if (errorEntries.length > 0) {
-                const [providerId] = errorEntries[0];
-                void handleProviderSelect(providerId as Provider);
+              if (runtime.cashfree.error) {
+                void handleProviderSelect(Provider.CASHFREE);
+              } else if (runtime.razorpay.error) {
+                void handleProviderSelect(Provider.RAZORPAY);
+              } else if (runtime.payu.error) {
+                void handleProviderSelect(Provider.PAYU);
               }
             }}
           />

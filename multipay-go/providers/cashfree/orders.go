@@ -42,14 +42,13 @@ func createOrder(ctx context.Context, adapter *Adapter, req *domain.CreateOrderR
 		nil, // xIdempotencyKey
 		adapter.httpClient,
 	)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
+		}
+	}()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create order on cashfree: %w", fmt.Errorf("%w: %w", domain.ErrProviderError, err))
-	}
-
-	if httpResp != nil && httpResp.Body != nil {
-		if closeErr := httpResp.Body.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
-		}
 	}
 
 	if cfOrder == nil {
@@ -57,7 +56,10 @@ func createOrder(ctx context.Context, adapter *Adapter, req *domain.CreateOrderR
 	}
 
 	// Map response to canonical type
-	order := MapOrderEntityToCanonical(cfOrder)
+	order, err := MapOrderEntityToCanonical(cfOrder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map order: %w", err)
+	}
 	order.Checkout = buildCashfreeCheckout(adapter.config.Environment, order.SessionID)
 	return order, nil
 }
@@ -91,6 +93,11 @@ func getOrder(ctx context.Context, adapter *Adapter, req *domain.GetOrderRequest
 		nil, // xIdempotencyKey
 		adapter.httpClient,
 	)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
+		}
+	}()
 	if err != nil {
 		// Check if error is 404 order not found
 		if isNotFoundError(err) {
@@ -98,18 +105,16 @@ func getOrder(ctx context.Context, adapter *Adapter, req *domain.GetOrderRequest
 		}
 		return nil, fmt.Errorf("failed to fetch order from Cashfree: %w", domain.ErrProviderError)
 	}
-	if httpResp != nil && httpResp.Body != nil {
-		if closeErr := httpResp.Body.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
-		}
-	}
 
 	if cfOrder == nil {
 		return nil, fmt.Errorf("cashfree returned nil order: %w", domain.ErrProviderError)
 	}
 
 	// Map response to canonical type
-	order := MapOrderEntityToCanonical(cfOrder)
+	order, err := MapOrderEntityToCanonical(cfOrder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map order: %w", err)
+	}
 	return order, nil
 }
 
@@ -132,18 +137,17 @@ func listOrderPayments(ctx context.Context, adapter *Adapter, req *domain.ListOr
 		nil, // xIdempotencyKey
 		adapter.httpClient,
 	)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
+		}
+	}()
 	if err != nil {
 		// Check if error is 404 order not found
 		if isNotFoundError(err) {
 			return nil, fmt.Errorf("order %s not found: %w", req.OrderID, domain.ErrOrderNotFound)
 		}
 		return nil, fmt.Errorf("failed to fetch payments from Cashfree: %w", domain.ErrProviderError)
-	}
-
-	if httpResp != nil && httpResp.Body != nil {
-		if closeErr := httpResp.Body.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
-		}
 	}
 
 	if cfPayments == nil {
@@ -154,7 +158,10 @@ func listOrderPayments(ctx context.Context, adapter *Adapter, req *domain.ListOr
 	result := make([]*domain.Payment, 0, len(cfPayments))
 	for i := range cfPayments {
 		cfPayment := &cfPayments[i]
-		payment := MapPaymentEntityToCanonical(cfPayment)
+		payment, err := MapPaymentEntityToCanonical(cfPayment)
+		if err != nil {
+			return nil, fmt.Errorf("failed to map payment at index %d: %w", i, err)
+		}
 		if payment != nil {
 			result = append(result, payment)
 		}

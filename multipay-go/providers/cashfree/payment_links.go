@@ -44,18 +44,21 @@ func createPaymentLink(ctx context.Context, adapter *Adapter, req *domain.Create
 		return nil, fmt.Errorf("failed to create payment link on cashfree: %w", domain.ErrProviderError)
 	}
 
-	if httpResp != nil && httpResp.Body != nil {
-		if closeErr := httpResp.Body.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
 		}
-	}
+	}()
 
 	if cfLink == nil {
 		return nil, fmt.Errorf("cashfree returned nil payment link: %w", domain.ErrProviderError)
 	}
 
 	// Map response to canonical type
-	link := MapLinkEntityToCanonical(cfLink)
+	link, err := MapLinkEntityToCanonical(cfLink)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map link: %w", err)
+	}
 	return link, nil
 }
 
@@ -86,18 +89,21 @@ func getPaymentLink(ctx context.Context, adapter *Adapter, req *domain.GetPaymen
 		}
 		return nil, fmt.Errorf("failed to fetch payment link from Cashfree: %w", domain.ErrProviderError)
 	}
-	if httpResp != nil && httpResp.Body != nil {
-		if closeErr := httpResp.Body.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
 		}
-	}
+	}()
 
 	if cfLink == nil {
 		return nil, fmt.Errorf("cashfree returned nil payment link: %w", domain.ErrProviderError)
 	}
 
 	// Map response to canonical type
-	link := MapLinkEntityToCanonical(cfLink)
+	link, err := MapLinkEntityToCanonical(cfLink)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map link: %w", err)
+	}
 	return link, nil
 }
 
@@ -124,17 +130,20 @@ func cancelPaymentLink(ctx context.Context, adapter *Adapter, req *domain.Cancel
 	if err != nil {
 		return nil, fmt.Errorf("failed to cancel payment link on cashfree: %w", domain.ErrProviderError)
 	}
-	if httpResp != nil && httpResp.Body != nil {
-		if closeErr := httpResp.Body.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
 		}
-	}
+	}()
 
 	if cfLink == nil {
 		return nil, fmt.Errorf("cashfree returned nil payment link: %w", domain.ErrProviderError)
 	}
 
 	// Map response to canonical type
-	link := MapLinkEntityToCanonical(cfLink)
+	link, err := MapLinkEntityToCanonical(cfLink)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map link: %w", err)
+	}
 	return link, nil
 }

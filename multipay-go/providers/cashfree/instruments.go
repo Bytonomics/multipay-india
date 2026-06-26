@@ -32,6 +32,11 @@ func getInstrument(ctx context.Context, adapter *Adapter, req *domain.GetInstrum
 		nil, // xIdempotencyKey
 		adapter.httpClient,
 	)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
+		}
+	}()
 	if err != nil {
 		// Check if error is 404 instrument not found
 		if isNotFoundError(err) {
@@ -39,18 +44,16 @@ func getInstrument(ctx context.Context, adapter *Adapter, req *domain.GetInstrum
 		}
 		return nil, fmt.Errorf("failed to fetch instrument from Cashfree: %w", domain.ErrProviderError)
 	}
-	if httpResp != nil && httpResp.Body != nil {
-		if closeErr := httpResp.Body.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
-		}
-	}
 
 	if cfInstrument == nil {
 		return nil, fmt.Errorf("cashfree returned nil instrument: %w", domain.ErrProviderError)
 	}
 
 	// Map response to canonical type
-	instrument := MapInstrumentEntityToCanonical(cfInstrument)
+	instrument, err := MapInstrumentEntityToCanonical(cfInstrument)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map instrument: %w", err)
+	}
 	return instrument, nil
 }
 
@@ -74,17 +77,17 @@ func listInstruments(ctx context.Context, adapter *Adapter, req *domain.ListInst
 		nil, // instrumentType (optional filter)
 		adapter.httpClient,
 	)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
+		}
+	}()
 	if err != nil {
 		// Check if error is 404 customer not found
 		if isNotFoundError(err) {
 			return nil, fmt.Errorf("customer %s not found: %w", req.CustomerID, domain.ErrInstrumentNotFound)
 		}
 		return nil, fmt.Errorf("failed to fetch instruments from Cashfree: %w", domain.ErrProviderError)
-	}
-	if httpResp != nil && httpResp.Body != nil {
-		if closeErr := httpResp.Body.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
-		}
 	}
 
 	if cfInstruments == nil {
@@ -95,7 +98,10 @@ func listInstruments(ctx context.Context, adapter *Adapter, req *domain.ListInst
 	result := make([]*domain.Instrument, 0, len(cfInstruments))
 	for i := range cfInstruments {
 		cfInstrument := &cfInstruments[i]
-		instrument := MapInstrumentEntityForAllSavedCardToCanonical(cfInstrument)
+		instrument, err := MapInstrumentEntityForAllSavedCardToCanonical(cfInstrument)
+		if err != nil {
+			return nil, fmt.Errorf("failed to map instrument at index %d: %w", i, err)
+		}
 		if instrument != nil {
 			result = append(result, instrument)
 		}

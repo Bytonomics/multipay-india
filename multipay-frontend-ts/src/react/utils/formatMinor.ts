@@ -16,11 +16,10 @@ export function formatMinor(
   currency: string,
   locale: string = "en-IN",
 ): string {
-  const formatter = new Intl.NumberFormat(locale, {
+  // First, create a formatter WITHOUT min/maxFractionDigits to get the true ISO exponent
+  const probeFormatter = new Intl.NumberFormat(locale, {
     style: "currency",
     currency: currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
   });
 
   // Get the ISO 4217 exponent (decimal places) for this currency
@@ -28,11 +27,12 @@ export function formatMinor(
   // exponent 2: 100 minor = 1 major (INR, USD, EUR, GBP)
   // exponent 3: 1000 minor = 1 major (BHD, KWD, OMR)
   const exponent: number =
-    formatter.resolvedOptions().maximumFractionDigits ?? 2;
+    probeFormatter.resolvedOptions().maximumFractionDigits ?? 2;
   const divisor: number = 10 ** exponent;
   const amountMajor: number = amountMinor / divisor;
 
-  return formatter.format(amountMajor);
+  // Now format with the default precision for this currency
+  return probeFormatter.format(amountMajor);
 }
 
 /**
@@ -50,18 +50,25 @@ export function formatMinorWithPrecision(
   fractionDigits: number = 2,
   locale: string = "en-IN",
 ): string {
-  const formatter = new Intl.NumberFormat(locale, {
+  // First, create a formatter WITHOUT min/maxFractionDigits to get the true ISO exponent
+  const probeFormatter = new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: currency,
+  });
+
+  // Get the ISO 4217 exponent (decimal places) for this currency
+  const exponent: number =
+    probeFormatter.resolvedOptions().maximumFractionDigits ?? 2;
+  const divisor: number = 10 ** exponent;
+  const amountMajor: number = amountMinor / divisor;
+
+  // Now format with the requested precision
+  const displayFormatter = new Intl.NumberFormat(locale, {
     style: "currency",
     currency: currency,
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits,
   });
 
-  // Get the ISO 4217 exponent (decimal places) for this currency
-  const exponent: number =
-    formatter.resolvedOptions().maximumFractionDigits ?? 2;
-  const divisor: number = 10 ** exponent;
-  const amountMajor: number = amountMinor / divisor;
-
-  return formatter.format(amountMajor);
+  return displayFormatter.format(amountMajor);
 }

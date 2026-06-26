@@ -62,18 +62,21 @@ func createSubscription(ctx context.Context, adapter *Adapter, req *domain.Creat
 	if err != nil {
 		return nil, fmt.Errorf("failed to create subscription on cashfree: %w", domain.ErrProviderError)
 	}
-	if httpResp != nil && httpResp.Body != nil {
-		if closeErr := httpResp.Body.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
 		}
-	}
+	}()
 
 	if cfSub == nil {
 		return nil, fmt.Errorf("cashfree returned nil subscription: %w", domain.ErrProviderError)
 	}
 
 	// Map response to canonical type
-	subscription := MapSubscriptionEntityToCanonical(cfSub)
+	subscription, err := MapSubscriptionEntityToCanonical(cfSub)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map subscription: %w", err)
+	}
 	return subscription, nil
 }
 
@@ -112,18 +115,21 @@ func getSubscription(ctx context.Context, adapter *Adapter, req *domain.GetSubsc
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch subscription from cashfree: %w", domain.ErrProviderError)
 	}
-	if httpResp != nil && httpResp.Body != nil {
-		if closeErr := httpResp.Body.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
 		}
-	}
+	}()
 
 	if cfSub == nil {
 		return nil, fmt.Errorf("cashfree returned nil subscription: %w", domain.ErrProviderError)
 	}
 
 	// Map response to canonical type
-	subscription := MapSubscriptionEntityToCanonical(cfSub)
+	subscription, err := MapSubscriptionEntityToCanonical(cfSub)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map subscription: %w", err)
+	}
 	return subscription, nil
 }
 
@@ -151,18 +157,21 @@ func cancelSubscription(ctx context.Context, adapter *Adapter, req *domain.Cance
 	if err != nil {
 		return nil, fmt.Errorf("failed to cancel subscription on cashfree: %w", domain.ErrProviderError)
 	}
-	if httpResp != nil && httpResp.Body != nil {
-		if closeErr := httpResp.Body.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
 		}
-	}
+	}()
 
 	if cfSub == nil {
 		return nil, fmt.Errorf("cashfree returned nil subscription: %w", domain.ErrProviderError)
 	}
 
 	// Map response to canonical type
-	subscription := MapSubscriptionEntityToCanonical(cfSub)
+	subscription, err := MapSubscriptionEntityToCanonical(cfSub)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map subscription: %w", err)
+	}
 	return subscription, nil
 }
 
@@ -190,18 +199,21 @@ func pauseSubscription(ctx context.Context, adapter *Adapter, req *domain.PauseS
 	if err != nil {
 		return nil, fmt.Errorf("failed to pause subscription on cashfree: %w", domain.ErrProviderError)
 	}
-	if httpResp != nil && httpResp.Body != nil {
-		if closeErr := httpResp.Body.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
 		}
-	}
+	}()
 
 	if cfSub == nil {
 		return nil, fmt.Errorf("cashfree returned nil subscription: %w", domain.ErrProviderError)
 	}
 
 	// Map response to canonical type
-	subscription := MapSubscriptionEntityToCanonical(cfSub)
+	subscription, err := MapSubscriptionEntityToCanonical(cfSub)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map subscription: %w", err)
+	}
 	return subscription, nil
 }
 
@@ -229,18 +241,21 @@ func resumeSubscription(ctx context.Context, adapter *Adapter, req *domain.Resum
 	if err != nil {
 		return nil, fmt.Errorf("failed to resume subscription on cashfree: %w", domain.ErrProviderError)
 	}
-	if httpResp != nil && httpResp.Body != nil {
-		if closeErr := httpResp.Body.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
 		}
-	}
+	}()
 
 	if cfSub == nil {
 		return nil, fmt.Errorf("cashfree returned nil subscription: %w", domain.ErrProviderError)
 	}
 
 	// Map response to canonical type
-	subscription := MapSubscriptionEntityToCanonical(cfSub)
+	subscription, err := MapSubscriptionEntityToCanonical(cfSub)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map subscription: %w", err)
+	}
 	return subscription, nil
 }
 
@@ -281,18 +296,21 @@ func changePlan(ctx context.Context, adapter *Adapter, req *domain.ChangePlanReq
 	if err != nil {
 		return nil, fmt.Errorf("failed to change plan on cashfree: %w", domain.ErrProviderError)
 	}
-	if httpResp != nil && httpResp.Body != nil {
-		if closeErr := httpResp.Body.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
 		}
-	}
+	}()
 
 	if cfSub == nil {
 		return nil, fmt.Errorf("cashfree returned nil subscription: %w", domain.ErrProviderError)
 	}
 
 	// Map response to canonical type
-	subscription := MapSubscriptionEntityToCanonical(cfSub)
+	subscription, err := MapSubscriptionEntityToCanonical(cfSub)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map subscription: %w", err)
+	}
 	return subscription, nil
 }
 
@@ -340,16 +358,19 @@ func getSubscriptionPayments(ctx context.Context, adapter *Adapter, req *domain.
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch subscription payments from cashfree: %w", domain.ErrProviderError)
 	}
-	if httpResp != nil && httpResp.Body != nil {
-		if closeErr := httpResp.Body.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
 		}
-	}
+	}()
 
 	// Map each payment entity to canonical type
 	payments := make([]*domain.SubscriptionPayment, 0, len(cfPayments))
 	for i := range cfPayments {
-		payment := MapSubscriptionPaymentEntityToCanonical(&cfPayments[i], currency)
+		payment, err := MapSubscriptionPaymentEntityToCanonical(&cfPayments[i], currency)
+		if err != nil {
+			return nil, fmt.Errorf("failed to map subscription payment at index %d: %w", i, err)
+		}
 		if payment != nil {
 			payments = append(payments, payment)
 		}

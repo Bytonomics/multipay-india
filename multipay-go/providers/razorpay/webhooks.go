@@ -39,11 +39,19 @@ var webhookEventMap = map[string]domain.WebhookEventType{
 
 // razorpayWebhookPayload represents the Razorpay webhook payload structure.
 // This is a simplified representation capturing the essential fields.
+type razorpayWebhookPayloadData struct {
+	Subscription *struct {
+		// Entity is captured as raw bytes so the top-level unmarshal can never fail on
+		// entity content; it is decoded in an isolated step in parseEvent (D12 isolation).
+		Entity json.RawMessage `json:"entity"`
+	} `json:"subscription"`
+}
+
 type razorpayWebhookPayload struct {
-	EventID   string         `json:"event_id"`
-	Event     string         `json:"event"`
-	CreatedAt int64          `json:"created_at"`
-	Payload   map[string]any `json:"payload"`
+	EventID   string                      `json:"event_id"`
+	Event     string                      `json:"event"`
+	CreatedAt int64                       `json:"created_at"`
+	Payload   *razorpayWebhookPayloadData `json:"payload"`
 }
 
 // verifySignature verifies the HMAC-SHA256 signature of a Razorpay webhook payload.
@@ -148,33 +156,31 @@ func parseEvent(ctx context.Context, body []byte, headers map[string]string) (*d
 
 	// Handle subscription webhook events
 	if strings.HasPrefix(eventTypeLower, "subscription.") {
-		// Extract subscription wrapper from the webhook payload
-		if subscriptionWrapper, ok := payload.Payload["subscription"].(map[string]any); ok {
-			// Unwrap the entity key (Razorpay nests subscription fields under entity)
-			entityData, entityOK := subscriptionWrapper["entity"].(map[string]any)
-			if !entityOK || len(entityData) == 0 {
-				event.ParseError = "subscription.entity missing or empty in webhook payload"
+		// Extract subscription from the webhook payload
+		if payload.Payload != nil && payload.Payload.Subscription != nil && len(payload.Payload.Subscription.Entity) > 0 {
+			// Decode the entity in an isolated step so a malformed entity does NOT abort the
+			// whole parse (D12: never abort dispatch — preserve the event type and dispatch).
+			entity := &razorpaySubscriptionResponse{}
+			if derr := json.Unmarshal(payload.Payload.Subscription.Entity, entity); derr != nil {
+				// Decode failure: preserve event type, record parse error (D12: never abort dispatch)
+				event.ParseError = derr.Error()
+				event.Subscription = nil
 			} else {
-				// Decode subscription from the entity data
-				typed, derr := decodeResponse[razorpaySubscriptionResponse](entityData)
-				if derr != nil {
-					// Decode failure: preserve event type, record parse error (D12: never abort dispatch)
-					event.ParseError = derr.Error()
+				// Encode subscription entity to JSON for RawPayload
+				rawJSON, merr := json.Marshal(entity)
+				if merr != nil {
+					event.ParseError = fmt.Sprintf("failed to marshal subscription: %v", merr)
 					event.Subscription = nil
 				} else {
-					rawJSON, merr := json.Marshal(typed)
-					if merr != nil {
-						event.ParseError = fmt.Sprintf("failed to marshal subscription: %v", merr)
-						event.Subscription = nil
-					} else {
-						event.Subscription = mapSubscriptionFromResponse(typed, rawJSON)
-						// Set RawVendorStatus for subscription events (D11)
-						if typed.Status != "" {
-							event.RawVendorStatus = typed.Status
-						}
+					event.Subscription = mapSubscriptionFromResponse(entity, rawJSON)
+					// Set RawVendorStatus for subscription events (D11)
+					if entity.Status != "" {
+						event.RawVendorStatus = entity.Status
 					}
 				}
 			}
+		} else {
+			event.ParseError = "subscription.entity missing or empty in webhook payload"
 		}
 	}
 

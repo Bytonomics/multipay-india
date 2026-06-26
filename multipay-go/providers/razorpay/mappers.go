@@ -49,6 +49,26 @@ type razorpayPlanCreateRequest struct {
 	Notes    map[string]string `json:"notes,omitempty"`
 }
 
+type razorpaySubscriptionCreateRequest struct {
+	PlanID         string         `json:"plan_id"`
+	CustomerNotify int            `json:"customer_notify"`
+	CustomerEmail  string         `json:"customer_email,omitempty"`
+	CustomerPhone  string         `json:"customer_phone,omitempty"`
+	CustomerName   string         `json:"customer_name,omitempty"`
+	ExpireBy       int64          `json:"expire_by,omitempty"`
+	StartAt        int64          `json:"start_at,omitempty"`
+	Notes          map[string]any `json:"notes,omitempty"`
+}
+
+type razorpayChangePlanRequest struct {
+	PlanID           string `json:"plan_id"`
+	ScheduleChangeAt string `json:"schedule_change_at"`
+}
+
+type razorpayInvoiceListRequest struct {
+	SubscriptionID string `json:"subscription_id"`
+}
+
 type razorpaySubscriptionResponse struct {
 	ID             string            `json:"id"`
 	PlanID         string            `json:"plan_id"`

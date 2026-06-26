@@ -159,15 +159,6 @@ export interface PickerControls {
   isSelected: (providerId: Provider) => boolean;
 
   /**
-   * Enable or disable a specific provider
-   */
-  setProviderDisabled: (
-    providerId: Provider,
-    disabled: boolean,
-    reason?: string,
-  ) => void;
-
-  /**
    * Focus the picker component
    */
   focus: () => void;

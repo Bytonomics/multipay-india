@@ -1,15 +1,6 @@
 import { useCallback, useState } from "react";
 import { Provider } from "../../core/types";
-
-export interface ProviderRuntimeState {
-  loading: boolean;
-  error?: string;
-}
-
-export interface PickerRuntimeState {
-  cashfree: ProviderRuntimeState;
-  razorpay: ProviderRuntimeState;
-}
+import type { PickerRuntimeState } from "../types";
 
 export interface PaymentPickerControls {
   setLoading: (provider: Provider, loading: boolean) => void;
@@ -24,6 +15,7 @@ export function usePaymentPicker(): {
   const [runtime, setRuntime] = useState<PickerRuntimeState>(() => ({
     cashfree: { loading: false },
     razorpay: { loading: false },
+    payu: { loading: false },
   }));
 
   const setLoading = useCallback((provider: Provider, loading: boolean) => {

@@ -55,14 +55,8 @@ export enum ResolvedTheme {
  */
 export interface CashfreeCheckoutPayload {
   provider: Provider.CASHFREE;
-  order_id: string;
-  session_id: string;
   environment: Environment;
-  amount: number;
-  currency: string;
-  customer_id?: string;
-  customer_phone?: string;
-  customer_email?: string;
+  session_id: string;
 }
 
 /**
@@ -70,16 +64,12 @@ export interface CashfreeCheckoutPayload {
  */
 export interface RazorpayCheckoutPayload {
   provider: Provider.RAZORPAY;
+  environment: Environment;
   order_id: string;
-  key_id: string;
   public_key: string;
+  callback_url: string;
   amount_minor: number;
   currency: string;
-  environment: Environment;
-  customer_id?: string;
-  customer_phone?: string;
-  customer_email?: string;
-  callback_url?: string;
 }
 
 /**

@@ -442,10 +442,11 @@ function CheckoutFlow() {
   // Check if a provider is selected
   const isCashfreeSelected = controls.isSelected('cashfree')
 
-  // Disable a provider dynamically
-  const disableRazorpay = () => {
-    controls.setProviderDisabled('razorpay', true, 'Currently unavailable')
-  }
+  // Disabling a provider is DECLARATIVE — set it on the payment.providers prop:
+  //   payment.providers.razorpay = {
+  //     ...entry, enabled: false, disabledMessage: 'Currently unavailable',
+  //   }
+  // Every variant honors `enabled`/`disabledMessage`; there is no imperative disable method.
 
   return (
     <PaymentPicker

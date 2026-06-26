@@ -48,18 +48,21 @@ func createPlan(ctx context.Context, a *Adapter, req *domain.CreatePlanRequest) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create plan: %w", err)
 	}
-	if httpResp != nil && httpResp.Body != nil {
-		if closeErr := httpResp.Body.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
 		}
-	}
+	}()
 
 	if cfPlan == nil {
 		return nil, fmt.Errorf("cashfree returned nil plan: %w", domain.ErrProviderError)
 	}
 
 	// Map response to canonical type
-	plan := MapPlanEntityToCanonical(cfPlan)
+	plan, err := MapPlanEntityToCanonical(cfPlan)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map plan: %w", err)
+	}
 	return plan, nil
 }
 
@@ -105,17 +108,20 @@ func getPlan(ctx context.Context, adapter *Adapter, req *domain.GetPlanRequest) 
 		}
 		return nil, fmt.Errorf("failed to fetch plan from Cashfree: %w", err)
 	}
-	if httpResp != nil && httpResp.Body != nil {
-		if closeErr := httpResp.Body.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
 		}
-	}
+	}()
 
 	if cfPlan == nil {
 		return nil, fmt.Errorf("cashfree returned nil plan: %w", domain.ErrProviderError)
 	}
 
 	// Map response to canonical type
-	plan := MapPlanEntityToCanonical(cfPlan)
+	plan, err := MapPlanEntityToCanonical(cfPlan)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map plan: %w", err)
+	}
 	return plan, nil
 }

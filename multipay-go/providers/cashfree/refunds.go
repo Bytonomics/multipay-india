@@ -41,13 +41,13 @@ func createRefund(ctx context.Context, adapter *Adapter, req *domain.CreateRefun
 		nil, // xIdempotencyKey
 		adapter.httpClient,
 	)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
+		}
+	}()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create refund on cashfree: %w", domain.ErrProviderError)
-	}
-	if httpResp != nil && httpResp.Body != nil {
-		if closeErr := httpResp.Body.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
-		}
 	}
 
 	if cfRefund == nil {
@@ -55,7 +55,10 @@ func createRefund(ctx context.Context, adapter *Adapter, req *domain.CreateRefun
 	}
 
 	// Map response to canonical type
-	refund := MapRefundEntityToCanonical(cfRefund)
+	refund, err := MapRefundEntityToCanonical(cfRefund)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map refund: %w", err)
+	}
 	return refund, nil
 }
 
@@ -84,6 +87,11 @@ func getRefund(ctx context.Context, adapter *Adapter, req *domain.GetRefundReque
 		nil, // xIdempotencyKey
 		adapter.httpClient,
 	)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
+		}
+	}()
 	if err != nil {
 		// Check if error is 404 refund not found
 		if isNotFoundError(err) {
@@ -91,18 +99,16 @@ func getRefund(ctx context.Context, adapter *Adapter, req *domain.GetRefundReque
 		}
 		return nil, fmt.Errorf("failed to fetch refund from Cashfree: %w", domain.ErrProviderError)
 	}
-	if httpResp != nil && httpResp.Body != nil {
-		if closeErr := httpResp.Body.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
-		}
-	}
 
 	if cfRefund == nil {
 		return nil, fmt.Errorf("cashfree returned nil refund: %w", domain.ErrProviderError)
 	}
 
 	// Map response to canonical type
-	refund := MapRefundEntityToCanonical(cfRefund)
+	refund, err := MapRefundEntityToCanonical(cfRefund)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map refund: %w", err)
+	}
 	return refund, nil
 }
 
@@ -146,7 +152,10 @@ func listRefunds(ctx context.Context, adapter *Adapter, req *domain.ListRefundsR
 	result := make([]*domain.Refund, 0, len(cfRefunds))
 	for i := range cfRefunds {
 		cfRefund := &cfRefunds[i]
-		refund := MapRefundEntityToCanonical(cfRefund)
+		refund, err := MapRefundEntityToCanonical(cfRefund)
+		if err != nil {
+			return nil, fmt.Errorf("failed to map refund at index %d: %w", i, err)
+		}
 		if refund != nil {
 			result = append(result, refund)
 		}

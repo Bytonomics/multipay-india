@@ -15,7 +15,10 @@ func TestMapSubscriptionPaymentEntity_CurrencyNotHardcoded(t *testing.T) {
 		PaymentAmount: &amtJPY,
 		PaymentId:     ptrString("pp"),
 	}
-	pj := MapSubscriptionPaymentEntityToCanonical(ej, "JPY")
+	pj, err := MapSubscriptionPaymentEntityToCanonical(ej, "JPY")
+	if err != nil {
+		t.Fatalf("failed to map payment for JPY: %v", err)
+	}
 	if pj == nil {
 		t.Fatalf("expected non-nil payment for JPY, got nil")
 	}
@@ -29,7 +32,10 @@ func TestMapSubscriptionPaymentEntity_CurrencyNotHardcoded(t *testing.T) {
 		PaymentAmount: &amtBHD,
 		PaymentId:     ptrString("pp"),
 	}
-	pb := MapSubscriptionPaymentEntityToCanonical(eb, "BHD")
+	pb, err := MapSubscriptionPaymentEntityToCanonical(eb, "BHD")
+	if err != nil {
+		t.Fatalf("failed to map payment for BHD: %v", err)
+	}
 	if pb == nil {
 		t.Fatalf("expected non-nil payment for BHD, got nil")
 	}
@@ -49,7 +55,10 @@ func TestMapPlanEntityToCanonical_AmountConversion(t *testing.T) {
 		PlanCurrency:        &cur,
 		PlanMaxAmount:       &ra,
 	}
-	p := MapPlanEntityToCanonical(e)
+	p, err := MapPlanEntityToCanonical(e)
+	if err != nil {
+		t.Fatalf("failed to map plan for INR: %v", err)
+	}
 	if p == nil {
 		t.Fatalf("expected non-nil plan for INR, got nil")
 	}
@@ -65,7 +74,10 @@ func TestMapPlanEntityToCanonical_AmountConversion(t *testing.T) {
 		PlanCurrency:        &cur,
 		PlanMaxAmount:       &ra,
 	}
-	p = MapPlanEntityToCanonical(e)
+	p, err = MapPlanEntityToCanonical(e)
+	if err != nil {
+		t.Fatalf("failed to map plan for JPY: %v", err)
+	}
 	if p == nil {
 		t.Fatalf("expected non-nil plan for JPY, got nil")
 	}

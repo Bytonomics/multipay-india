@@ -16,9 +16,7 @@ describe("MultiPay.checkout", () => {
       const mpay = new MultiPay();
       const malformedPayload = {
         provider: Provider.CASHFREE,
-        order_id: "order_123",
         environment: Environment.PRODUCTION,
-        currency: "INR",
         // session_id is missing
       } as CheckoutPayload;
 
@@ -44,12 +42,12 @@ describe("MultiPay.checkout", () => {
       const mpay = new MultiPay();
       const malformedPayload = {
         provider: Provider.RAZORPAY,
-        key_id: "key_123",
         order_id: "order_123",
         amount_minor: 50000,
         currency: "INR",
         environment: Environment.PRODUCTION,
         // public_key is missing
+        callback_url: "https://example.com/callback",
       } as CheckoutPayload;
 
       // Mock DOM operations to ensure they are never called
@@ -136,7 +134,6 @@ describe("MultiPay.checkout", () => {
       const mpay = new MultiPay();
       const payload: CheckoutPayload = {
         provider: Provider.RAZORPAY,
-        key_id: "rzp_live_xxx",
         order_id: "order_RZP123",
         public_key: "rzp_live_xxx",
         callback_url: "https://api.smriti.ai/v1/payments/callback/razorpay",
@@ -164,7 +161,6 @@ describe("MultiPay.checkout", () => {
       const mpay = new MultiPay();
       const payload: CheckoutPayload = {
         provider: Provider.RAZORPAY,
-        key_id: "rzp_live_xxx",
         order_id: "order_RZP123",
         public_key: "rzp_live_xxx",
         callback_url: "https://api.smriti.ai/v1/payments/callback/razorpay",
@@ -224,7 +220,6 @@ describe("MultiPay.checkout", () => {
       const mpay = new MultiPay();
       const payload: CheckoutPayload = {
         provider: Provider.RAZORPAY,
-        key_id: "rzp_live_xxx",
         order_id: "order_RZP123",
         public_key: "rzp_live_xxx",
         callback_url: "https://api.smriti.ai/v1/payments/callback/razorpay",
@@ -273,11 +268,8 @@ describe("MultiPay.checkout", () => {
       const mpay = new MultiPay();
       const payload: CheckoutPayload = {
         provider: Provider.CASHFREE,
-        order_id: "order_CF123",
         session_id: "session_abc123",
         environment: Environment.PRODUCTION,
-        currency: "INR",
-        amount: 500,
       };
 
       await mpay.checkout(payload);
@@ -298,11 +290,8 @@ describe("MultiPay.checkout", () => {
       const mpay = new MultiPay();
       const payload: CheckoutPayload = {
         provider: Provider.CASHFREE,
-        order_id: "order_CF123",
         session_id: "session_abc123",
         environment: Environment.SANDBOX,
-        currency: "INR",
-        amount: 500,
       };
 
       await mpay.checkout(payload);

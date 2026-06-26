@@ -8,6 +8,7 @@ export const NeumorphicFlow: React.FC<PickerVariantProps> = ({
   views,
   selected,
   onSelect,
+  theme,
 }) => {
   if (views.length === 0) {
     return null;
@@ -25,16 +26,12 @@ export const NeumorphicFlow: React.FC<PickerVariantProps> = ({
   };
 
   return (
-    <div className={styles.neumorphicFlow} data-theme="light">
+    <div className={styles.neumorphicFlow} data-theme={theme}>
       {/* One-Tap Pay Primary Action */}
       <button
         type="button"
         className={styles.payButton}
-        disabled={
-          selectedView
-            ? selectedView.state.loading || !!selectedView.state.error
-            : false
-        }
+        disabled={selectedView ? selectedView.state.loading : false}
         onClick={() => selected && handleSelect(selected)}
       >
         <span className={styles.payButtonText}>

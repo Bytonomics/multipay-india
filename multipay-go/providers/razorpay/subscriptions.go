@@ -44,42 +44,40 @@ func createSubscription(ctx context.Context, adapter *Adapter, req *domain.Creat
 		planID = planTyped.ID
 	}
 
-	// Build subscription data
-	subData := map[string]any{
-		"plan_id":         planID,
-		"customer_notify": 1,
-	}
-
-	// Add customer details
-	if req.CustomerEmail != "" {
-		subData["customer_email"] = req.CustomerEmail
-	}
-	if req.CustomerPhone != "" {
-		subData["customer_phone"] = req.CustomerPhone
-	}
-	if req.CustomerName != "" {
-		subData["customer_name"] = req.CustomerName
+	// Build subscription data as typed struct
+	subData := &razorpaySubscriptionCreateRequest{
+		PlanID:         planID,
+		CustomerNotify: 1,
+		CustomerEmail:  req.CustomerEmail,
+		CustomerPhone:  req.CustomerPhone,
+		CustomerName:   req.CustomerName,
 	}
 
 	// Add optional fields
 	if req.ExpiresAt != nil {
-		subData["expire_by"] = req.ExpiresAt.Unix()
+		subData.ExpireBy = req.ExpiresAt.Unix()
 	}
 	if req.FirstChargeTime != nil {
-		subData["start_at"] = req.FirstChargeTime.Unix()
+		subData.StartAt = req.FirstChargeTime.Unix()
 	}
 
 	// Add tags as notes
 	if len(req.Tags) > 0 {
-		notesMap := make(map[string]any)
+		notes := make(map[string]any)
 		for k, v := range req.Tags {
-			notesMap[k] = v
+			notes[k] = v
 		}
-		subData["notes"] = notesMap
+		subData.Notes = notes
+	}
+
+	// Convert typed struct to map for SDK
+	subDataMap, err := encodeRequest(subData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode subscription request: %w", err)
 	}
 
 	// Call Razorpay Subscription.Create()
-	subResp, err := adapter.client.Subscription.Create(subData, nil)
+	subResp, err := adapter.client.Subscription.Create(subDataMap, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create subscription on razorpay: %w", domain.ErrProviderError)
 	}
@@ -229,9 +227,16 @@ func changePlan(ctx context.Context, adapter *Adapter, req *domain.ChangePlanReq
 		scheduleAt = "now"
 	}
 
-	updateData := map[string]any{
-		"plan_id":            req.NewPlanID,
-		"schedule_change_at": scheduleAt,
+	// Build change plan request as typed struct
+	updateReq := &razorpayChangePlanRequest{
+		PlanID:           req.NewPlanID,
+		ScheduleChangeAt: scheduleAt,
+	}
+
+	// Convert typed struct to map for SDK
+	updateData, err := encodeRequest(updateReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode change plan request: %w", err)
 	}
 
 	// Call Razorpay Subscription.Update()
@@ -263,7 +268,18 @@ func getSubscriptionPayments(ctx context.Context, adapter *Adapter, req *domain.
 		return nil, fmt.Errorf("request is required: %w", domain.ErrInvalidRequest)
 	}
 
-	resp, err := adapter.client.Invoice.All(map[string]any{"subscription_id": req.SubscriptionID}, nil)
+	// Build invoice list request as typed struct
+	invoiceReq := &razorpayInvoiceListRequest{
+		SubscriptionID: req.SubscriptionID,
+	}
+
+	// Convert typed struct to map for SDK
+	invoiceReqMap, err := encodeRequest(invoiceReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode invoice list request: %w", err)
+	}
+
+	resp, err := adapter.client.Invoice.All(invoiceReqMap, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list subscription invoices: %w", err)
 	}
@@ -273,7 +289,11 @@ func getSubscriptionPayments(ctx context.Context, adapter *Adapter, req *domain.
 	}
 	payments := make([]*domain.SubscriptionPayment, 0, len(typed.Items))
 	for i := range typed.Items {
-		payments = append(payments, mapInvoiceToSubscriptionPayment(&typed.Items[i], req.SubscriptionID, nil))
+		rawJSON, err := json.Marshal(&typed.Items[i])
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal invoice: %w", err)
+		}
+		payments = append(payments, mapInvoiceToSubscriptionPayment(&typed.Items[i], req.SubscriptionID, rawJSON))
 	}
 	return payments, nil
 }

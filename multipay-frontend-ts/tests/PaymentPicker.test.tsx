@@ -859,7 +859,7 @@ describe("PaymentPicker Component", () => {
   });
 
   describe("Assertion 7: PickerControls via ref", () => {
-    it("should provide error control method via ref", async () => {
+    it("should expose the imperative control surface via ref", async () => {
       const mockRef: React.RefObject<PickerControls> = { current: null };
 
       const props = {
@@ -873,11 +873,14 @@ describe("PaymentPicker Component", () => {
         expect(mockRef.current).not.toBeNull();
       });
 
-      // Note: setProviderDisabled is available via controls
-      // Error/loading rendering is handled by the component's state
+      // Provider enable/disable is declarative (payment.providers[id].enabled);
+      // the ref exposes only genuinely imperative actions.
       if (mockRef.current) {
-        // Verify controls exists (implementation detail)
-        expect(typeof mockRef.current.setProviderDisabled).toBe("function");
+        expect(typeof mockRef.current.selectProvider).toBe("function");
+        expect(typeof mockRef.current.getSelectedProvider).toBe("function");
+        expect(typeof mockRef.current.isSelected).toBe("function");
+        expect(typeof mockRef.current.focus).toBe("function");
+        expect(typeof mockRef.current.blur).toBe("function");
       }
     });
 

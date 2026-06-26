@@ -32,6 +32,11 @@ func getPayment(ctx context.Context, adapter *Adapter, req *domain.GetPaymentReq
 		nil, // xIdempotencyKey
 		adapter.httpClient,
 	)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
+		}
+	}()
 	if err != nil {
 		// Check if error is 404 payment not found
 		if isNotFoundError(err) {
@@ -39,18 +44,16 @@ func getPayment(ctx context.Context, adapter *Adapter, req *domain.GetPaymentReq
 		}
 		return nil, fmt.Errorf("failed to fetch payment from Cashfree: %w", domain.ErrProviderError)
 	}
-	if httpResp != nil && httpResp.Body != nil {
-		if closeErr := httpResp.Body.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
-		}
-	}
 
 	if cfPayment == nil {
 		return nil, fmt.Errorf("cashfree returned nil payment: %w", domain.ErrProviderError)
 	}
 
 	// Map response to canonical type
-	payment := MapPaymentEntityToCanonical(cfPayment)
+	payment, err := MapPaymentEntityToCanonical(cfPayment)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map payment: %w", err)
+	}
 	return payment, nil
 }
 
@@ -73,17 +76,17 @@ func listPayments(ctx context.Context, adapter *Adapter, req *domain.ListPayment
 		nil, // xIdempotencyKey
 		adapter.httpClient,
 	)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
+		}
+	}()
 	if err != nil {
 		// Check if error is 404 order not found
 		if isNotFoundError(err) {
 			return nil, fmt.Errorf("order %s not found: %w", req.OrderID, domain.ErrOrderNotFound)
 		}
 		return nil, fmt.Errorf("failed to fetch payments from Cashfree: %w", domain.ErrProviderError)
-	}
-	if httpResp != nil && httpResp.Body != nil {
-		if closeErr := httpResp.Body.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close response body: %w", closeErr)
-		}
 	}
 
 	if cfPayments == nil {
@@ -94,7 +97,10 @@ func listPayments(ctx context.Context, adapter *Adapter, req *domain.ListPayment
 	result := make([]*domain.Payment, 0, len(cfPayments))
 	for i := range cfPayments {
 		cfPayment := &cfPayments[i]
-		payment := MapPaymentEntityToCanonical(cfPayment)
+		payment, err := MapPaymentEntityToCanonical(cfPayment)
+		if err != nil {
+			return nil, fmt.Errorf("failed to map payment at index %d: %w", i, err)
+		}
 		if payment != nil {
 			result = append(result, payment)
 		}

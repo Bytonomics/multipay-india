@@ -13,10 +13,7 @@ export const InteractiveMatrix: React.FC<PickerVariantProps> = ({
       <div className={styles.grid}>
         {views.map((view) => {
           const isSelected = view.id === selected;
-          const isDisabled =
-            !view.entry.enabled ||
-            view.state.loading ||
-            view.state.error !== undefined;
+          const isDisabled = !view.entry.enabled || view.state.loading;
 
           return (
             <button

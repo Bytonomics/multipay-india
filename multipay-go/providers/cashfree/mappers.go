@@ -2,6 +2,7 @@ package cashfree
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"time"
 
@@ -53,9 +54,14 @@ func AmountMajorToMinor(majorAmount float64, currencyCode string) int64 {
 
 // MapOrderEntityToCanonical maps a Cashfree OrderEntity to the canonical domain.Order type.
 // Handles type conversions and status mapping.
-func MapOrderEntityToCanonical(cfOrder *cf.OrderEntity) *domain.Order {
+func MapOrderEntityToCanonical(cfOrder *cf.OrderEntity) (*domain.Order, error) {
 	if cfOrder == nil {
-		return nil
+		return nil, fmt.Errorf("order entity is required: %w", domain.ErrInvalidRequest)
+	}
+
+	raw, err := rawResponse(cfOrder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal order: %w", err)
 	}
 
 	metadata := domain.Metadata(nil)
@@ -74,7 +80,7 @@ func MapOrderEntityToCanonical(cfOrder *cf.OrderEntity) *domain.Order {
 		CreatedAt:       timePtr(TimeFromTimestamp(cfOrder.CreatedAt)),
 		Customer:        nil,
 		Metadata:        metadata,
-		Raw:             rawResponse(cfOrder),
+		Raw:             raw,
 	}
 
 	order.ProviderDetails = &domain.OrderProviderDetail{
@@ -105,13 +111,18 @@ func MapOrderEntityToCanonical(cfOrder *cf.OrderEntity) *domain.Order {
 		}
 	}
 
-	return order
+	return order, nil
 }
 
 // MapPaymentEntityToCanonical maps a Cashfree PaymentEntity to the canonical domain.Payment type.
-func MapPaymentEntityToCanonical(cfPayment *cf.PaymentEntity) *domain.Payment {
+func MapPaymentEntityToCanonical(cfPayment *cf.PaymentEntity) (*domain.Payment, error) {
 	if cfPayment == nil {
-		return nil
+		return nil, fmt.Errorf("payment entity is required: %w", domain.ErrInvalidRequest)
+	}
+
+	raw, err := rawResponse(cfPayment)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payment: %w", err)
 	}
 
 	payment := &domain.Payment{
@@ -128,7 +139,7 @@ func MapPaymentEntityToCanonical(cfPayment *cf.PaymentEntity) *domain.Payment {
 		BankReference:     StringPtrToStr(cfPayment.BankReference),
 		ErrorCode:         "",
 		ErrorMessage:      "",
-		Raw:               rawResponse(cfPayment),
+		Raw:               raw,
 	}
 
 	payment.ProviderDetails = &domain.PaymentProviderDetail{
@@ -153,7 +164,7 @@ func MapPaymentEntityToCanonical(cfPayment *cf.PaymentEntity) *domain.Payment {
 		}
 	}
 
-	return payment
+	return payment, nil
 }
 
 // mapOrderStatus converts Cashfree order status strings to canonical domain.OrderStatus.
@@ -238,9 +249,14 @@ func timePtr(t time.Time) *time.Time {
 }
 
 // MapRefundEntityToCanonical maps a Cashfree RefundEntity to the canonical domain.Refund type.
-func MapRefundEntityToCanonical(cfRefund *cf.RefundEntity) *domain.Refund {
+func MapRefundEntityToCanonical(cfRefund *cf.RefundEntity) (*domain.Refund, error) {
 	if cfRefund == nil {
-		return nil
+		return nil, fmt.Errorf("refund entity is required: %w", domain.ErrInvalidRequest)
+	}
+
+	raw, err := rawResponse(cfRefund)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal refund: %w", err)
 	}
 
 	refundID := ""
@@ -260,7 +276,7 @@ func MapRefundEntityToCanonical(cfRefund *cf.RefundEntity) *domain.Refund {
 		ARN:              StringPtrToStr(cfRefund.RefundArn),
 		CreatedAt:        timePtr(TimeFromTimestamp(cfRefund.CreatedAt)),
 		ProcessedAt:      timePtr(TimeFromTimestamp(cfRefund.ProcessedAt)),
-		Raw:              rawResponse(cfRefund),
+		Raw:              raw,
 	}
 
 	refund.ProviderDetails = &domain.RefundProviderDetail{
@@ -301,7 +317,7 @@ func MapRefundEntityToCanonical(cfRefund *cf.RefundEntity) *domain.Refund {
 		refund.ProviderDetails.Cashfree.RefundSplits = splits
 	}
 
-	return refund
+	return refund, nil
 }
 
 // mapRefundStatus converts Cashfree refund status strings to canonical domain.RefundStatus.
@@ -325,9 +341,14 @@ func mapRefundStatus(statusPtr *string) domain.RefundStatus {
 }
 
 // MapInstrumentEntityToCanonical maps a Cashfree InstrumentEntity to the canonical domain.Instrument type.
-func MapInstrumentEntityToCanonical(cfInstrument *cf.InstrumentEntity) *domain.Instrument {
+func MapInstrumentEntityToCanonical(cfInstrument *cf.InstrumentEntity) (*domain.Instrument, error) {
 	if cfInstrument == nil {
-		return nil
+		return nil, fmt.Errorf("instrument entity is required: %w", domain.ErrInvalidRequest)
+	}
+
+	raw, err := rawResponse(cfInstrument)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal instrument: %w", err)
 	}
 
 	instrumentID := ""
@@ -347,7 +368,7 @@ func MapInstrumentEntityToCanonical(cfInstrument *cf.InstrumentEntity) *domain.I
 		DisplayValue:   StringPtrToStr(cfInstrument.InstrumentDisplay),
 		Status:         StringPtrToStr(cfInstrument.InstrumentStatus),
 		CreatedAt:      timePtr(TimeFromTimestamp(cfInstrument.CreatedAt)),
-		Raw:            rawResponse(cfInstrument),
+		Raw:            raw,
 	}
 
 	instrument.ProviderDetails = &domain.InstrumentProviderDetail{
@@ -366,14 +387,19 @@ func MapInstrumentEntityToCanonical(cfInstrument *cf.InstrumentEntity) *domain.I
 		}
 	}
 
-	return instrument
+	return instrument, nil
 }
 
 // MapInstrumentEntityForAllSavedCardToCanonical maps a Cashfree InstrumentEntityForAllSavedCard
 // (returned from list operations) to the canonical domain.Instrument type.
-func MapInstrumentEntityForAllSavedCardToCanonical(cfInstrument *cf.InstrumentEntityForAllSavedCard) *domain.Instrument {
+func MapInstrumentEntityForAllSavedCardToCanonical(cfInstrument *cf.InstrumentEntityForAllSavedCard) (*domain.Instrument, error) {
 	if cfInstrument == nil {
-		return nil
+		return nil, fmt.Errorf("instrument entity is required: %w", domain.ErrInvalidRequest)
+	}
+
+	raw, err := rawResponse(cfInstrument)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal instrument: %w", err)
 	}
 
 	instrumentID := ""
@@ -393,7 +419,7 @@ func MapInstrumentEntityForAllSavedCardToCanonical(cfInstrument *cf.InstrumentEn
 		DisplayValue:   StringPtrToStr(cfInstrument.InstrumentDisplay),
 		Status:         StringPtrToStr(cfInstrument.InstrumentStatus),
 		CreatedAt:      timePtr(TimeFromTimestamp(cfInstrument.CreatedAt)),
-		Raw:            rawResponse(cfInstrument),
+		Raw:            raw,
 	}
 
 	instrument.ProviderDetails = &domain.InstrumentProviderDetail{
@@ -412,13 +438,18 @@ func MapInstrumentEntityForAllSavedCardToCanonical(cfInstrument *cf.InstrumentEn
 		}
 	}
 
-	return instrument
+	return instrument, nil
 }
 
 // MapLinkEntityToCanonical maps a Cashfree LinkEntity (payment link) to the canonical domain.PaymentLink type.
-func MapLinkEntityToCanonical(cfLink *cf.LinkEntity) *domain.PaymentLink {
+func MapLinkEntityToCanonical(cfLink *cf.LinkEntity) (*domain.PaymentLink, error) {
 	if cfLink == nil {
-		return nil
+		return nil, fmt.Errorf("link entity is required: %w", domain.ErrInvalidRequest)
+	}
+
+	raw, err := rawResponse(cfLink)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal link: %w", err)
 	}
 
 	// Parse LinkStatus to PaymentLinkStatus
@@ -445,7 +476,7 @@ func MapLinkEntityToCanonical(cfLink *cf.LinkEntity) *domain.PaymentLink {
 		CreatedAt:      timePtr(TimeFromTimestamp(cfLink.LinkCreatedAt)),
 		ExpiryTime:     timePtr(TimeFromTimestamp(cfLink.LinkExpiryTime)),
 		Metadata:       metadata,
-		Raw:            rawResponse(cfLink),
+		Raw:            raw,
 	}
 
 	link.ProviderDetails = &domain.PaymentLinkProviderDetail{
@@ -470,7 +501,7 @@ func MapLinkEntityToCanonical(cfLink *cf.LinkEntity) *domain.PaymentLink {
 		link.ProviderDetails.Cashfree.OrderSplits = splits
 	}
 
-	return link
+	return link, nil
 }
 
 // derefBool safely dereferences a bool pointer or returns false.
@@ -482,20 +513,24 @@ func derefBool(b *bool) bool {
 }
 
 // rawResponse marshals a Cashfree SDK entity to JSON and returns it as RawProviderResponse.
-func rawResponse(v interface{}) domain.RawProviderResponse {
+func rawResponse(v interface{}) (domain.RawProviderResponse, error) {
 	data, err := json.Marshal(v)
 	if err != nil {
-		// If marshaling fails, return empty response
-		return domain.RawProviderResponse(nil)
+		return nil, fmt.Errorf("failed to marshal response: %w", err)
 	}
-	return domain.RawProviderResponse(data)
+	return domain.RawProviderResponse(data), nil
 }
 
 // MapPlanEntityToCanonical maps a Cashfree PlanEntity to the canonical domain.Plan type.
 // Handles type conversions, currency lookup, and status mapping.
-func MapPlanEntityToCanonical(entity *cf.PlanEntity) *domain.Plan {
+func MapPlanEntityToCanonical(entity *cf.PlanEntity) (*domain.Plan, error) {
 	if entity == nil {
-		return nil
+		return nil, fmt.Errorf("plan entity is required: %w", domain.ErrInvalidRequest)
+	}
+
+	raw, err := rawResponse(entity)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal plan: %w", err)
 	}
 
 	// Extract currency from the entity (if available in the response)
@@ -523,17 +558,22 @@ func MapPlanEntityToCanonical(entity *cf.PlanEntity) *domain.Plan {
 		Status:         status,
 		Note:           StringPtrToStr(entity.PlanNote),
 		Provider:       domain.ProviderCashfree,
-		Raw:            rawResponse(entity),
+		Raw:            raw,
 	}
 
-	return plan
+	return plan, nil
 }
 
 // MapSubscriptionEntityToCanonical maps a Cashfree SubscriptionEntity to the canonical domain.Subscription type.
 // Handles status mapping and timestamp conversion.
-func MapSubscriptionEntityToCanonical(entity *cf.SubscriptionEntity) *domain.Subscription {
+func MapSubscriptionEntityToCanonical(entity *cf.SubscriptionEntity) (*domain.Subscription, error) {
 	if entity == nil {
-		return nil
+		return nil, fmt.Errorf("subscription entity is required: %w", domain.ErrInvalidRequest)
+	}
+
+	raw, err := rawResponse(entity)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal subscription: %w", err)
 	}
 
 	// Extract PlanID from nested PlanDetails
@@ -566,17 +606,22 @@ func MapSubscriptionEntityToCanonical(entity *cf.SubscriptionEntity) *domain.Sub
 		FirstChargeTime:        timePtr(TimeFromTimestamp(entity.SubscriptionFirstChargeTime)),
 		NextChargeDate:         timePtr(TimeFromTimestamp(entity.NextScheduleDate)),
 		Provider:               domain.ProviderCashfree,
-		Raw:                    rawResponse(entity),
+		Raw:                    raw,
 	}
 
-	return subscription
+	return subscription, nil
 }
 
 // MapSubscriptionPaymentEntityToCanonical maps a Cashfree SubscriptionPaymentEntity to the canonical domain.SubscriptionPayment type.
 // currency is the ISO-4217 code of the parent subscription's plan, used to convert the major-unit payment_amount to minor units; it must be a non-empty code resolved by the caller.
-func MapSubscriptionPaymentEntityToCanonical(entity *cf.SubscriptionPaymentEntity, currency string) *domain.SubscriptionPayment {
+func MapSubscriptionPaymentEntityToCanonical(entity *cf.SubscriptionPaymentEntity, currency string) (*domain.SubscriptionPayment, error) {
 	if entity == nil {
-		return nil
+		return nil, fmt.Errorf("subscription payment entity is required: %w", domain.ErrInvalidRequest)
+	}
+
+	raw, err := rawResponse(entity)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal subscription payment: %w", err)
 	}
 
 	payment := &domain.SubscriptionPayment{
@@ -589,10 +634,10 @@ func MapSubscriptionPaymentEntityToCanonical(entity *cf.SubscriptionPaymentEntit
 		InitiatedDate:  timePtr(TimeFromTimestamp(entity.PaymentInitiatedDate)),
 		RetryAttempts:  int(getInt32OrDefault(entity.RetryAttempts)),
 		Provider:       domain.ProviderCashfree,
-		Raw:            rawResponse(entity),
+		Raw:            raw,
 	}
 
-	return payment
+	return payment, nil
 }
 
 // mapPlanType converts Cashfree plan type strings to canonical domain.PlanType.
