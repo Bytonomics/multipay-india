@@ -33,33 +33,7 @@ A few things worth knowing before the diagram:
   signature, or providers will auto-disable it.
 - **Money is always in minor units** (paisa/cents) — see [Amounts](#amounts-are-always-in-minor-currency-units).
 
-### The order → pay → confirm handshake
-
-```mermaid
-sequenceDiagram
-  autonumber
-  participant FE as Frontend (multipay-frontend-ts)
-  participant BE as Your backend (imports multipay-go)
-  participant MP as multipay-go
-  participant PG as Provider (Cashfree / Razorpay)
-
-  FE->>BE: POST /checkout { amount, currency, customer, return_url }
-  Note over BE,MP: in-process Go call (same binary)
-  BE->>MP: client.Orders().CreateOrder(req)
-  MP->>PG: create order (provider SDK, HTTPS)
-  PG-->>MP: provider order id + payment session
-  MP-->>BE: domain.Order{ Checkout: CheckoutPayload }
-  BE-->>FE: CheckoutPayload { provider, environment, session/order id }
-  FE->>PG: MultiPay.checkout(payload) — redirect to hosted page
-  Note over FE,PG: customer pays on the provider's hosted page
-  PG-->>BE: webhook  POST /webhooks/{provider}/{account}
-  BE->>MP: WebhookHandler — store, dedup, verify signature, parse
-  MP-->>BE: domain.WebhookEvent (typed)
-  BE-->>PG: 200 ACK (always, after signature check)
-  Note over BE: your handler updates billing / order state
-```
-
-### Who imports what
+### The big picture — who imports what
 
 ```mermaid
 flowchart LR
@@ -72,16 +46,24 @@ flowchart LR
   PG[(Payment provider)]
 
   FE -- CheckoutPayload JSON --> BE
-  BE -- Orders / Refunds / Subscriptions / Webhooks --> MP
+  BE -- Orders / PaymentLinks / Refunds / Subscriptions / Webhooks --> MP
   MP -- provider SDK calls --> PG
   FE -. redirect to hosted page .-> PG
   PG -. webhook = source of truth .-> BE
 ```
 
-> **Payment links and subscription renewals skip the redirect.** There's no browser to come back, so the
-> webhook is the *only* thing that closes the loop — same mental model, fewer hops. A full Cashfree-flavoured
-> walkthrough of every flow (checkout, links, subscriptions, webhooks, entitlements) lives in the consumer's
-> `aidocs/payments.md`.
+## Workflows
+
+The library exposes **nine first-class service surfaces** — orders, payments, refunds, instruments, payment
+links, plans, subscriptions, webhooks, and a capability matrix. Each follows the same shape: you call a typed
+method, the library calls the provider, you get a typed result back, and — for anything where money actually
+moves — a **webhook** later confirms the real-world outcome.
+
+**A sequence diagram for every one of these flows lives in [`PAYMENT_FLOWS.md`](./PAYMENT_FLOWS.md).**
+
+> **What you do with a confirmed webhook is yours, not the library's.** The library hands you a typed
+> `domain.WebhookEvent`; turning that into "mark the order paid", "activate the subscription", or "grant
+> access" is your application's business logic.
 
 ## Layout
 

@@ -167,8 +167,28 @@ type GetRefundRequest struct {
 	RefundID string `json:"refund_id" pedantigo:"required,minLength=1"`
 }
 
+// ListRefundsRequest asks a provider for every refund issued against ONE transaction.
+// The two providers scope a refund list differently, so the request carries BOTH ids and
+// each adapter uses only the one its provider requires. At least one of OrderID or
+// PaymentID must be set (enforced by Validate()).
 type ListRefundsRequest struct {
-	OrderID string `json:"order_id" pedantigo:"required,minLength=1"`
+	// OrderID — CASHFREE only. Cashfree lists refunds under the ORDER:
+	//   GET /pg/orders/{order_id}/refunds  (SDK: PGOrderFetchRefunds).
+	// Set this for Cashfree. It is ignored by the Razorpay adapter.
+	OrderID string `json:"order_id,omitempty" pedantigo:"omitempty,minLength=1"`
+	// PaymentID — RAZORPAY only. Razorpay lists refunds under the captured PAYMENT:
+	//   GET /v1/payments/{payment_id}/refunds  (SDK: Payment.FetchMultipleRefund).
+	// Set this for Razorpay. It is ignored by the Cashfree adapter.
+	PaymentID string `json:"payment_id,omitempty" pedantigo:"omitempty,minLength=1"`
+}
+
+// Validate enforces that at least one provider identifier is present. pedantigo's Validate()
+// does not enforce field presence, so this cross-field rule is checked explicitly here.
+func (r *ListRefundsRequest) Validate() error {
+	if r.OrderID == "" && r.PaymentID == "" {
+		return errors.New("at least one of order_id (Cashfree) or payment_id (Razorpay) is required")
+	}
+	return nil
 }
 
 // --- Instrument types ---

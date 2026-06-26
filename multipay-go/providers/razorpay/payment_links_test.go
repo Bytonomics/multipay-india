@@ -41,7 +41,7 @@ func TestCreatePaymentLink_ForwardsParameters(t *testing.T) {
 	}
 
 	cfg := &Config{
-		Key:         "rzp_test_abc123",
+		Key:         "rzp_mock_testonly",
 		Secret:      "test_secret",
 		Environment: domain.EnvironmentSandbox,
 		HTTPClient:  mockHTTPClient,

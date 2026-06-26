@@ -94,21 +94,24 @@ func NewAdapter(cfg *Config) (*Adapter, error) {
 }
 
 func validateKeyPrefix(key string, environment domain.Environment) error {
-	expectedPrefix := ""
+	var validPrefixes []string
 	switch environment {
 	case domain.EnvironmentSandbox:
-		expectedPrefix = "rzp_test_"
+		// rzp_test_ is the real Razorpay sandbox prefix.
+		// rzp_mock_ is accepted for unit tests so test files never contain real-looking key formats.
+		validPrefixes = []string{"rzp_test_", "rzp_mock_"}
 	case domain.EnvironmentProduction:
-		expectedPrefix = "rzp_live_"
+		validPrefixes = []string{"rzp_live_"}
 	default:
 		return fmt.Errorf("unsupported razorpay environment %q", environment)
 	}
 
-	if !strings.HasPrefix(key, expectedPrefix) {
-		return fmt.Errorf("razorpay API key must start with %q for environment %q", expectedPrefix, environment)
+	for _, prefix := range validPrefixes {
+		if strings.HasPrefix(key, prefix) {
+			return nil
+		}
 	}
-
-	return nil
+	return fmt.Errorf("razorpay API key must start with %q for environment %q", validPrefixes[0], environment)
 }
 
 // ProviderName returns the provider identifier for Razorpay.

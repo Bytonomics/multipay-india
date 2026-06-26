@@ -175,3 +175,46 @@ func TestCreateSubscriptionRequest_Validate(t *testing.T) {
 		})
 	}
 }
+
+func TestListRefundsRequest_Validate(t *testing.T) {
+	tests := []struct {
+		name    string
+		req     *ListRefundsRequest
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:    "valid with order_id (Cashfree)",
+			req:     &ListRefundsRequest{OrderID: "order_123"},
+			wantErr: false,
+		},
+		{
+			name:    "valid with payment_id (Razorpay)",
+			req:     &ListRefundsRequest{PaymentID: "pay_123"},
+			wantErr: false,
+		},
+		{
+			name:    "valid with both ids",
+			req:     &ListRefundsRequest{OrderID: "order_123", PaymentID: "pay_123"},
+			wantErr: false,
+		},
+		{
+			name:    "missing both order_id and payment_id",
+			req:     &ListRefundsRequest{},
+			wantErr: true,
+			errMsg:  "at least one of order_id (Cashfree) or payment_id (Razorpay) is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.req.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr && err.Error() != tt.errMsg {
+				t.Errorf("Validate() error = %v, want %v", err.Error(), tt.errMsg)
+			}
+		})
+	}
+}

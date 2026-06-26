@@ -16,10 +16,6 @@ type razorpayCreateRefundRequest struct {
 	Notes     map[string]string `json:"notes,omitempty"`
 }
 
-type razorpayListRefundsRequest struct {
-	PaymentID string `json:"payment_id"`
-}
-
 // D17: Typed response struct for Razorpay Refund API responses.
 type razorpayRefundResponse struct {
 	ID             string                `json:"id"`
@@ -135,29 +131,25 @@ func (a *Adapter) GetRefund(ctx context.Context, req *domain.GetRefundRequest) (
 	return mapRefundFromResponse(typed, rawJSON), nil
 }
 
-// ListRefunds retrieves all refunds for an order.
-// It takes a ListRefundsRequest containing the order ID and returns a slice of canonical Refund domain objects.
+// ListRefunds retrieves every refund issued against a Razorpay PAYMENT. Razorpay scopes
+// refunds under the captured payment (not the order), so this uses the canonical
+// ListRefundsRequest.PaymentID and returns a slice of canonical Refund domain objects.
 func (a *Adapter) ListRefunds(ctx context.Context, req *domain.ListRefundsRequest) ([]*domain.Refund, error) {
 	if req == nil {
 		return nil, domain.ErrInvalidRequest
 	}
-	if req.OrderID == "" {
+	if req.PaymentID == "" {
 		return nil, domain.ErrInvalidRequest
 	}
 
-	// Build parameters to filter refunds
-	params, err := encodeRequest(&razorpayListRefundsRequest{PaymentID: req.OrderID})
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode list refunds request: %w", err)
-	}
-
-	// Call Razorpay SDK to fetch refunds
-	// Razorpay All refund method signature: All(params map[string]interface{}, options map[string]string)
-	refundsData, err := a.client.Refund.All(params, nil)
+	// Razorpay lists refunds per payment: GET /v1/payments/{payment_id}/refunds.
+	// NOTE: the account-wide Refund.All endpoint does NOT filter by payment id, so we must
+	// use the payment-scoped FetchMultipleRefund here.
+	refundsData, err := a.client.Payment.FetchMultipleRefund(req.PaymentID, nil, nil)
 	if err != nil {
 		// Check if payment not found
 		if isNotFoundError(err) {
-			return nil, fmt.Errorf("payment %s not found: %w", req.OrderID, domain.ErrPaymentNotFound)
+			return nil, fmt.Errorf("payment %s not found: %w", req.PaymentID, domain.ErrPaymentNotFound)
 		}
 		return nil, fmt.Errorf("failed to list refunds: %w", err)
 	}

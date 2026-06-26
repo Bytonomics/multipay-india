@@ -124,7 +124,7 @@ func TestCreateOrder_PopulatesCheckout(t *testing.T) {
 
 	// Setup test config with mocked HTTP client
 	cfg := &Config{
-		Key:         "rzp_test_1234567890",
+		Key:         "rzp_mock_testonly",
 		Secret:      "test_secret",
 		Environment: domain.EnvironmentSandbox,
 		AccountID:   "test_account",
@@ -178,8 +178,8 @@ func TestCreateOrder_PopulatesCheckout(t *testing.T) {
 	}
 
 	// Assert PublicKey
-	if order.Checkout.PublicKey != "rzp_test_1234567890" {
-		t.Errorf("expected PublicKey %s, got %s", "rzp_test_1234567890", order.Checkout.PublicKey)
+	if order.Checkout.PublicKey != "rzp_mock_testonly" {
+		t.Errorf("expected PublicKey %s, got %s", "rzp_mock_testonly", order.Checkout.PublicKey)
 	}
 
 	// Assert CallbackURL
