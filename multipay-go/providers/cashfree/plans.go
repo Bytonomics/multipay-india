@@ -21,20 +21,26 @@ func createPlan(ctx context.Context, a *Adapter, req *domain.CreatePlanRequest) 
 	maxAmountMajor := AmountMinorToMajor(int64(req.MaxAmountMinor), string(req.Currency))
 	amountMajor := AmountMinorToMajor(int64(req.AmountMinor), string(req.Currency))
 
-	// Build Cashfree CreatePlanRequest
-	// Note: PlanMaxAmount is float32 (required), PlanRecurringAmount is *float32 (optional)
+	// Build Cashfree CreatePlanRequest.
+	// Mandatory fields (validated non-empty at the boundary by CreatePlanRequest.Validate) are
+	// set directly. Optional fields use the nil-if-empty helpers so omitempty drops them.
 	maxAmount32 := float32(maxAmountMajor)
-	amount32 := float32(amountMajor)
 	cfReq := &cf.CreatePlanRequest{
-		PlanId:              req.PlanID,
-		PlanName:            req.PlanName,
-		PlanType:            string(req.PlanType),
-		PlanMaxAmount:       maxAmount32,
-		PlanRecurringAmount: &amount32,
-		PlanIntervals:       ptrInt32(req.Interval), // nolint:gosec // Interval is validated as gte=1, safe int32 conversion
-		PlanIntervalType:    ptrString(string(req.IntervalType)),
-		PlanMaxCycles:       ptrInt32(req.MaxCycles), // nolint:gosec // MaxCycles is validated as gte=0, safe int32 conversion
-		PlanNote:            ptrString(req.Note),
+		PlanId:        req.PlanID,
+		PlanName:      req.PlanName,
+		PlanType:      string(req.PlanType),
+		PlanMaxAmount: maxAmount32,
+		PlanMaxCycles: optInt32(req.MaxCycles),
+		PlanNote:      optStr(req.Note),
+	}
+
+	// Conditional (PERIODIC only): the per-cycle recurring amount and the interval are
+	// meaningless for ON_DEMAND plans and must be omitted, not sent as zero/empty.
+	if req.PlanType == domain.PlanTypePeriodic {
+		amount32 := float32(amountMajor)
+		cfReq.PlanRecurringAmount = &amount32
+		cfReq.PlanIntervals = optInt32(req.Interval)
+		cfReq.PlanIntervalType = optStr(string(req.IntervalType))
 	}
 
 	// Call Cashfree SDK
@@ -71,8 +77,21 @@ func ptrString(s string) *string {
 	return &s
 }
 
-// ptrInt32 creates a pointer to an int32.
-func ptrInt32(i int32) *int32 {
+// optStr returns nil for an empty string so that an optional `,omitempty` field is dropped
+// rather than serialized as "". A non-nil pointer to "" is NOT dropped by omitempty.
+func optStr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+// optInt32 returns nil for a zero value so that an optional `,omitempty` field is dropped
+// rather than serialized as 0. A non-nil pointer to 0 is NOT dropped by omitempty.
+func optInt32(i int32) *int32 {
+	if i == 0 {
+		return nil
+	}
 	return &i
 }
 

@@ -29,10 +29,51 @@ func createOrder(ctx context.Context, adapter *Adapter, req *domain.CreateOrderR
 		OrderCurrency: string(req.Currency),
 		CustomerDetails: &cf.CustomerDetails{
 			CustomerId:    req.Customer.CustomerID,
-			CustomerEmail: stringPtr(req.Customer.Email),
 			CustomerPhone: req.Customer.Phone,
 		},
 	}
+
+	// Guard optional CustomerEmail (only if non-empty)
+	if req.Customer.Email != "" {
+		email := req.Customer.Email
+		cfReq.CustomerDetails.CustomerEmail = &email
+	}
+
+	// Add optional OrderId
+	if req.OrderID != "" {
+		orderId := req.OrderID
+		cfReq.OrderId = &orderId
+	}
+
+	// Add optional OrderNote
+	if req.Note != "" {
+		note := req.Note
+		cfReq.OrderNote = &note
+	}
+
+	// Add optional OrderExpiryTime (RFC3339 format)
+	if req.ExpiryTime != nil && !req.ExpiryTime.IsZero() {
+		expiryStr := req.ExpiryTime.Format("2006-01-02T15:04:05-07:00")
+		cfReq.OrderExpiryTime = &expiryStr
+	}
+
+	// Add optional OrderTags from Metadata (convert type alias to plain map)
+	if len(req.Metadata) > 0 {
+		metadata := (map[string]string)(req.Metadata)
+		cfReq.OrderTags = &metadata
+	}
+
+	// Add OrderMeta with ReturnUrl (critical for post-payment redirect)
+	returnUrl := req.ReturnURL
+	orderMeta := &cf.OrderMeta{
+		ReturnUrl: &returnUrl,
+	}
+	// Add optional NotifyUrl only if non-empty (omitempty does not drop non-nil pointers to empty strings)
+	if req.NotifyURL != "" {
+		notifyUrl := req.NotifyURL
+		orderMeta.NotifyUrl = &notifyUrl
+	}
+	cfReq.OrderMeta = orderMeta
 
 	// Call Cashfree SDK
 	cfOrder, httpResp, err := adapter.cfClient.PGCreateOrderWithContext(
@@ -168,11 +209,6 @@ func listOrderPayments(ctx context.Context, adapter *Adapter, req *domain.ListOr
 	}
 
 	return result, nil
-}
-
-// stringPtr is a helper to create a pointer to a string.
-func stringPtr(s string) *string {
-	return &s
 }
 
 // isNotFoundError checks if an error from Cashfree SDK indicates a 404 not found response.

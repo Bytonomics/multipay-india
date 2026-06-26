@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -134,6 +135,36 @@ type CreatePlanRequest struct {
 	Note           string           `json:"note,omitempty" pedantigo:"omitempty,maxLength=500"`
 }
 
+// Validate enforces presence of the mandatory plan fields (pedantigo's Validate() does not
+// enforce the `required` tag), plus the PERIODIC-only conditional fields. ON_DEMAND plans
+// legitimately omit AmountMinor/Interval/IntervalType.
+func (r *CreatePlanRequest) Validate() error {
+	if r.PlanID == "" {
+		return errors.New("plan_id is required")
+	}
+	if r.PlanName == "" {
+		return errors.New("plan_name is required")
+	}
+	if r.PlanType == "" {
+		return errors.New("plan_type is required")
+	}
+	if r.MaxAmountMinor <= 0 {
+		return errors.New("max_amount_minor must be greater than 0")
+	}
+	if r.PlanType == PlanTypePeriodic {
+		if r.AmountMinor <= 0 {
+			return errors.New("amount_minor is required and must be greater than 0 for PERIODIC plans")
+		}
+		if r.Interval < 1 {
+			return errors.New("interval must be at least 1 for PERIODIC plans")
+		}
+		if r.IntervalType == "" {
+			return errors.New("interval_type is required for PERIODIC plans")
+		}
+	}
+	return nil
+}
+
 // GetPlanRequest represents a request to get a plan.
 type GetPlanRequest struct {
 	PlanID string `json:"plan_id" pedantigo:"required,minLength=1"`
@@ -141,26 +172,44 @@ type GetPlanRequest struct {
 
 // CreateSubscriptionRequest represents a request to create a new subscription.
 type CreateSubscriptionRequest struct {
-	SubscriptionID  string             `json:"subscription_id" pedantigo:"required,minLength=1,maxLength=250"`
-	PlanID          string             `json:"plan_id,omitempty" pedantigo:"omitempty,minLength=1"`
-	PlanDetails     *CreatePlanRequest `json:"plan_details,omitempty"`
-	CustomerEmail   string             `json:"customer_email,omitempty" pedantigo:"omitempty,email"`
-	CustomerPhone   string             `json:"customer_phone" pedantigo:"required,minLength=5,maxLength=20"`
-	CustomerName    string             `json:"customer_name,omitempty" pedantigo:"omitempty,maxLength=200"`
-	ReturnURL       string             `json:"return_url,omitempty" pedantigo:"omitempty,url"`
-	ExpiresAt       *time.Time         `json:"expires_at,omitempty"`
-	FirstChargeTime *time.Time         `json:"first_charge_time,omitempty"`
-	Tags            map[string]string  `json:"tags,omitempty" pedantigo:"omitempty,maxItems=10"`
+	SubscriptionID string             `json:"subscription_id" pedantigo:"required,minLength=1,maxLength=250"`
+	PlanID         string             `json:"plan_id,omitempty" pedantigo:"omitempty,minLength=1"`
+	PlanDetails    *CreatePlanRequest `json:"plan_details,omitempty"`
+	// CustomerEmail is optional in the canonical contract but required by Cashfree provider adapter.
+	// The adapter enforces this requirement; validation is provider-specific, not checked here.
+	CustomerEmail   string            `json:"customer_email,omitempty" pedantigo:"omitempty,email"`
+	CustomerPhone   string            `json:"customer_phone" pedantigo:"required,minLength=5,maxLength=20"`
+	CustomerName    string            `json:"customer_name,omitempty" pedantigo:"omitempty,maxLength=200"`
+	ReturnURL       string            `json:"return_url" pedantigo:"required,url"`
+	ExpiresAt       *time.Time        `json:"expires_at,omitempty"`
+	FirstChargeTime *time.Time        `json:"first_charge_time,omitempty"`
+	Tags            map[string]string `json:"tags,omitempty" pedantigo:"omitempty,maxItems=10"`
 }
 
-// Validate enforces cross-field rules: exactly one of PlanID or PlanDetails must be provided,
-// and CustomerEmail must not be empty.
+// Validate enforces cross-field rules:
+// 1. Exactly one of PlanID or PlanDetails must be provided (mutually exclusive XOR)
+// 2. ReturnURL must not be empty (required by payment providers)
+// 3. When PlanDetails is provided, all nested required fields are validated:
+//   - PlanID, PlanName, PlanType, MaxAmountMinor (always required)
+//   - For PERIODIC plans: AmountMinor, Interval, IntervalType (required)
+//
+// 4. CustomerEmail is NOT validated here; Cashfree enforces it separately as a provider-specific requirement
 func (r *CreateSubscriptionRequest) Validate() error {
 	if r.PlanID == "" && r.PlanDetails == nil {
 		return errors.New("exactly one of plan_id or plan_details is required")
 	}
 	if r.PlanID != "" && r.PlanDetails != nil {
 		return errors.New("plan_id and plan_details are mutually exclusive")
+	}
+	if r.ReturnURL == "" {
+		return errors.New("return_url is required and must not be empty")
+	}
+	// Inline plan details are validated by the canonical CreatePlanRequest.Validate()
+	// (single source of truth) rather than re-implementing the rules here.
+	if r.PlanDetails != nil {
+		if err := r.PlanDetails.Validate(); err != nil {
+			return fmt.Errorf("plan_details.%w", err)
+		}
 	}
 	return nil
 }

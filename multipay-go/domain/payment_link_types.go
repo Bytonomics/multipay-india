@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"errors"
+	"time"
+)
 
 type CreatePaymentLinkRequest struct {
 	LinkID         string        `json:"link_id,omitempty" pedantigo:"omitempty,maxLength=250"`
@@ -14,6 +17,20 @@ type CreatePaymentLinkRequest struct {
 	NotifyEmail    *bool         `json:"notify_email,omitempty"`
 	ReturnURL      string        `json:"return_url,omitempty" pedantigo:"omitempty,url"`
 	Metadata       Metadata      `json:"metadata,omitempty"`
+}
+
+// Validate enforces presence of the customer (pedantigo's Validate() does not enforce the
+// `required` tag on a pointer field) and the Cashfree-mandatory customer phone. ReturnURL is
+// intentionally optional here — recovery links are paid from an email and reconcile via webhook,
+// so they do not require a redirect.
+func (r *CreatePaymentLinkRequest) Validate() error {
+	if r.Customer == nil {
+		return errors.New("customer is required")
+	}
+	if r.Customer.Phone == "" {
+		return errors.New("customer.phone is required")
+	}
+	return nil
 }
 
 type PaymentLink struct {

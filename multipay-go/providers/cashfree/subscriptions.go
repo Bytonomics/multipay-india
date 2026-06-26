@@ -30,6 +30,28 @@ func createSubscription(ctx context.Context, adapter *Adapter, req *domain.Creat
 		},
 	}
 
+	// Set CustomerName if provided
+	if req.CustomerName != "" {
+		cfReq.CustomerDetails.CustomerName = &req.CustomerName
+	}
+
+	// Set subscription metadata (ReturnUrl for mandate-authorization redirect)
+	if req.ReturnURL != "" {
+		returnUrl := req.ReturnURL
+		cfReq.SubscriptionMeta = &cf.CreateSubscriptionRequestSubscriptionMeta{
+			ReturnUrl: &returnUrl,
+		}
+	}
+
+	// Convert and set subscription tags (convert from map[string]string to map[string]interface{})
+	if len(req.Tags) > 0 {
+		tags := make(map[string]interface{}, len(req.Tags))
+		for k, v := range req.Tags {
+			tags[k] = v
+		}
+		cfReq.SubscriptionTags = tags
+	}
+
 	// Handle plan: either existing PlanID or inline PlanDetails
 	if req.PlanID != "" {
 		// Cashfree expects CreateSubscriptionRequestPlanDetails for inline refs
@@ -82,18 +104,26 @@ func createSubscription(ctx context.Context, adapter *Adapter, req *domain.Creat
 
 // buildInlinePlanDetails maps a canonical CreatePlanRequest to the Cashfree inline plan-details struct.
 func buildInlinePlanDetails(pd *domain.CreatePlanRequest) cf.CreateSubscriptionRequestPlanDetails {
-	return cf.CreateSubscriptionRequestPlanDetails{
-		PlanId:           &pd.PlanID,
-		PlanName:         &pd.PlanName,
-		PlanType:         ptrString(string(pd.PlanType)),
-		PlanCurrency:     ptrString(string(pd.Currency)),
-		PlanAmount:       ptrFloat32(float32(AmountMinorToMajor(int64(pd.AmountMinor), string(pd.Currency)))),
-		PlanMaxAmount:    ptrFloat32(float32(AmountMinorToMajor(int64(pd.MaxAmountMinor), string(pd.Currency)))),
-		PlanMaxCycles:    ptrInt32(pd.MaxCycles),
-		PlanIntervals:    ptrInt32(pd.Interval),
-		PlanIntervalType: ptrString(string(pd.IntervalType)),
-		PlanNote:         ptrString(pd.Note),
+	// Mandatory fields are set directly (validated non-empty at the boundary).
+	// Optional fields use the nil-if-empty helpers so omitempty drops them.
+	details := cf.CreateSubscriptionRequestPlanDetails{
+		PlanId:        &pd.PlanID,
+		PlanName:      &pd.PlanName,
+		PlanType:      ptrString(string(pd.PlanType)),
+		PlanMaxAmount: ptrFloat32(float32(AmountMinorToMajor(int64(pd.MaxAmountMinor), string(pd.Currency)))),
+		PlanCurrency:  optStr(string(pd.Currency)),
+		PlanMaxCycles: optInt32(pd.MaxCycles),
+		PlanNote:      optStr(pd.Note),
 	}
+
+	// Conditional (PERIODIC only): the per-cycle amount and the interval are meaningless
+	// for ON_DEMAND plans and must be omitted, not sent as zero/empty.
+	if pd.PlanType == domain.PlanTypePeriodic {
+		details.PlanAmount = ptrFloat32(float32(AmountMinorToMajor(int64(pd.AmountMinor), string(pd.Currency))))
+		details.PlanIntervals = optInt32(pd.Interval)
+		details.PlanIntervalType = optStr(string(pd.IntervalType))
+	}
+	return details
 }
 
 // getSubscription retrieves an existing subscription from the Cashfree payment gateway.

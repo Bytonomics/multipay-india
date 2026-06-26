@@ -14,13 +14,24 @@ type razorpayNotifyOptions struct {
 	SMS   bool `json:"sms,omitempty"`
 }
 
+type razorpayLinkCustomer struct {
+	Name    string `json:"name,omitempty"`
+	Email   string `json:"email,omitempty"`
+	Contact string `json:"contact,omitempty"`
+}
+
 type razorpayCreatePaymentLinkRequest struct {
-	Amount      int64                  `json:"amount"`
-	Currency    string                 `json:"currency"`
-	Description string                 `json:"description,omitempty"`
-	Notes       domain.Metadata        `json:"notes,omitempty"`
-	Notify      *razorpayNotifyOptions `json:"notify,omitempty"`
-	ExpireBy    int64                  `json:"expire_by,omitempty"`
+	Amount         int64                  `json:"amount"`
+	Currency       string                 `json:"currency"`
+	Description    string                 `json:"description,omitempty"`
+	Notes          domain.Metadata        `json:"notes,omitempty"`
+	Notify         *razorpayNotifyOptions `json:"notify,omitempty"`
+	ExpireBy       int64                  `json:"expire_by,omitempty"`
+	Customer       *razorpayLinkCustomer  `json:"customer,omitempty"`
+	CallbackURL    string                 `json:"callback_url,omitempty"`
+	CallbackMethod string                 `json:"callback_method,omitempty"`
+	ReferenceID    string                 `json:"reference_id,omitempty"`
+	AcceptPartial  bool                   `json:"accept_partial,omitempty"`
 }
 
 // D17: Typed response struct for Razorpay Payment Link API responses.
@@ -62,6 +73,32 @@ func (a *Adapter) CreatePaymentLink(ctx context.Context, req *domain.CreatePayme
 		Description: req.Purpose,
 		Notes:       req.Metadata,
 	}
+
+	// Populate customer information
+	if req.Customer != nil {
+		linkReq.Customer = &razorpayLinkCustomer{
+			Name:    req.Customer.Name,
+			Email:   req.Customer.Email,
+			Contact: req.Customer.Phone,
+		}
+	}
+
+	// Populate callback URL and method
+	if req.ReturnURL != "" {
+		linkReq.CallbackURL = req.ReturnURL
+		linkReq.CallbackMethod = "get"
+	}
+
+	// Populate reference ID (link ID)
+	if req.LinkID != "" {
+		linkReq.ReferenceID = req.LinkID
+	}
+
+	// Populate partial payment flag
+	if req.PartialPayment != nil {
+		linkReq.AcceptPartial = *req.PartialPayment
+	}
+
 	if req.NotifyEmail != nil && *req.NotifyEmail {
 		if linkReq.Notify == nil {
 			linkReq.Notify = &razorpayNotifyOptions{}

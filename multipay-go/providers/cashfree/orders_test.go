@@ -217,3 +217,156 @@ func TestCreateOrder_PopulatesCheckout(t *testing.T) {
 		t.Errorf("expected Currency to be empty (Razorpay-only), got %s", order.Checkout.Currency)
 	}
 }
+
+// TestCreateOrder_ForwardsParameters verifies that all request parameters are forwarded to the Cashfree SDK.
+// Tests: OrderId, OrderNote, OrderMeta.ReturnUrl, OrderMeta.NotifyUrl, OrderTags
+func TestCreateOrder_ForwardsParameters(t *testing.T) {
+	tests := []struct {
+		name      string
+		notifyURL string
+		orderID   string
+		note      string
+		expectErr bool
+	}{
+		{
+			name:      "with all parameters",
+			notifyURL: "https://example.com/notify",
+			orderID:   "merchant_order_123",
+			note:      "Order payment note",
+			expectErr: false,
+		},
+		{
+			name:      "without optional NotifyURL",
+			notifyURL: "",
+			orderID:   "merchant_order_456",
+			note:      "Order note 2",
+			expectErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var capturedReq *cf.CreateOrderRequest
+			mockHTTPClient := &http.Client{
+				Transport: cfRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+					body, err := io.ReadAll(req.Body)
+					if err != nil {
+						return nil, err
+					}
+					if unmarshalErr := json.Unmarshal(body, &capturedReq); unmarshalErr != nil {
+						t.Fatalf("failed to unmarshal request body: %v (body: %s)", unmarshalErr, string(body))
+					}
+
+					cfOrderId := "cf_order_abc123"
+					mockOrder := &cf.OrderEntity{
+						CfOrderId:        &cfOrderId,
+						OrderId:          &tt.orderID,
+						OrderAmount:      new(float32),
+						OrderCurrency:    new(string),
+						OrderStatus:      new(string),
+						PaymentSessionId: new(string),
+						Entity:           new(string),
+						CreatedAt:        new(string),
+						OrderExpiryTime:  new(string),
+					}
+					*mockOrder.OrderAmount = 500.0
+					*mockOrder.OrderCurrency = "INR"
+					*mockOrder.OrderStatus = "ACTIVE"
+					*mockOrder.PaymentSessionId = "session_xyz"
+					*mockOrder.Entity = "order"
+					*mockOrder.CreatedAt = "1719342000"
+					*mockOrder.OrderExpiryTime = "1719428400"
+
+					jsonData, err := json.Marshal(mockOrder)
+					if err != nil {
+						return nil, err
+					}
+					header := make(http.Header)
+					header.Set("Content-Type", "application/json")
+					return &http.Response{
+						Status:        "200 OK",
+						StatusCode:    200,
+						Proto:         "HTTP/1.1",
+						ProtoMajor:    1,
+						ProtoMinor:    1,
+						Header:        header,
+						Body:          io.NopCloser(strings.NewReader(string(jsonData))),
+						ContentLength: int64(len(jsonData)),
+					}, nil
+				}),
+			}
+
+			cfg := &Config{
+				ClientID:     "test_client_id",
+				ClientSecret: "test_client_secret",
+				Environment:  domain.EnvironmentSandbox,
+				AccountID:    "test_account",
+				HTTPClient:   mockHTTPClient,
+			}
+
+			adapter, err := NewAdapter(cfg)
+			if err != nil {
+				t.Fatalf("failed to create adapter: %v", err)
+			}
+
+			req := &domain.CreateOrderRequest{
+				OrderID:     tt.orderID,
+				AmountMinor: 50000,
+				Currency:    domain.Currency("INR"),
+				Customer: &domain.CustomerInfo{
+					CustomerID: "cust_123",
+					Email:      "test@example.com",
+					Phone:      "+919876543210",
+				},
+				ReturnURL: "https://example.com/return",
+				NotifyURL: tt.notifyURL,
+				Note:      tt.note,
+				Metadata: domain.Metadata{
+					"order_ref":  "ORD-2024-001",
+					"utm_source": "app",
+				},
+			}
+
+			_, err = adapter.CreateOrder(context.Background(), req)
+			if (err != nil) != tt.expectErr {
+				t.Fatalf("CreateOrder() error = %v, expectErr %v", err, tt.expectErr)
+			}
+
+			if capturedReq == nil {
+				t.Fatal("request was not captured")
+			}
+
+			// Assert OrderId is forwarded
+			if capturedReq.OrderId == nil || *capturedReq.OrderId != tt.orderID {
+				t.Errorf("OrderId not forwarded: expected %s, got %v", tt.orderID, capturedReq.OrderId)
+			}
+
+			// Assert OrderNote is forwarded
+			if capturedReq.OrderNote == nil || *capturedReq.OrderNote != tt.note {
+				t.Errorf("OrderNote not forwarded: expected %s, got %v", tt.note, capturedReq.OrderNote)
+			}
+
+			// Assert OrderMeta.ReturnUrl is forwarded
+			if capturedReq.OrderMeta == nil || capturedReq.OrderMeta.ReturnUrl == nil || *capturedReq.OrderMeta.ReturnUrl != "https://example.com/return" {
+				t.Errorf("OrderMeta.ReturnUrl not forwarded: %v", capturedReq.OrderMeta)
+			}
+
+			// Assert OrderMeta.NotifyUrl is set only when NotifyURL is non-empty
+			if tt.notifyURL != "" {
+				if capturedReq.OrderMeta == nil || capturedReq.OrderMeta.NotifyUrl == nil || *capturedReq.OrderMeta.NotifyUrl != tt.notifyURL {
+					t.Errorf("OrderMeta.NotifyUrl not forwarded: expected %s, got %v", tt.notifyURL, capturedReq.OrderMeta)
+				}
+			} else {
+				// When NotifyURL is empty, NotifyUrl should be nil (conditional omit)
+				if capturedReq.OrderMeta != nil && capturedReq.OrderMeta.NotifyUrl != nil {
+					t.Errorf("OrderMeta.NotifyUrl should be nil when NotifyURL is empty, got %s", *capturedReq.OrderMeta.NotifyUrl)
+				}
+			}
+
+			// Assert OrderTags are forwarded
+			if capturedReq.OrderTags == nil || len(*capturedReq.OrderTags) == 0 {
+				t.Error("OrderTags not forwarded")
+			}
+		})
+	}
+}

@@ -29,7 +29,17 @@ func createRefund(ctx context.Context, adapter *Adapter, req *domain.CreateRefun
 
 	cfReq := &cf.OrderCreateRefundRequest{
 		RefundAmount: refundAmount,
-		RefundNote:   stringPtr(req.Reason),
+	}
+
+	// Guard optional RefundNote (only if Reason is non-empty)
+	if req.Reason != "" {
+		reason := req.Reason
+		cfReq.RefundNote = &reason
+	}
+
+	if req.RefundID != "" {
+		refundId := req.RefundID
+		cfReq.RefundId = &refundId
 	}
 
 	// Call Cashfree SDK to create refund

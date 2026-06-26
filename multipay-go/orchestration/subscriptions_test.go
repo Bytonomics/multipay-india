@@ -187,6 +187,7 @@ func TestCreateSubscriptionRequest_Validate_XOR(t *testing.T) {
 		SubscriptionID: "s",
 		CustomerEmail:  "a@b.com",
 		CustomerPhone:  "12345",
+		ReturnURL:      "https://example.com/return",
 	}
 
 	// Case A: neither PlanID nor PlanDetails set → error
@@ -327,7 +328,7 @@ func TestSubscriptionService_CreateSubscription_Pipeline(t *testing.T) {
 		clock := ports.NewRealClock()
 		svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, pipeline, logger, clock)
 
-		req := &domain.CreateSubscriptionRequest{SubscriptionID: "s", CustomerEmail: "a@b.com", CustomerPhone: "12345"}
+		req := &domain.CreateSubscriptionRequest{SubscriptionID: "s", CustomerEmail: "a@b.com", CustomerPhone: "12345", ReturnURL: "https://example.com/return"}
 		// missing both PlanID and PlanDetails — XOR violation caught by Validate()
 		_, err := svc.CreateSubscription(context.Background(), req)
 		if err == nil {
@@ -356,6 +357,7 @@ func TestSubscriptionService_CreateSubscription_Pipeline(t *testing.T) {
 			CustomerEmail:  "a@b.com",
 			CustomerPhone:  "12345",
 			PlanID:         "p",
+			ReturnURL:      "https://example.com/return",
 		}
 		sub, err := svc.CreateSubscription(context.Background(), req)
 		if err != nil {
@@ -383,6 +385,7 @@ func TestSubscriptionService_CreateSubscription_Pipeline(t *testing.T) {
 			CustomerEmail:  "a@b.com",
 			CustomerPhone:  "12345",
 			PlanID:         "p",
+			ReturnURL:      "https://example.com/return",
 		}
 		_, err := svc.CreateSubscription(context.Background(), req)
 		if err == nil {

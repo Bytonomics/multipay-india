@@ -3,6 +3,7 @@ package cashfree
 import (
 	"context"
 	"fmt"
+	"time"
 
 	cf "github.com/cashfree/cashfree-pg/v6"
 
@@ -26,10 +27,56 @@ func createPaymentLink(ctx context.Context, adapter *Adapter, req *domain.Create
 	}
 
 	// Build Cashfree CreateLinkRequest
+	purpose := req.Purpose
+
+	customerDetails := cf.LinkCustomerDetailsEntity{
+		CustomerPhone: req.Customer.Phone,
+	}
+	// Guard optional customer email/name pointers
+	if req.Customer.Email != "" {
+		email := req.Customer.Email
+		customerDetails.CustomerEmail = &email
+	}
+	if req.Customer.Name != "" {
+		name := req.Customer.Name
+		customerDetails.CustomerName = &name
+	}
+
 	cfReq := &cf.CreateLinkRequest{
-		LinkAmount:   AmountMinorToMajor(int64(req.AmountMinor), string(req.Currency)),
-		LinkCurrency: string(req.Currency),
-		LinkPurpose:  stringPtr(req.Purpose),
+		LinkAmount:          AmountMinorToMajor(int64(req.AmountMinor), string(req.Currency)),
+		LinkCurrency:        string(req.Currency),
+		LinkPurpose:         &purpose,
+		CustomerDetails:     customerDetails,
+		LinkPartialPayments: req.PartialPayment,
+		LinkExpiryTime:      toRFC3339String(req.ExpiryTime),
+	}
+
+	// Guard LinkMeta.ReturnUrl (only if ReturnURL is non-empty)
+	if req.ReturnURL != "" {
+		returnUrl := req.ReturnURL
+		cfReq.LinkMeta = &cf.LinkMetaResponseEntity{
+			ReturnUrl: &returnUrl,
+		}
+	}
+
+	// Guard optional LinkId
+	if req.LinkID != "" {
+		linkId := req.LinkID
+		cfReq.LinkId = &linkId
+	}
+
+	// Guard optional LinkNotes (only if Metadata non-empty)
+	if len(req.Metadata) > 0 {
+		metadataPtr := (map[string]string)(req.Metadata)
+		cfReq.LinkNotes = &metadataPtr
+	}
+
+	// Guard LinkNotify (only if either notify flag is set)
+	if req.NotifySMS != nil || req.NotifyEmail != nil {
+		cfReq.LinkNotify = &cf.LinkNotifyEntity{
+			SendSms:   req.NotifySMS,
+			SendEmail: req.NotifyEmail,
+		}
 	}
 
 	// Call Cashfree SDK
@@ -145,4 +192,14 @@ func cancelPaymentLink(ctx context.Context, adapter *Adapter, req *domain.Cancel
 		return nil, fmt.Errorf("failed to map link: %w", err)
 	}
 	return link, nil
+}
+
+// toRFC3339String converts a time.Time pointer to an RFC3339-formatted string pointer.
+// Returns nil if the input time is nil or zero-valued.
+func toRFC3339String(t *time.Time) *string {
+	if t == nil || t.IsZero() {
+		return nil
+	}
+	rfc3339str := t.Format(time.RFC3339)
+	return &rfc3339str
 }

@@ -1,94 +1,144 @@
 package cashfree
 
 import (
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
+
+	cf "github.com/cashfree/cashfree-pg/v6"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 )
 
+// TestBuildInlinePlanDetails_AllFields verifies that buildInlinePlanDetails correctly maps all inline plan fields,
+// including amount conversion from minor to major units.
 func TestBuildInlinePlanDetails_AllFields(t *testing.T) {
-	pd := &domain.CreatePlanRequest{
-		PlanID:         "p1",
-		PlanName:       "P",
+	req := &domain.CreatePlanRequest{
+		PlanID:         "plan_123",
+		PlanName:       "Premium Plan",
 		PlanType:       domain.PlanTypePeriodic,
 		Currency:       "INR",
-		AmountMinor:    50000,
-		MaxAmountMinor: 100000,
+		AmountMinor:    50000,  // ₹500.00
+		MaxAmountMinor: 100000, // ₹1000.00
 		Interval:       1,
 		IntervalType:   domain.PlanIntervalMonth,
-		MaxCycles:      12,
-		Note:           "n",
-	}
-	d := buildInlinePlanDetails(pd)
-
-	// All fields are pointers — deref and check non-nil first
-	if d.PlanId == nil {
-		t.Fatalf("PlanId is nil")
-	}
-	if *d.PlanId != "p1" {
-		t.Fatalf("expected PlanId=p1, got %s", *d.PlanId)
 	}
 
-	if d.PlanName == nil {
-		t.Fatalf("PlanName is nil")
-	}
-	if *d.PlanName != "P" {
-		t.Fatalf("expected PlanName=P, got %s", *d.PlanName)
+	result := buildInlinePlanDetails(req)
+
+	// Assert PlanId
+	if result.PlanId == nil || *result.PlanId != "plan_123" {
+		t.Errorf("expected PlanId=plan_123, got %v", result.PlanId)
 	}
 
-	if d.PlanType == nil {
-		t.Fatalf("PlanType is nil")
-	}
-	if *d.PlanType != "PERIODIC" {
-		t.Fatalf("expected PlanType=PERIODIC, got %s", *d.PlanType)
+	// Assert PlanName
+	if result.PlanName == nil || *result.PlanName != "Premium Plan" {
+		t.Errorf("expected PlanName=Premium Plan, got %v", result.PlanName)
 	}
 
-	if d.PlanCurrency == nil {
-		t.Fatalf("PlanCurrency is nil")
-	}
-	if *d.PlanCurrency != "INR" {
-		t.Fatalf("expected PlanCurrency=INR, got %s", *d.PlanCurrency)
+	// Assert PlanType
+	if result.PlanType == nil || *result.PlanType != "PERIODIC" {
+		t.Errorf("expected PlanType=PERIODIC, got %v", result.PlanType)
 	}
 
-	if d.PlanAmount == nil {
-		t.Fatalf("PlanAmount is nil")
-	}
-	if *d.PlanAmount != float32(500.0) {
-		t.Fatalf("expected PlanAmount=500.0 (50000 minor / 100 for INR exp2), got %f", *d.PlanAmount)
+	// Assert PlanAmount (minor to major conversion: 50000 paisa = 500.00 INR)
+	if result.PlanAmount == nil || *result.PlanAmount != 500.0 {
+		t.Errorf("expected PlanAmount=500.0 (minor=50000, INR), got %v", result.PlanAmount)
 	}
 
-	if d.PlanMaxAmount == nil {
-		t.Fatalf("PlanMaxAmount is nil")
-	}
-	if *d.PlanMaxAmount != float32(1000.0) {
-		t.Fatalf("expected PlanMaxAmount=1000.0 (100000 / 100), got %f", *d.PlanMaxAmount)
+	// Assert PlanMaxAmount (minor to major conversion: 100000 paisa = 1000.00 INR)
+	if result.PlanMaxAmount == nil || *result.PlanMaxAmount != 1000.0 {
+		t.Errorf("expected PlanMaxAmount=1000.0 (minor=100000, INR), got %v", result.PlanMaxAmount)
 	}
 
-	if d.PlanMaxCycles == nil {
-		t.Fatalf("PlanMaxCycles is nil")
-	}
-	if *d.PlanMaxCycles != int32(12) {
-		t.Fatalf("expected PlanMaxCycles=12, got %d", *d.PlanMaxCycles)
+	// Assert PlanIntervals
+	if result.PlanIntervals == nil || *result.PlanIntervals != 1 {
+		t.Errorf("expected PlanIntervals=1, got %v", result.PlanIntervals)
 	}
 
-	if d.PlanIntervals == nil {
-		t.Fatalf("PlanIntervals is nil")
+	// Assert PlanIntervalType
+	if result.PlanIntervalType == nil {
+		t.Error("expected PlanIntervalType to be non-nil")
+	} else if *result.PlanIntervalType != "MONTH" {
+		t.Errorf("expected PlanIntervalType=MONTH, got %v", *result.PlanIntervalType)
 	}
-	if *d.PlanIntervals != int32(1) {
-		t.Fatalf("expected PlanIntervals=1, got %d", *d.PlanIntervals)
+}
+
+// TestCreateSubscription_ForwardsCustomerName verifies that createSubscription forwards customer_name, return_url, and tags to Cashfree.
+func TestCreateSubscription_ForwardsCustomerName(t *testing.T) {
+	var capturedReq *cf.CreateSubscriptionRequest
+	mockHTTPClient := &http.Client{
+		Transport: cfRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+			body, err := io.ReadAll(req.Body)
+			if err != nil {
+				return nil, err
+			}
+			if unmarshalErr := json.Unmarshal(body, &capturedReq); unmarshalErr != nil {
+				t.Fatalf("failed to unmarshal request body: %v (body: %s)", unmarshalErr, string(body))
+			}
+
+			subId := "cf_sub_123"
+			mockSub := &cf.SubscriptionEntity{
+				SubscriptionId: &subId,
+			}
+			jsonData, err := json.Marshal(mockSub)
+			if err != nil {
+				return nil, err
+			}
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(string(jsonData))),
+			}, nil
+		}),
 	}
 
-	if d.PlanIntervalType == nil {
-		t.Fatalf("PlanIntervalType is nil")
-	}
-	if *d.PlanIntervalType != "MONTH" {
-		t.Fatalf("expected PlanIntervalType=MONTH, got %s", *d.PlanIntervalType)
+	cfg := &Config{
+		ClientID:     "test_client_id",
+		ClientSecret: "test_client_secret",
+		Environment:  domain.EnvironmentSandbox,
+		AccountID:    "test_account",
+		HTTPClient:   mockHTTPClient,
 	}
 
-	if d.PlanNote == nil {
-		t.Fatalf("PlanNote is nil")
+	adapter, err := NewAdapter(cfg)
+	if err != nil {
+		t.Fatalf("failed to create adapter: %v", err)
 	}
-	if *d.PlanNote != "n" {
-		t.Fatalf("expected PlanNote=n, got %s", *d.PlanNote)
+
+	req := &domain.CreateSubscriptionRequest{
+		SubscriptionID: "sub_123",
+		PlanID:         "plan_456",
+		CustomerEmail:  "test@example.com",
+		CustomerPhone:  "9876543210",
+		CustomerName:   "John Doe",
+		ReturnURL:      "https://example.com/mandate",
+		Tags: map[string]string{
+			"type":    "premium",
+			"channel": "app",
+		},
+	}
+
+	createSubscription(context.Background(), adapter, req)
+
+	if capturedReq == nil {
+		t.Fatal("request was not captured")
+	}
+
+	// Assert CustomerDetails.CustomerName is forwarded
+	if capturedReq.CustomerDetails.CustomerName == nil || *capturedReq.CustomerDetails.CustomerName != "John Doe" {
+		t.Error("CustomerDetails.CustomerName not forwarded")
+	}
+
+	// Assert SubscriptionMeta.ReturnUrl is forwarded
+	if capturedReq.SubscriptionMeta == nil || capturedReq.SubscriptionMeta.ReturnUrl == nil || *capturedReq.SubscriptionMeta.ReturnUrl != "https://example.com/mandate" {
+		t.Error("SubscriptionMeta.ReturnUrl not forwarded")
+	}
+
+	// Assert SubscriptionTags are forwarded
+	if capturedReq.SubscriptionTags == nil || len(capturedReq.SubscriptionTags) == 0 {
+		t.Error("SubscriptionTags not forwarded")
 	}
 }

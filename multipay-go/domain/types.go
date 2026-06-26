@@ -26,11 +26,26 @@ type CreateOrderRequest struct {
 	AmountMinor AmountMinor   `json:"amount_minor" pedantigo:"required,gt=0"`
 	Currency    Currency      `json:"currency" pedantigo:"required,iso4217"`
 	Customer    *CustomerInfo `json:"customer" pedantigo:"required"`
-	ReturnURL   string        `json:"return_url,omitempty" pedantigo:"omitempty,url"`
+	ReturnURL   string        `json:"return_url" pedantigo:"required,url"`
 	NotifyURL   string        `json:"notify_url,omitempty" pedantigo:"omitempty,url"`
 	ExpiryTime  *time.Time    `json:"expiry_time,omitempty"`
 	Note        string        `json:"note,omitempty" pedantigo:"omitempty,maxLength=500"`
 	Metadata    Metadata      `json:"metadata,omitempty"`
+}
+
+// Validate enforces presence and non-empty constraints on CreateOrderRequest fields.
+// Checks: Customer non-nil, Currency non-empty, ReturnURL non-empty.
+func (r *CreateOrderRequest) Validate() error {
+	if r.Customer == nil {
+		return errors.New("customer is required")
+	}
+	if r.Currency == "" {
+		return errors.New("currency is required")
+	}
+	if r.ReturnURL == "" {
+		return errors.New("return_url is required")
+	}
+	return nil
 }
 
 type Order struct {
@@ -94,6 +109,8 @@ type Payment struct {
 }
 
 type GetPaymentRequest struct {
+	// OrderID is optional in the canonical contract, but required by Cashfree (enforced in adapter).
+	// Razorpay fetches payments by PaymentID alone.
 	OrderID   string `json:"order_id,omitempty" pedantigo:"omitempty,minLength=1"`
 	PaymentID string `json:"payment_id" pedantigo:"required,minLength=1"`
 }
@@ -121,7 +138,7 @@ type CreateRefundRequest struct {
 }
 
 // Validate enforces the cross-field rule: at least one of OrderID or PaymentID must be provided.
-// Cashfree refunds are identified by OrderID; Razorpay refunds are identified by PaymentID.
+// Provider-specific refund identification is enforced in adapters: Cashfree uses OrderID, Razorpay uses PaymentID.
 func (r *CreateRefundRequest) Validate() error {
 	if r.OrderID == "" && r.PaymentID == "" {
 		return errors.New("at least one of order_id or payment_id is required")

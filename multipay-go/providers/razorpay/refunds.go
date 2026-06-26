@@ -9,14 +9,11 @@ import (
 )
 
 // D17: Typed request structs for Razorpay Refund APIs.
-type razorpayRefundNotes struct {
-	Note string `json:"note,omitempty"`
-}
-
 type razorpayCreateRefundRequest struct {
-	PaymentID string               `json:"payment_id"`
-	Amount    int64                `json:"amount,omitempty"`
-	Notes     *razorpayRefundNotes `json:"notes,omitempty"`
+	PaymentID string            `json:"payment_id"`
+	Amount    int64             `json:"amount,omitempty"`
+	Receipt   string            `json:"receipt,omitempty"`
+	Notes     map[string]string `json:"notes,omitempty"`
 }
 
 type razorpayListRefundsRequest struct {
@@ -53,17 +50,26 @@ func (a *Adapter) CreateRefund(ctx context.Context, req *domain.CreateRefundRequ
 	if req == nil {
 		return nil, domain.ErrInvalidRequest
 	}
-	if req.OrderID == "" {
+	if req.PaymentID == "" {
 		return nil, domain.ErrInvalidRequest
 	}
 
 	// Build Razorpay refund creation parameters
 	refundReq := &razorpayCreateRefundRequest{
-		PaymentID: req.OrderID,
+		PaymentID: req.PaymentID,
 		Amount:    int64(req.AmountMinor), // 0 = full refund; omitempty drops it
+		Receipt:   req.RefundID,
 	}
-	if req.Reason != "" {
-		refundReq.Notes = &razorpayRefundNotes{Note: req.Reason}
+	// Merge metadata with reason as "note" key
+	if len(req.Metadata) > 0 || req.Reason != "" {
+		notes := make(map[string]string)
+		for k, v := range req.Metadata {
+			notes[k] = v
+		}
+		if req.Reason != "" {
+			notes["note"] = req.Reason
+		}
+		refundReq.Notes = notes
 	}
 	params, err := encodeRequest(refundReq)
 	if err != nil {
