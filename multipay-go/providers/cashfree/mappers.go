@@ -590,9 +590,9 @@ func MapSubscriptionEntityToCanonical(entity *cf.SubscriptionEntity) (*domain.Su
 		customerPhone = entity.CustomerDetails.CustomerPhone
 	}
 
-	// Extract auth link from AuthorisationDetails if available
-	authLink := ""
-	// Note: AuthorisationDetails may contain auth URL, but specific field name depends on Cashfree SDK version
+	// Cashfree returns the mandate-authorization handle as the subscription session id
+	// (used by the Cashfree JS SDK for the auth step); map it to the canonical AuthLink.
+	authLink := StringPtrToStr(entity.SubscriptionSessionId)
 
 	subscription := &domain.Subscription{
 		SubscriptionID:         StringPtrToStr(entity.SubscriptionId),

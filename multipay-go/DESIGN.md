@@ -75,6 +75,18 @@ All services share the same `Adapter`, `Validator`, `Pipeline`, `Logger`, and `C
 
 Plans and Subscriptions are **first-class services** on both Cashfree and Razorpay. Unlike capability-gated services (Orders, Payments, Refunds, Instruments, Payment Links), Plans and Subscriptions do NOT require capability validation — both providers fully support all operations.
 
+### Subscription AuthLink Population (Cashfree)
+
+The canonical `domain.Subscription.AuthLink` field holds the session ID that the Cashfree JS SDK uses for the mandate authorization step. During mapping via `MapSubscriptionEntityToCanonical()`, the adapter populates `AuthLink` from the Cashfree response field `SubscriptionSessionId`:
+
+```go
+// Cashfree returns the mandate-authorization handle as the subscription session id
+// (used by the Cashfree JS SDK for the auth step); map it to the canonical AuthLink.
+authLink := StringPtrToStr(entity.SubscriptionSessionId)
+```
+
+This is the handle a frontend must pass to the Cashfree JS SDK to initiate mandate authorization. For Razorpay, the equivalent field (if any) may differ — refer to the Razorpay adapter's mapper for its specific mapping logic.
+
 ### Supported Operations
 
 | Operation | Cashfree | Razorpay | First-Class |
@@ -186,6 +198,36 @@ sequenceDiagram
 8. **Mark Processed**: Record successful processing in the deduplication store
 
 This design ensures that even if a webhook is delivered multiple times, the handler is called exactly once.
+
+### WebhookService API: Handler()
+
+The `WebhookService` exposes a SINGLE, framework-agnostic webhook entry point. There is no per-framework
+mount method by design — `http.Handler` is the universal Go HTTP contract, so one method serves every router.
+
+#### Handler(basePath) http.Handler
+
+`Handler()` returns the constructed `routing.WebhookHandler` as a plain `http.Handler`. Because every Go
+router/framework accepts an `http.Handler`, this one method mounts on net/http, chi, Echo, Gin, Fiber, or
+any other router — the library never grows a router-specific method (such as a `*http.ServeMux`-only helper).
+
+```go
+svc := client.WebhookService()
+svc.RegisterHandler(domain.WebhookEventTypeOrderPaid, myOrderHandler)
+svc.RegisterHandler(domain.WebhookEventTypePaymentFailed, myPaymentHandler)
+handler := svc.Handler("/webhooks")  // a plain http.Handler — mount it on any router
+```
+
+**CRITICAL CONTRACT**: All `RegisterHandler()` calls MUST precede `Handler()` — handlers are snapshotted into the returned handler at construction time. Registering handlers after calling `Handler()` has no effect.
+
+**Endpoint Matching**: The internal `EndpointMatcher` re-parses the FULL request path (`{basePath}/{provider}/{accountID}`), so the consumer's router MUST mount the handler on a **prefix/subtree route that does NOT strip the basePath prefix**:
+
+- ✅ **net/http** (correct): `mux.Handle(basePath+"/", handler)` — the TRAILING SLASH makes `ServeMux` match the whole subtree (`{basePath}/{provider}/{account}`). A pattern WITHOUT the trailing slash (`mux.Handle(basePath, handler)`) matches ONLY the exact `basePath` and would 404 the real webhook URL.
+- ✅ **chi** (correct): `r.Handle(basePath+"/*", handler)`
+- ✅ **Echo** (correct): `e.Any(basePath+"/*", echo.WrapHandler(handler))` — does NOT strip the path
+- ❌ **Echo** (wrong): `e.Group(basePath).Any("/*", handler)` — the group strips the prefix, breaking matching
+- ✅ **Gin** (correct): `r.Any(basePath+"/*path", gin.WrapH(handler))`
+
+Non-`*http.ServeMux` routers like Echo/Gin require their adapter (`echo.WrapHandler()` / `gin.WrapH()`) to wrap the plain `http.Handler`.
 
 ## Capability Matrix Decision Tree
 

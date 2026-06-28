@@ -142,3 +142,33 @@ func TestCreateSubscription_ForwardsCustomerName(t *testing.T) {
 		t.Error("SubscriptionTags not forwarded")
 	}
 }
+
+// TestMapSubscriptionEntityToCanonical_AuthLinkFromSessionID verifies that MapSubscriptionEntityToCanonical
+// populates domain.Subscription.AuthLink from Cashfree SubscriptionEntity.SubscriptionSessionId.
+func TestMapSubscriptionEntityToCanonical_AuthLinkFromSessionID(t *testing.T) {
+	subID := "sub_merchant_1"
+	cfSubID := "cf_sub_1"
+	status := "INITIALIZED"
+	sessionID := "sub_session_abc123"
+
+	entity := &cf.SubscriptionEntity{
+		SubscriptionId:        &subID,
+		CfSubscriptionId:      &cfSubID,
+		SubscriptionStatus:    &status,
+		SubscriptionSessionId: &sessionID,
+	}
+
+	got, err := MapSubscriptionEntityToCanonical(entity)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got == nil {
+		t.Fatal("expected non-nil subscription")
+	}
+	if got.AuthLink != sessionID {
+		t.Errorf("AuthLink = %q, want %q (must come from SubscriptionSessionId)", got.AuthLink, sessionID)
+	}
+	if got.ProviderSubscriptionID != cfSubID {
+		t.Errorf("ProviderSubscriptionID = %q, want %q", got.ProviderSubscriptionID, cfSubID)
+	}
+}

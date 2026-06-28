@@ -140,10 +140,26 @@ func (s *WebhookService) HandleEvent(ctx context.Context, provider domain.Provid
 	return event, nil
 }
 
-// MountHTTP mounts the webhook handler on an HTTP router.
-func (s *WebhookService) MountHTTP(basePath string, mux *http.ServeMux) {
+// Handler returns the webhook endpoint as a framework-agnostic http.Handler. This is the single,
+// portable way to mount webhook handling on ANY Go HTTP router — net/http, chi, Echo (via
+// echo.WrapHandler), gin (via gin.WrapH), Fiber, etc. Because every router accepts an http.Handler,
+// the library never needs a per-framework mount method. It builds the endpoint matcher, the mandatory
+// non-nil default handler (returns nil => 2xx), constructs the routing.WebhookHandler, and registers
+// all currently-registered event handlers.
+//
+// IMPORTANT: all RegisterHandler calls MUST happen BEFORE Handler is called — the handlers map is
+// snapshotted into the returned handler at construction time.
+//
+// The EndpointMatcher re-parses the FULL request path ({basePath}/{provider}/{accountID}), so the
+// consumer MUST mount this on a PREFIX/subtree route that does NOT strip basePath. A bare exact-path
+// mount (e.g. net/http mux.Handle(basePath, h) without a trailing slash) matches ONLY basePath and
+// would 404 the real webhook URL — always mount the subtree:
+//   - net/http: mux.Handle(basePath+"/", svc.Handler(basePath))         // trailing slash => subtree
+//   - chi:      r.Handle(basePath+"/*", svc.Handler(basePath))
+//   - Echo:     e.Any(basePath+"/*", echo.WrapHandler(svc.Handler(basePath)))
+//   - gin:      r.Any(basePath+"/*path", gin.WrapH(svc.Handler(basePath)))
+func (s *WebhookService) Handler(basePath string) http.Handler {
 	matcher := routing.NewEndpointMatcher(basePath)
-	// mandatory non-nil default handler: logs unhandled/unknown/parse-failed events, returns nil (=> 2xx)
 	defaultHandler := func(ctx context.Context, ev *domain.WebhookEvent) error {
 		s.logger.Info(ctx, "webhook event received (no specific handler)", "eventType", string(ev.EventType))
 		return nil
@@ -152,5 +168,5 @@ func (s *WebhookService) MountHTTP(basePath string, mux *http.ServeMux) {
 	for evType, handler := range s.handlers {
 		h.RegisterEventHandler(evType, handler)
 	}
-	mux.Handle(basePath, h)
+	return h
 }
