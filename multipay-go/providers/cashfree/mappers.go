@@ -3,54 +3,13 @@ package cashfree
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"time"
 
-	"github.com/bojanz/currency"
 	cf "github.com/cashfree/cashfree-pg/v6"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/utils/currencyutils"
 )
-
-// AmountMinorToMajor converts minor units (paisa/cents/fils) to major units (rupees/dollars/dinars)
-// using the ISO 4217 minor unit exponent for the given currency.
-// Examples:
-//
-//	AmountMinorToMajor(50000, "INR") → 500.0  (exponent 2, factor 100)
-//	AmountMinorToMajor(500, "JPY")   → 500.0  (exponent 0, factor 1)
-//	AmountMinorToMajor(500000, "BHD") → 500.0  (exponent 3, factor 1000)
-func AmountMinorToMajor(minorAmount int64, currencyCode string) float64 {
-	digits, ok := currency.GetDigits(currencyCode)
-	if !ok {
-		// Unknown currency — fall back to exponent 2 (most common)
-		digits = 2
-	}
-	if digits == 0 {
-		return float64(minorAmount)
-	}
-	factor := math.Pow(10, float64(digits))
-	return float64(minorAmount) / factor
-}
-
-// AmountMajorToMinor converts major units (rupees/dollars/dinars) to minor units (paisa/cents/fils)
-// using the ISO 4217 minor unit exponent for the given currency.
-// Examples:
-//
-//	AmountMajorToMinor(500.0, "INR")  → 50000  (exponent 2, factor 100)
-//	AmountMajorToMinor(500.0, "JPY")  → 500    (exponent 0, factor 1)
-//	AmountMajorToMinor(500.0, "BHD")  → 500000 (exponent 3, factor 1000)
-func AmountMajorToMinor(majorAmount float64, currencyCode string) int64 {
-	digits, ok := currency.GetDigits(currencyCode)
-	if !ok {
-		// Unknown currency — fall back to exponent 2 (most common)
-		digits = 2
-	}
-	if digits == 0 {
-		return int64(math.Round(majorAmount))
-	}
-	factor := math.Pow(10, float64(digits))
-	return int64(math.Round(majorAmount * factor))
-}
 
 // MapOrderEntityToCanonical maps a Cashfree OrderEntity to the canonical domain.Order type.
 // Handles type conversions and status mapping.
@@ -73,7 +32,7 @@ func MapOrderEntityToCanonical(cfOrder *cf.OrderEntity) (*domain.Order, error) {
 		ProviderOrderID: StringPtrToStr(cfOrder.CfOrderId),
 		OrderID:         StringPtrToStr(cfOrder.OrderId),
 		Status:          mapOrderStatus(cfOrder.OrderStatus),
-		AmountMinor:     domain.AmountMinor(AmountMajorToMinor(FloatPtrToFloat64(cfOrder.OrderAmount), StringPtrToStr(cfOrder.OrderCurrency))),
+		AmountMinor:     domain.AmountMinor(currencyutils.AmountMajorToMinor(FloatPtrToFloat64(cfOrder.OrderAmount), StringPtrToStr(cfOrder.OrderCurrency))),
 		Currency:        domain.Currency(StringPtrToStr(cfOrder.OrderCurrency)),
 		SessionID:       StringPtrToStr(cfOrder.PaymentSessionId),
 		ExpiryTime:      timePtr(TimeFromTimestamp(cfOrder.OrderExpiryTime)),
@@ -129,7 +88,7 @@ func MapPaymentEntityToCanonical(cfPayment *cf.PaymentEntity) (*domain.Payment, 
 		ProviderPaymentID: StringPtrToStr(cfPayment.CfPaymentId),
 		OrderID:           StringPtrToStr(cfPayment.OrderId),
 		Status:            mapPaymentStatus(cfPayment.PaymentStatus),
-		AmountMinor:       domain.AmountMinor(AmountMajorToMinor(FloatPtrToFloat64(cfPayment.PaymentAmount), StringPtrToStr(cfPayment.PaymentCurrency))),
+		AmountMinor:       domain.AmountMinor(currencyutils.AmountMajorToMinor(FloatPtrToFloat64(cfPayment.PaymentAmount), StringPtrToStr(cfPayment.PaymentCurrency))),
 		Currency:          domain.Currency(StringPtrToStr(cfPayment.PaymentCurrency)),
 		PaymentGroup:      StringPtrToStr(cfPayment.PaymentGroup),
 		PaymentMethod:     "",
@@ -270,7 +229,7 @@ func MapRefundEntityToCanonical(cfRefund *cf.RefundEntity) (*domain.Refund, erro
 		OrderID:          StringPtrToStr(cfRefund.OrderId),
 		PaymentID:        StringPtrToStr(cfRefund.CfPaymentId),
 		Status:           mapRefundStatus(cfRefund.RefundStatus),
-		AmountMinor:      domain.AmountMinor(AmountMajorToMinor(FloatPtrToFloat64(cfRefund.RefundAmount), StringPtrToStr(cfRefund.RefundCurrency))),
+		AmountMinor:      domain.AmountMinor(currencyutils.AmountMajorToMinor(FloatPtrToFloat64(cfRefund.RefundAmount), StringPtrToStr(cfRefund.RefundCurrency))),
 		Currency:         domain.Currency(StringPtrToStr(cfRefund.RefundCurrency)),
 		Reason:           StringPtrToStr(cfRefund.RefundNote),
 		ARN:              StringPtrToStr(cfRefund.RefundArn),
@@ -467,8 +426,8 @@ func MapLinkEntityToCanonical(cfLink *cf.LinkEntity) (*domain.PaymentLink, error
 		ProviderLinkID: StringPtrToStr(cfLink.CfLinkId),
 		LinkID:         StringPtrToStr(cfLink.LinkId),
 		Status:         linkStatus,
-		AmountMinor:    domain.AmountMinor(AmountMajorToMinor(FloatPtrToFloat64(cfLink.LinkAmount), StringPtrToStr(cfLink.LinkCurrency))),
-		AmountPaid:     domain.AmountMinor(AmountMajorToMinor(FloatPtrToFloat64(cfLink.LinkAmountPaid), StringPtrToStr(cfLink.LinkCurrency))),
+		AmountMinor:    domain.AmountMinor(currencyutils.AmountMajorToMinor(FloatPtrToFloat64(cfLink.LinkAmount), StringPtrToStr(cfLink.LinkCurrency))),
+		AmountPaid:     domain.AmountMinor(currencyutils.AmountMajorToMinor(FloatPtrToFloat64(cfLink.LinkAmountPaid), StringPtrToStr(cfLink.LinkCurrency))),
 		Currency:       domain.Currency(StringPtrToStr(cfLink.LinkCurrency)),
 		Purpose:        StringPtrToStr(cfLink.LinkPurpose),
 		LinkURL:        StringPtrToStr(cfLink.LinkUrl),
@@ -550,8 +509,8 @@ func MapPlanEntityToCanonical(entity *cf.PlanEntity) (*domain.Plan, error) {
 		PlanName:       StringPtrToStr(entity.PlanName),
 		PlanType:       mapPlanType(entity.PlanType),
 		Currency:       domain.Currency(currency),
-		AmountMinor:    domain.AmountMinor(AmountMajorToMinor(FloatPtrToFloat64(entity.PlanRecurringAmount), currency)),
-		MaxAmountMinor: domain.AmountMinor(AmountMajorToMinor(FloatPtrToFloat64(entity.PlanMaxAmount), currency)),
+		AmountMinor:    domain.AmountMinor(currencyutils.AmountMajorToMinor(FloatPtrToFloat64(entity.PlanRecurringAmount), currency)),
+		MaxAmountMinor: domain.AmountMinor(currencyutils.AmountMajorToMinor(FloatPtrToFloat64(entity.PlanMaxAmount), currency)),
 		Interval:       getInt32OrDefault(entity.PlanIntervals),
 		IntervalType:   mapPlanIntervalType(entity.PlanIntervalType),
 		MaxCycles:      getInt32OrDefault(entity.PlanMaxCycles),
@@ -627,7 +586,7 @@ func MapSubscriptionPaymentEntityToCanonical(entity *cf.SubscriptionPaymentEntit
 	payment := &domain.SubscriptionPayment{
 		PaymentID:      StringPtrToStr(entity.PaymentId),
 		SubscriptionID: StringPtrToStr(entity.SubscriptionId),
-		AmountMinor:    domain.AmountMinor(AmountMajorToMinor(FloatPtrToFloat64(entity.PaymentAmount), currency)),
+		AmountMinor:    domain.AmountMinor(currencyutils.AmountMajorToMinor(FloatPtrToFloat64(entity.PaymentAmount), currency)),
 		Status:         mapSubscriptionPaymentStatus(entity.PaymentStatus),
 		PaymentType:    mapSubscriptionPaymentType(entity.PaymentType),
 		ScheduledDate:  timePtr(TimeFromTimestamp(entity.PaymentScheduleDate)),

@@ -9,6 +9,7 @@ import (
 	cf "github.com/cashfree/cashfree-pg/v6"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/utils/currencyutils"
 )
 
 // createOrder creates a new order on the Cashfree payment gateway.
@@ -25,7 +26,7 @@ func createOrder(ctx context.Context, adapter *Adapter, req *domain.CreateOrderR
 
 	// Build Cashfree CreateOrderRequest
 	cfReq := &cf.CreateOrderRequest{
-		OrderAmount:   AmountMinorToMajor(int64(req.AmountMinor), string(req.Currency)),
+		OrderAmount:   currencyutils.AmountMinorToMajor(int64(req.AmountMinor), string(req.Currency)),
 		OrderCurrency: string(req.Currency),
 		CustomerDetails: &cf.CustomerDetails{
 			CustomerId:    req.Customer.CustomerID,

@@ -8,6 +8,7 @@ import (
 	cf "github.com/cashfree/cashfree-pg/v6"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/utils/currencyutils"
 )
 
 // createPaymentLink creates a new shareable payment link on the Cashfree payment gateway.
@@ -43,7 +44,7 @@ func createPaymentLink(ctx context.Context, adapter *Adapter, req *domain.Create
 	}
 
 	cfReq := &cf.CreateLinkRequest{
-		LinkAmount:          AmountMinorToMajor(int64(req.AmountMinor), string(req.Currency)),
+		LinkAmount:          currencyutils.AmountMinorToMajor(int64(req.AmountMinor), string(req.Currency)),
 		LinkCurrency:        string(req.Currency),
 		LinkPurpose:         &purpose,
 		CustomerDetails:     customerDetails,

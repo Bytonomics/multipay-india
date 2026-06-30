@@ -228,9 +228,9 @@ All monetary amounts in the library use `domain.AmountMinor` (`int64`) — the s
 
 **Rules for agents:**
 - NEVER pass a major-unit value (like `500` for ₹500) as `AmountMinor` — that would be ₹5.00
-- NEVER hardcode `/100` or `*100` for currency conversion — use `AmountMinorToMajor`/`AmountMajorToMinor` from `providers/cashfree/mappers.go` which use `bojanz/currency.GetDigits()` for the correct ISO 4217 exponent
+- NEVER hardcode `/100` or `*100` for currency conversion — use `currencyutils.AmountMinorToMajor`/`currencyutils.AmountMajorToMinor` from `providers/cashfree/mappers.go` which use `bojanz/currency.GetDigits()` for the correct ISO 4217 exponent
 - Razorpay API uses minor units natively — `AmountMinor` is passed directly, no conversion
-- Cashfree API uses major units (float64) — the adapter converts using `AmountMinorToMajor(amount, currencyCode)`
+- Cashfree API uses major units (float64) — the adapter converts using `currencyutils.AmountMinorToMajor(amount, currencyCode)`
 - When constructing test data, always think in minor units: `AmountMinor: 50000` for ₹500, `AmountMinor: 500` for ¥500
 
 ### Error Handling

@@ -174,7 +174,7 @@ format: setup-safe ## Format code with gofmt, goimports, and gci
 	@goimports -w -local github.com/Bytonomics/multipay-india/multipay-go .
 	@echo "Fixing import grouping with gci..."
 	@which gci > /dev/null 2>&1 || (echo "Installing gci..." && go install github.com/daixiang0/gci@latest)
-	@gci write --skip-generated -s standard -s default -s "prefix(github.com/Bytonomics)" .
+	@gci write --skip-generated --skip-vendor -s standard -s default -s "prefix(github.com/Bytonomics)" .
 	@echo "✅ Format complete"
 	@echo ""
 

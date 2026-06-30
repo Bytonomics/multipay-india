@@ -7,6 +7,7 @@ import (
 	cf "github.com/cashfree/cashfree-pg/v6"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/utils/currencyutils"
 )
 
 // createSubscription creates a new subscription on the Cashfree payment gateway.
@@ -110,7 +111,7 @@ func buildInlinePlanDetails(pd *domain.CreatePlanRequest) cf.CreateSubscriptionR
 		PlanId:        &pd.PlanID,
 		PlanName:      &pd.PlanName,
 		PlanType:      ptrString(string(pd.PlanType)),
-		PlanMaxAmount: ptrFloat32(float32(AmountMinorToMajor(int64(pd.MaxAmountMinor), string(pd.Currency)))),
+		PlanMaxAmount: ptrFloat32(float32(currencyutils.AmountMinorToMajor(int64(pd.MaxAmountMinor), string(pd.Currency)))),
 		PlanCurrency:  optStr(string(pd.Currency)),
 		PlanMaxCycles: optInt32(pd.MaxCycles),
 		PlanNote:      optStr(pd.Note),
@@ -119,7 +120,7 @@ func buildInlinePlanDetails(pd *domain.CreatePlanRequest) cf.CreateSubscriptionR
 	// Conditional (PERIODIC only): the per-cycle amount and the interval are meaningless
 	// for ON_DEMAND plans and must be omitted, not sent as zero/empty.
 	if pd.PlanType == domain.PlanTypePeriodic {
-		details.PlanAmount = ptrFloat32(float32(AmountMinorToMajor(int64(pd.AmountMinor), string(pd.Currency))))
+		details.PlanAmount = ptrFloat32(float32(currencyutils.AmountMinorToMajor(int64(pd.AmountMinor), string(pd.Currency))))
 		details.PlanIntervals = optInt32(pd.Interval)
 		details.PlanIntervalType = optStr(string(pd.IntervalType))
 	}

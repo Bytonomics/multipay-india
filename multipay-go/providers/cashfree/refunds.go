@@ -7,6 +7,7 @@ import (
 	cf "github.com/cashfree/cashfree-pg/v6"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/utils/currencyutils"
 )
 
 // createRefund creates a new refund for an order on the Cashfree payment gateway.
@@ -24,7 +25,7 @@ func createRefund(ctx context.Context, adapter *Adapter, req *domain.CreateRefun
 	// Build Cashfree refund request
 	refundAmount := 0.0
 	if req.AmountMinor > 0 {
-		refundAmount = AmountMinorToMajor(int64(req.AmountMinor), string(req.Currency))
+		refundAmount = currencyutils.AmountMinorToMajor(int64(req.AmountMinor), string(req.Currency))
 	}
 
 	cfReq := &cf.OrderCreateRefundRequest{

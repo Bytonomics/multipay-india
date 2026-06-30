@@ -7,6 +7,7 @@ import (
 	cf "github.com/cashfree/cashfree-pg/v6"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/utils/currencyutils"
 )
 
 // createPlan creates a new subscription plan on the Cashfree payment gateway.
@@ -18,8 +19,8 @@ func createPlan(ctx context.Context, a *Adapter, req *domain.CreatePlanRequest) 
 	}
 
 	// Convert amounts from minor to major units
-	maxAmountMajor := AmountMinorToMajor(int64(req.MaxAmountMinor), string(req.Currency))
-	amountMajor := AmountMinorToMajor(int64(req.AmountMinor), string(req.Currency))
+	maxAmountMajor := currencyutils.AmountMinorToMajor(int64(req.MaxAmountMinor), string(req.Currency))
+	amountMajor := currencyutils.AmountMinorToMajor(int64(req.AmountMinor), string(req.Currency))
 
 	// Build Cashfree CreatePlanRequest.
 	// Mandatory fields (validated non-empty at the boundary by CreatePlanRequest.Validate) are

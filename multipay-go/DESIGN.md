@@ -635,8 +635,8 @@ Amount conversion between minor units (`AmountMinor int64`) and provider major u
 - **Exponent 2** (INR, USD, EUR): factor = 100
 - **Exponent 3** (BHD, KWD, OMR): factor = 1000
 
-Conversion functions in `providers/cashfree/mappers.go`:
-- `AmountMinorToMajor(minorAmount int64, currencyCode string) float64` — outbound to Cashfree
-- `AmountMajorToMinor(majorAmount float64, currencyCode string) int64` — inbound from Cashfree
+Conversion functions in `utils/currencyutils/currency.go`:
+- `currencyutils.AmountMinorToMajor(minorAmount int64, currencyCode string) float64` — outbound to Cashfree
+- `currencyutils.AmountMajorToMinor(majorAmount float64, currencyCode string) int64` — inbound from Cashfree
 
 Razorpay uses minor units natively — no conversion needed.
