@@ -69,6 +69,11 @@ type razorpayInvoiceListRequest struct {
 	SubscriptionID string `json:"subscription_id"`
 }
 
+type razorpayAddonRequest struct {
+	Item     razorpayItem `json:"item"`
+	Quantity int          `json:"quantity"`
+}
+
 type razorpaySubscriptionResponse struct {
 	ID             string            `json:"id"`
 	PlanID         string            `json:"plan_id"`

@@ -245,3 +245,105 @@ type ChangePlanRequest struct {
 type GetSubscriptionPaymentsRequest struct {
 	SubscriptionID string `json:"subscription_id" pedantigo:"required,minLength=1"`
 }
+
+// UpgradeStrategy represents the strategy used for upgrading a subscription.
+type UpgradeStrategy string
+
+const (
+	UpgradeReauthProrated  UpgradeStrategy = "REAUTH_PRORATED"
+	UpgradeNativeImmediate UpgradeStrategy = "NATIVE_IMMEDIATE"
+	UpgradeCycleEnd        UpgradeStrategy = "CYCLE_END"
+)
+
+// UpgradeSubscriptionRequest represents a request to upgrade an existing subscription to a new plan.
+type UpgradeSubscriptionRequest struct {
+	SubscriptionID    string      `json:"subscription_id" pedantigo:"required,minLength=1"`
+	NewSubscriptionID string      `json:"new_subscription_id" pedantigo:"required,minLength=1"`
+	CurrentPlanID     string      `json:"current_plan_id" pedantigo:"required,minLength=1"`
+	NewPlanID         string      `json:"new_plan_id" pedantigo:"required,minLength=1"`
+	OldAmountMinor    AmountMinor `json:"old_amount_minor" pedantigo:"required,gt=0"`
+	NewAmountMinor    AmountMinor `json:"new_amount_minor" pedantigo:"required,gt=0"`
+	Currency          Currency    `json:"currency" pedantigo:"required,iso4217"`
+	RemainingDays     int         `json:"remaining_days" pedantigo:"required,gte=0"`
+	CycleDays         int         `json:"cycle_days" pedantigo:"required,gt=0"`
+	CustomerEmail     string      `json:"customer_email" pedantigo:"required,email"`
+	CustomerPhone     string      `json:"customer_phone" pedantigo:"required,minLength=5,maxLength=20"`
+	CustomerName      string      `json:"customer_name" pedantigo:"omitempty,maxLength=200"`
+	ReturnURL         string      `json:"return_url" pedantigo:"required,url"`
+}
+
+// Validate enforces presence of mandatory fields and cross-field constraints.
+func (r *UpgradeSubscriptionRequest) Validate() error {
+	if r.SubscriptionID == "" {
+		return errors.New("subscription_id is required")
+	}
+	if r.NewSubscriptionID == "" {
+		return errors.New("new_subscription_id is required")
+	}
+	if r.NewPlanID == "" {
+		return errors.New("new_plan_id is required")
+	}
+	if r.CycleDays <= 0 {
+		return errors.New("cycle_days must be > 0")
+	}
+	if r.RemainingDays < 0 || r.RemainingDays > r.CycleDays {
+		return errors.New("remaining_days must be within [0, cycle_days]")
+	}
+	if r.ReturnURL == "" {
+		return errors.New("return_url is required")
+	}
+	return nil
+}
+
+// UpgradeResult represents the result of an upgrade operation.
+type UpgradeResult struct {
+	Strategy                UpgradeStrategy `json:"strategy"`
+	ProratedAmountMinor     AmountMinor     `json:"prorated_amount_minor"`
+	RequiresReauthorization bool            `json:"requires_reauthorization"`
+	AuthLink                string          `json:"auth_link,omitempty"`
+	NewSubscriptionID       string          `json:"new_subscription_id"`
+	RecurringEffective      string          `json:"recurring_effective"`
+}
+
+// FinalizeUpgradeRequest represents a request to finalize an upgrade operation.
+type FinalizeUpgradeRequest struct {
+	NewSubscriptionID   string      `json:"new_subscription_id" pedantigo:"required,minLength=1"`
+	OldSubscriptionID   string      `json:"old_subscription_id" pedantigo:"required,minLength=1"`
+	PaymentRef          string      `json:"payment_ref" pedantigo:"required,minLength=1"`
+	ProratedAmountMinor AmountMinor `json:"prorated_amount_minor" pedantigo:"required,gt=0"`
+	Currency            Currency    `json:"currency" pedantigo:"required,iso4217"`
+}
+
+// Validate enforces presence of mandatory fields.
+func (r *FinalizeUpgradeRequest) Validate() error {
+	if r.NewSubscriptionID == "" {
+		return errors.New("new_subscription_id is required")
+	}
+	if r.PaymentRef == "" {
+		return errors.New("payment_ref is required")
+	}
+	return nil
+}
+
+// ChargeSubscriptionRequest represents a request to perform an on-demand charge on a subscription.
+type ChargeSubscriptionRequest struct {
+	SubscriptionID string      `json:"subscription_id" pedantigo:"required,minLength=1"`
+	PaymentRef     string      `json:"payment_ref" pedantigo:"required,minLength=1"`
+	AmountMinor    AmountMinor `json:"amount_minor" pedantigo:"required,gt=0"`
+	Currency       Currency    `json:"currency" pedantigo:"required,iso4217"`
+	Remarks        string      `json:"remarks,omitempty" pedantigo:"omitempty,maxLength=500"`
+}
+
+// Validate enforces presence of mandatory fields.
+func (r *ChargeSubscriptionRequest) Validate() error {
+	if r.SubscriptionID == "" {
+		return errors.New("subscription_id is required")
+	}
+	if r.PaymentRef == "" {
+		return errors.New("payment_ref is required")
+	}
+	if r.AmountMinor <= 0 {
+		return errors.New("amount_minor must be > 0")
+	}
+	return nil
+}

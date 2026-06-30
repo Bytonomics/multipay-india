@@ -40,19 +40,20 @@ func NewSupportMatrix() *SupportMatrix {
 		CapWebhookConsume:    true,
 
 		// Cashfree-specific capabilities
-		CapInstrumentCryptogram:     true,
-		CapOfferCreate:              true,
-		CapOfferFetch:               true,
-		CapEligibilityFetch:         true,
-		CapPaymentLinkListOrders:    true,
-		CapSettlementOrderFetch:     true,
-		CapSettlementList:           true,
-		CapSettlementReconFetch:     true,
-		CapReconFetch:               true,
-		CapSubscriptionManualCharge: true,
-		CapSubscriptionEligibility:  true,
-		CapSubscriptionList:         false,
-		CapPlanList:                 false,
+		CapInstrumentCryptogram:         true,
+		CapOfferCreate:                  true,
+		CapOfferFetch:                   true,
+		CapEligibilityFetch:             true,
+		CapPaymentLinkListOrders:        true,
+		CapSettlementOrderFetch:         true,
+		CapSettlementList:               true,
+		CapSettlementReconFetch:         true,
+		CapReconFetch:                   true,
+		CapSubscriptionManualCharge:     true,
+		CapSubscriptionUpgradeProration: true,
+		CapSubscriptionEligibility:      true,
+		CapSubscriptionList:             false,
+		CapPlanList:                     false,
 
 		// Razorpay-only capabilities (not supported by Cashfree)
 		CapOrderUpdate:       false,
@@ -125,9 +126,10 @@ func NewSupportMatrix() *SupportMatrix {
 		CapUPICreate:         true,
 		CapVPAValidate:       true,
 
-		// Cashfree-specific capabilities (not supported by Razorpay)
-		CapSubscriptionManualCharge: false,
-		CapSubscriptionEligibility:  false,
+		// Cashfree-specific capabilities (supported by Razorpay)
+		CapSubscriptionManualCharge:     true,
+		CapSubscriptionUpgradeProration: true,
+		CapSubscriptionEligibility:      false,
 
 		// Cashfree-only capabilities (not supported by Razorpay)
 		CapInstrumentCryptogram:  false,

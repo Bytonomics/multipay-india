@@ -45,3 +45,17 @@ func AmountMajorToMinor(majorAmount float64, currencyCode string) int64 {
 	factor := math.Pow(10, float64(digits))
 	return int64(math.Round(majorAmount * factor))
 }
+
+// ProrateUpgrade returns the one-time top-up to charge for an immediate plan upgrade:
+// (newAmountMinor - oldAmountMinor) * remainingDays / totalDays, rounded to the currency's
+// smallest unit. Returns 0 for downgrades (new <= old), or when totalDays <= 0, or
+// remainingDays <= 0. currencyCode is the ISO-4217 code (e.g. "INR").
+func ProrateUpgrade(oldAmountMinor, newAmountMinor int64, remainingDays, totalDays int, currencyCode string) int64 {
+	if newAmountMinor <= oldAmountMinor || totalDays <= 0 || remainingDays <= 0 {
+		return 0
+	}
+	diffMinor := newAmountMinor - oldAmountMinor
+	// integer math in minor units, rounded to nearest minor unit
+	prorated := (diffMinor*int64(remainingDays) + int64(totalDays)/2) / int64(totalDays)
+	return prorated
+}

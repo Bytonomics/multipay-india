@@ -87,3 +87,73 @@ export interface RazorpayFormFields {
   currency: string;
   callback_url: string;
 }
+
+/**
+ * Upgrade strategy for subscription upgrades
+ */
+export enum UpgradeStrategy {
+  REAUTH_PRORATED = "REAUTH_PRORATED",
+  NATIVE_IMMEDIATE = "NATIVE_IMMEDIATE",
+  CYCLE_END = "CYCLE_END",
+}
+
+/**
+ * When recurring charges should take effect
+ */
+export enum RecurringEffective {
+  IMMEDIATE = "IMMEDIATE",
+  CYCLE_END = "CYCLE_END",
+}
+
+/**
+ * Request to upgrade an existing subscription to a new plan
+ */
+export interface UpgradeSubscriptionRequest {
+  subscription_id: string;
+  new_subscription_id: string;
+  current_plan_id: string;
+  new_plan_id: string;
+  old_amount_minor: number;
+  new_amount_minor: number;
+  currency: string;
+  remaining_days: number;
+  cycle_days: number;
+  customer_email: string;
+  customer_phone: string;
+  customer_name?: string;
+  return_url: string;
+}
+
+/**
+ * Result of an upgrade operation
+ */
+export interface UpgradeResult {
+  strategy: UpgradeStrategy;
+  prorated_amount_minor: number;
+  requires_reauthorization: boolean;
+  auth_link?: string;
+  new_subscription_id: string;
+  recurring_effective: RecurringEffective;
+}
+
+/**
+ * Request to finalize an upgrade operation
+ */
+export interface FinalizeUpgradeRequest {
+  new_subscription_id: string;
+  old_subscription_id: string;
+  payment_ref: string;
+  prorated_amount_minor: number;
+  currency: string;
+}
+
+/**
+ * Request to perform an on-demand charge on a subscription
+ */
+export interface ChargeSubscriptionRequest {
+  subscription_id: string;
+  payment_ref: string;
+  amount_minor: number;
+  currency: string;
+  remarks?: string;
+}

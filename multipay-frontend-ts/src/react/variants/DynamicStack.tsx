@@ -16,7 +16,8 @@ export const DynamicStack: React.FC<PickerVariantProps> = ({
   }
 
   // Primary card = views[0], alternatives = views.slice(1)
-  const primaryView = views[0];
+  // views is guaranteed non-empty here due to the guard above
+  const primaryView = views[0] as PickerProviderView;
   const alternativeViews = views.slice(1);
 
   return (

@@ -410,6 +410,93 @@ func getSubscriptionPayments(ctx context.Context, adapter *Adapter, req *domain.
 	return payments, nil
 }
 
+// chargeSubscription performs an on-demand charge on a subscription.
+// Maps the canonical domain.ChargeSubscriptionRequest to a Cashfree CreateSubscriptionPaymentRequest,
+// calls the SDK, and maps the response back to a canonical domain.SubscriptionPayment.
+func chargeSubscription(ctx context.Context, adapter *Adapter, req *domain.ChargeSubscriptionRequest) (*domain.SubscriptionPayment, error) {
+	if req == nil {
+		return nil, fmt.Errorf("request is required: %w", domain.ErrInvalidRequest)
+	}
+
+	// Fetch subscription to get currency
+	subEntity, subHttpResp, ferr := adapter.cfClient.SubsFetchSubscriptionWithContext(
+		ctx,
+		req.SubscriptionID,
+		nil, // xRequestId
+		nil, // xIdempotencyKey
+		adapter.httpClient,
+	)
+	defer func() {
+		if subHttpResp != nil && subHttpResp.Body != nil {
+			_ = subHttpResp.Body.Close()
+		}
+	}()
+	if ferr != nil {
+		return nil, fmt.Errorf("failed to fetch subscription for currency: %w", ferr)
+	}
+
+	// Resolve currency
+	currency := ""
+	if subEntity != nil && subEntity.PlanDetails != nil && subEntity.PlanDetails.PlanCurrency != nil {
+		currency = *subEntity.PlanDetails.PlanCurrency
+	}
+	if currency == "" {
+		return nil, fmt.Errorf("could not resolve subscription currency for %s: %w", req.SubscriptionID, domain.ErrProviderError)
+	}
+
+	// Convert amount from minor to major units
+	amountMajor := currencyutils.AmountMinorToMajor(int64(req.AmountMinor), string(req.Currency))
+
+	// Build Cashfree CreateSubscriptionPaymentRequest
+	cfReq := &cf.CreateSubscriptionPaymentRequest{
+		SubscriptionId: req.SubscriptionID,
+		PaymentId:      req.PaymentRef, // caller-supplied unique id
+		PaymentAmount:  ptrFloat32(float32(amountMajor)),
+		PaymentType:    "CHARGE",
+		PaymentRemarks: optStr(req.Remarks),
+	}
+
+	// Call Cashfree SDK
+	cfPayment, httpResp, err := adapter.cfClient.SubsCreatePaymentWithContext(
+		ctx,
+		cfReq,
+		nil, // xRequestId
+		nil, // xIdempotencyKey
+		adapter.httpClient,
+	)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
+		}
+	}()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create payment on cashfree: %w", domain.ErrProviderError)
+	}
+
+	if cfPayment == nil {
+		return nil, fmt.Errorf("cashfree returned nil payment: %w", domain.ErrProviderError)
+	}
+
+	// Convert CreateSubscriptionPaymentResponse to SubscriptionPaymentEntity
+	entity := &cf.SubscriptionPaymentEntity{
+		CfPaymentId:          cfPayment.CfPaymentId,
+		PaymentAmount:        cfPayment.PaymentAmount,
+		PaymentId:            cfPayment.PaymentId,
+		PaymentInitiatedDate: cfPayment.PaymentInitiatedDate,
+		PaymentStatus:        cfPayment.PaymentStatus,
+		PaymentType:          cfPayment.PaymentType,
+		SubscriptionId:       cfPayment.SubscriptionId,
+		FailureDetails:       cfPayment.FailureDetails,
+	}
+
+	// Map response to canonical type using existing mapper
+	payment, err := MapSubscriptionPaymentEntityToCanonical(entity, currency)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map subscription payment: %w", err)
+	}
+	return payment, nil
+}
+
 // Adapter method stubs - these delegate to the operation functions above
 
 // CreateSubscription creates a new subscription.
@@ -452,4 +539,10 @@ func (a *Adapter) ChangePlan(ctx context.Context, req *domain.ChangePlanRequest)
 // See subscriptions.go for implementation.
 func (a *Adapter) GetSubscriptionPayments(ctx context.Context, req *domain.GetSubscriptionPaymentsRequest) ([]*domain.SubscriptionPayment, error) {
 	return getSubscriptionPayments(ctx, a, req)
+}
+
+// ChargeSubscription performs an on-demand charge on a subscription.
+// See subscriptions.go for implementation.
+func (a *Adapter) ChargeSubscription(ctx context.Context, req *domain.ChargeSubscriptionRequest) (*domain.SubscriptionPayment, error) {
+	return chargeSubscription(ctx, a, req)
 }

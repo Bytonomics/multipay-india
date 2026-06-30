@@ -25,6 +25,14 @@ func (f *fakeAdapter) ProviderName() domain.Provider {
 	return f.provider
 }
 
+func (f *fakeAdapter) ChargeSubscription(_ context.Context, req *domain.ChargeSubscriptionRequest) (*domain.SubscriptionPayment, error) {
+	return &domain.SubscriptionPayment{
+		PaymentID:   req.PaymentRef,
+		Status:      domain.SubPaymentStatusSuccess,
+		AmountMinor: req.AmountMinor,
+	}, nil
+}
+
 func (f *fakeAdapter) VerifySignature(_ context.Context, _ []byte, _ map[string]string) error {
 	return nil
 }

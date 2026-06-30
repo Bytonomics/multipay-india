@@ -25,17 +25,18 @@ const (
 
 // Cashfree-specific Capabilities
 const (
-	CapInstrumentCryptogram     Capability = "instrument_cryptogram"
-	CapOfferCreate              Capability = "offer_create"
-	CapOfferFetch               Capability = "offer_fetch"
-	CapEligibilityFetch         Capability = "eligibility_fetch"
-	CapPaymentLinkListOrders    Capability = "payment_link_list_orders"
-	CapSettlementOrderFetch     Capability = "settlement_order_fetch"
-	CapSettlementList           Capability = "settlement_list"
-	CapSettlementReconFetch     Capability = "settlement_recon_fetch"
-	CapReconFetch               Capability = "recon_fetch"
-	CapSubscriptionManualCharge Capability = "subscription_manual_charge"
-	CapSubscriptionEligibility  Capability = "subscription_eligibility"
+	CapInstrumentCryptogram         Capability = "instrument_cryptogram"
+	CapOfferCreate                  Capability = "offer_create"
+	CapOfferFetch                   Capability = "offer_fetch"
+	CapEligibilityFetch             Capability = "eligibility_fetch"
+	CapPaymentLinkListOrders        Capability = "payment_link_list_orders"
+	CapSettlementOrderFetch         Capability = "settlement_order_fetch"
+	CapSettlementList               Capability = "settlement_list"
+	CapSettlementReconFetch         Capability = "settlement_recon_fetch"
+	CapReconFetch                   Capability = "recon_fetch"
+	CapSubscriptionManualCharge     Capability = "subscription_manual_charge"
+	CapSubscriptionUpgradeProration Capability = "subscription_upgrade_proration"
+	CapSubscriptionEligibility      Capability = "subscription_eligibility"
 )
 
 // Razorpay-specific Capabilities

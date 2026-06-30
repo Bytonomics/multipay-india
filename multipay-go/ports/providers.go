@@ -99,6 +99,9 @@ type SubscriptionProvider interface {
 
 	// GetSubscriptionPayments retrieves all payments for a subscription.
 	GetSubscriptionPayments(ctx context.Context, req *domain.GetSubscriptionPaymentsRequest) ([]*domain.SubscriptionPayment, error)
+
+	// ChargeSubscription performs an on-demand charge on a subscription.
+	ChargeSubscription(ctx context.Context, req *domain.ChargeSubscriptionRequest) (*domain.SubscriptionPayment, error)
 }
 
 // WebhookConsumerProvider defines operations for webhook processing.

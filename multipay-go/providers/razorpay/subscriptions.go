@@ -298,6 +298,60 @@ func getSubscriptionPayments(ctx context.Context, adapter *Adapter, req *domain.
 	return payments, nil
 }
 
+// chargeSubscription performs an on-demand charge on a subscription using the CreateAddon method.
+// Maps the canonical domain.ChargeSubscriptionRequest to Razorpay addon data,
+// calls the SDK, and maps the response back to a canonical domain.SubscriptionPayment.
+func chargeSubscription(ctx context.Context, adapter *Adapter, req *domain.ChargeSubscriptionRequest) (*domain.SubscriptionPayment, error) {
+	if req == nil {
+		return nil, fmt.Errorf("request is required: %w", domain.ErrInvalidRequest)
+	}
+
+	// Build addon request data as typed struct
+	addonData := &razorpayAddonRequest{
+		Item: razorpayItem{
+			Name:     req.Remarks,
+			Amount:   int64(req.AmountMinor), // Razorpay native minor units
+			Currency: string(req.Currency),
+		},
+		Quantity: 1,
+	}
+
+	// Convert typed struct to map for SDK
+	addonDataMap, err := encodeRequest(addonData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode addon request: %w", err)
+	}
+
+	// Call Razorpay Subscription.CreateAddon()
+	addonResp, err := adapter.client.Subscription.CreateAddon(req.SubscriptionID, addonDataMap, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create addon on razorpay: %w", domain.ErrProviderError)
+	}
+
+	if addonResp == nil {
+		return nil, fmt.Errorf("razorpay returned nil addon response: %w", domain.ErrProviderError)
+	}
+
+	// Decode response to typed struct - try as invoice-like payment response
+	typed, err := decodeResponse[razorpayInvoiceResponse](addonResp)
+	if err != nil {
+		return nil, err
+	}
+
+	rawJSON, err := json.Marshal(typed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal addon response: %w", err)
+	}
+
+	// Map invoice response to subscription payment
+	payment := mapInvoiceToSubscriptionPayment(typed, req.SubscriptionID, rawJSON)
+	if payment == nil {
+		return nil, fmt.Errorf("failed to map addon response to subscription payment: %w", domain.ErrProviderError)
+	}
+
+	return payment, nil
+}
+
 // Adapter method stubs - these delegate to the operation functions above
 
 // CreateSubscription creates a new subscription.
@@ -340,4 +394,10 @@ func (a *Adapter) ChangePlan(ctx context.Context, req *domain.ChangePlanRequest)
 // See subscriptions.go for implementation.
 func (a *Adapter) GetSubscriptionPayments(ctx context.Context, req *domain.GetSubscriptionPaymentsRequest) ([]*domain.SubscriptionPayment, error) {
 	return getSubscriptionPayments(ctx, a, req)
+}
+
+// ChargeSubscription performs an on-demand charge on a subscription.
+// See subscriptions.go for implementation.
+func (a *Adapter) ChargeSubscription(ctx context.Context, req *domain.ChargeSubscriptionRequest) (*domain.SubscriptionPayment, error) {
+	return chargeSubscription(ctx, a, req)
 }

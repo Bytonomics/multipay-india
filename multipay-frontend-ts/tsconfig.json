@@ -13,6 +13,7 @@
     "sourceMap": true,
     "removeComments": false,
     "strict": true,
+    "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,

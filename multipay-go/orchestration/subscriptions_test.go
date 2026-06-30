@@ -14,12 +14,14 @@ import (
 
 // fakeAdapter is a test implementation of ports.ProviderAdapter.
 // It implements all 29 methods of the ProviderAdapter interface.
-// The three operation methods (CreatePlan, GetPlan, CreateSubscription) can be
-// configured with custom func fields; all other methods return zero values.
+// Operation methods can be configured with custom func fields; all other methods return zero values.
 type fakeAdapter struct {
 	createPlanFunc         func(ctx context.Context, req *domain.CreatePlanRequest) (*domain.Plan, error)
 	getPlanFunc            func(ctx context.Context, req *domain.GetPlanRequest) (*domain.Plan, error)
 	createSubscriptionFunc func(ctx context.Context, req *domain.CreateSubscriptionRequest) (*domain.Subscription, error)
+	changePlanFunc         func(ctx context.Context, req *domain.ChangePlanRequest) (*domain.Subscription, error)
+	cancelSubscriptionFunc func(ctx context.Context, req *domain.CancelSubscriptionRequest) (*domain.Subscription, error)
+	chargeSubscriptionFunc func(ctx context.Context, req *domain.ChargeSubscriptionRequest) (*domain.SubscriptionPayment, error)
 }
 
 // --- OrderProvider methods ---
@@ -122,7 +124,10 @@ func (f *fakeAdapter) GetSubscription(ctx context.Context, req *domain.GetSubscr
 }
 
 func (f *fakeAdapter) CancelSubscription(ctx context.Context, req *domain.CancelSubscriptionRequest) (*domain.Subscription, error) {
-	return nil, nil
+	if f.cancelSubscriptionFunc != nil {
+		return f.cancelSubscriptionFunc(ctx, req)
+	}
+	return &domain.Subscription{}, nil
 }
 
 func (f *fakeAdapter) PauseSubscription(ctx context.Context, req *domain.PauseSubscriptionRequest) (*domain.Subscription, error) {
@@ -134,11 +139,25 @@ func (f *fakeAdapter) ResumeSubscription(ctx context.Context, req *domain.Resume
 }
 
 func (f *fakeAdapter) ChangePlan(ctx context.Context, req *domain.ChangePlanRequest) (*domain.Subscription, error) {
-	return nil, nil
+	if f.changePlanFunc != nil {
+		return f.changePlanFunc(ctx, req)
+	}
+	return &domain.Subscription{}, nil
 }
 
 func (f *fakeAdapter) GetSubscriptionPayments(ctx context.Context, req *domain.GetSubscriptionPaymentsRequest) ([]*domain.SubscriptionPayment, error) {
 	return nil, nil
+}
+
+func (f *fakeAdapter) ChargeSubscription(ctx context.Context, req *domain.ChargeSubscriptionRequest) (*domain.SubscriptionPayment, error) {
+	if f.chargeSubscriptionFunc != nil {
+		return f.chargeSubscriptionFunc(ctx, req)
+	}
+	return &domain.SubscriptionPayment{
+		PaymentID:   req.PaymentRef,
+		Status:      domain.SubPaymentStatusSuccess,
+		AmountMinor: req.AmountMinor,
+	}, nil
 }
 
 // --- WebhookConsumerProvider methods ---
@@ -303,7 +322,8 @@ func TestSubscriptionService_CreateSubscription_Pipeline(t *testing.T) {
 		logger := ports.NewNoopLogger()
 		pipeline := hooks.NewPipeline(logger)
 		clock := ports.NewRealClock()
-		svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, pipeline, logger, clock)
+		validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+		svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, validator, pipeline, logger, clock)
 
 		_, err := svc.CreateSubscription(context.Background(), nil)
 		if err == nil {
@@ -326,7 +346,8 @@ func TestSubscriptionService_CreateSubscription_Pipeline(t *testing.T) {
 		logger := ports.NewNoopLogger()
 		pipeline := hooks.NewPipeline(logger)
 		clock := ports.NewRealClock()
-		svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, pipeline, logger, clock)
+		validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+		svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, validator, pipeline, logger, clock)
 
 		req := &domain.CreateSubscriptionRequest{SubscriptionID: "s", CustomerEmail: "a@b.com", CustomerPhone: "12345", ReturnURL: "https://example.com/return"}
 		// missing both PlanID and PlanDetails — XOR violation caught by Validate()
@@ -350,7 +371,8 @@ func TestSubscriptionService_CreateSubscription_Pipeline(t *testing.T) {
 		logger := ports.NewNoopLogger()
 		pipeline := hooks.NewPipeline(logger)
 		clock := ports.NewRealClock()
-		svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, pipeline, logger, clock)
+		validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+		svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, validator, pipeline, logger, clock)
 
 		req := &domain.CreateSubscriptionRequest{
 			SubscriptionID: "s",
@@ -378,7 +400,8 @@ func TestSubscriptionService_CreateSubscription_Pipeline(t *testing.T) {
 		logger := ports.NewNoopLogger()
 		pipeline := hooks.NewPipeline(logger)
 		clock := ports.NewRealClock()
-		svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, pipeline, logger, clock)
+		validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+		svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, validator, pipeline, logger, clock)
 
 		req := &domain.CreateSubscriptionRequest{
 			SubscriptionID: "s",

@@ -1,0 +1,9 @@
+/**
+ * MultiPay React - Styles Entry Point
+ * Imports all CSS variables and component styles needed for the PaymentPicker
+ *
+ * Usage: import '@bytonomics/multipay-frontend-ts/react/styles.css'
+ */
+
+/* Design system tokens (light + dark theme CSS custom properties) */
+@import "./styles/variables.css";

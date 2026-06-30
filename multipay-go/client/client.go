@@ -54,6 +54,10 @@ func NewClient(cfg *ClientConfig) (*MultiPayClient, error) {
 		panic("ClientConfig.WebhookStore is required (cannot be nil); WebhookStore provides durable event capture for webhook replay and idempotency")
 	}
 
+	if cfg.Provider == nil {
+		panic("ClientConfig.Provider is required (cannot be nil); a payment client must be bound to exactly one provider adapter")
+	}
+
 	adapter := cfg.Provider
 	provider := adapter.ProviderName()
 
@@ -89,9 +93,9 @@ func NewClient(cfg *ClientConfig) (*MultiPayClient, error) {
 	instrumentService := orchestration.NewInstrumentService(provider, adapter, validator, pipeline, logger, clock)
 	paymentLinkService := orchestration.NewPaymentLinkService(provider, adapter, validator, pipeline, logger, clock)
 
-	// Create PlanService and SubscriptionService (first-class services, no validator)
+	// Create PlanService and SubscriptionService with validator for capability checks
 	planService := orchestration.NewPlanService(provider, adapter, pipeline, logger, clock)
-	subscriptionService := orchestration.NewSubscriptionService(provider, adapter, pipeline, logger, clock)
+	subscriptionService := orchestration.NewSubscriptionService(provider, adapter, validator, pipeline, logger, clock)
 
 	// WebhookService has a different constructor (requires Provider, Adapter, Pipeline, Store, EndpointRegistry, Logger)
 	endpointRegistry := routing.NewEndpointRegistry()

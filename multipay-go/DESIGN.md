@@ -100,6 +100,9 @@ This is the handle a frontend must pass to the Cashfree JS SDK to initiate manda
 | ResumeSubscription | ✓ | ✓ | YES |
 | ChangePlan | ✓ | ✓ | YES |
 | GetSubscriptionPayments | ✓ | ✓ | YES |
+| UpgradeSubscription | ✓ | ✓ | YES |
+| FinalizeUpgrade | ✓ | ✓ | YES |
+| ChargeSubscription | ✓ | ✓ | YES |
 
 ### Service Flow (No Capability Gate)
 
@@ -153,6 +156,70 @@ if err := createPlanValidator.Validate(req); err != nil {
 - Subscriptions: `Subscription.Create`, `Subscription.Fetch`, `Subscription.Cancel`, `Subscription.Pause`, `Subscription.Resume`, `Subscription.Update`
   - **Note**: CreateSubscription auto-creates a plan if PlanDetails is provided (2-step SDK call internally)
   - Update supports `schedule_change_at` ("now" or "cycle_end")
+
+### Subscription Upgrade Orchestration
+
+**UpgradeSubscription(ctx, *UpgradeSubscriptionRequest) (*UpgradeResult, error)**
+- Creates a new subscription or schedules a plan change, depending on provider strategy
+- Capability-gated: requires `CapSubscriptionUpgradeProration` (both Cashfree and Razorpay support)
+
+**Cashfree (strategy `REAUTH_PRORATED`)**:
+- Creates a NEW subscription/mandate via `adapter.CreateSubscription(SubscriptionID=req.NewSubscriptionID, PlanID=req.NewPlanID, FirstChargeTime=clock.Now()+remainingDays)`
+- Returns: `RequiresReauthorization=true`, `AuthLink` (mandate authorization session from new subscription), `ProratedAmountMinor` (computed via `currencyutils.ProrateUpgrade(...)`), `RecurringEffective="CYCLE_END"`
+- The old mandate is NOT charged; old subscription remains active until `FinalizeUpgrade` cancels it
+
+**Razorpay (strategy `NATIVE_IMMEDIATE`)**:
+- Calls `adapter.ChangePlan(ScheduleAt=NOW)` to transition immediately
+- Returns: `RequiresReauthorization=false`, `ProratedAmountMinor=0`, `RecurringEffective="IMMEDIATE"`
+- Razorpay prorates natively; the library does NOT charge a computed delta
+
+**FinalizeUpgrade(ctx, *FinalizeUpgradeRequest) (*SubscriptionPayment, error)**
+- Charges the prorated amount and/or finalizes the subscription transition
+- Return type: `(*SubscriptionPayment, error)` (NOT bare `error`)
+- Capability-gated: requires `CapSubscriptionUpgradeProration`
+
+**Cashfree**:
+- Charges the prorated delta on the NEW mandate: `adapter.ChargeSubscription(SubscriptionID=req.NewSubscriptionID, PaymentRef=req.PaymentRef, AmountMinor=req.ProratedAmountMinor)`
+- Cancels the old subscription: `adapter.CancelSubscription(req.OldSubscriptionID)`
+- Returns the charge payment result
+
+**Razorpay**:
+- No-op success (no charge step needed; plan change is already effective)
+- Returns a non-nil empty `*SubscriptionPayment` (never `nil, nil`)
+
+**ChargeSubscription(ctx, *ChargeSubscriptionRequest) (*SubscriptionPayment, error)**
+- Manually charge an existing subscription mandate (used by upgrade, recovery, admin flows)
+- Capability-gated: requires `CapSubscriptionManualCharge`
+- Direct adapter call; orchestration wrapper handles hooks and validation
+- Returns payment details including ID, status, and amount charged
+
+#### Upgrade Flow
+
+1. Caller validates new plan amount > old plan amount and determines remaining billing days
+2. Call `UpgradeSubscription(oldSubscriptionID, newSubscriptionID, newPlanID, remainingDays, ...)`
+   - Cashfree: creates new mandate, returns `RequiresReauthorization=true, AuthLink, ProratedAmountMinor`
+   - Razorpay: schedules plan change immediately, returns `RequiresReauthorization=false, ProratedAmountMinor=0`
+   - Executes before/after hooks
+3. If Cashfree: caller directs user to reauthorize via AuthLink before next step
+4. Call `FinalizeUpgrade(oldSubscriptionID, newSubscriptionID, proratedAmountMinor, paymentRef, ...)`
+   - Cashfree: charges prorated on new mandate, cancels old subscription, returns charge payment
+   - Razorpay: no-op, returns empty payment
+   - Executes before/after hooks
+5. Return finalized upgrade state to caller
+
+#### Subscription Upgrade Capabilities
+
+Both Cashfree and Razorpay support the upgrade orchestration capabilities:
+
+- `CapSubscriptionUpgradeProration`: Pro-rata upgrade charging on an existing mandate
+  - Gated on: `UpgradeSubscription()` and `FinalizeUpgrade()`
+  - Supported by: Cashfree ✓, Razorpay ✓
+  - Behavior: Computes pro-rata amount for remaining billing cycle, charges immediately on mandate, then transitions to new plan
+
+- `CapSubscriptionManualCharge`: Manual charge on an existing subscription mandate
+  - Gated on: `ChargeSubscription()`
+  - Supported by: Cashfree ✓, Razorpay ✓
+  - Behavior: Direct charge without plan transition; used by recovery flows and admin operations
 
 ### Webhook Events for Subscriptions
 

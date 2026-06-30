@@ -100,6 +100,9 @@ func (stubProviderAdapter) ChangePlan(_ context.Context, _ *domain.ChangePlanReq
 func (stubProviderAdapter) GetSubscriptionPayments(_ context.Context, _ *domain.GetSubscriptionPaymentsRequest) ([]*domain.SubscriptionPayment, error) {
 	return nil, domain.ErrProviderError
 }
+func (stubProviderAdapter) ChargeSubscription(_ context.Context, _ *domain.ChargeSubscriptionRequest) (*domain.SubscriptionPayment, error) {
+	return nil, domain.ErrProviderError
+}
 func (stubProviderAdapter) VerifySignature(_ context.Context, _ []byte, _ map[string]string) error {
 	return nil
 }

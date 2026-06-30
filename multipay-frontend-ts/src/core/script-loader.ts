@@ -79,7 +79,8 @@ function createScriptElement(src: string): Promise<void> {
 function isScriptLoaded(src: string): boolean {
   const scripts = document.getElementsByTagName("script");
   for (let i = 0; i < scripts.length; i++) {
-    if (scripts[i].src === src || scripts[i].getAttribute("src") === src) {
+    const script = scripts[i];
+    if (script && (script.src === src || script.getAttribute("src") === src)) {
       return true;
     }
   }
