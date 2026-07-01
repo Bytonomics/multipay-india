@@ -707,3 +707,34 @@ Conversion functions in `utils/currencyutils/currency.go`:
 - `currencyutils.AmountMajorToMinor(majorAmount float64, currencyCode string) int64` — inbound from Cashfree
 
 Razorpay uses minor units natively — no conversion needed.
+
+## Testing — Vendor-Free Fake Harness (providers/fake)
+
+The fake harness enables comprehensive testing without contacting Cashfree or Razorpay. `client.MultiPayClient` returns CONCRETE `*orchestration.OrderService` (not interfaces), which means a fake that returns nil services can never be invoked by production code. The only workable seam is `ports.ProviderAdapter`. The `providers/fake` package provides a single `FakeAdapter` implementing `ports.ProviderAdapter`; tests build a REAL client via `client.NewClient` with the fake injected, so requests flow through the genuine orchestration layer (pedantigo validation, capability checks, hook pipeline) and land on the fake — no vendor is ever contacted.
+
+**Package contents:**
+
+- `FakeAdapter` (`adapter.go`) — Implements all 33 `ProviderAdapter` methods; per-operation behavior is configured via callable `<Method>Func` func fields (`nil` ⇒ safe zero-value defaults); call logs (`CreateOrderCalls`, `CreateSubscriptionCalls`, `CancelSubscriptionCalls`, `ChargeSubscriptionCalls`, `CreatePaymentLinkCalls`, etc.); `VerifySignature` always returns nil; `ParseEvent` decodes the fake's `WebhookEnvelope`; `ProviderName()` returns the configured provider (default `domain.ProviderCashfree`); `ProviderCapabilities()` returns an empty slice (the capability validator reads the hardcoded support matrix keyed by provider name, not this method).
+- `WebhookEnvelope` (`adapter.go`) — The fake's self-describing JSON webhook payload (`EventType`, `DedupeKey`, `RawVendorStatus`, and optional `Order`/`Payment`/`Subscription`); `Marshal()` returns its JSON bytes.
+- `InMemoryWebhookStore` (`store.go`) — An in-memory `ports.WebhookStore` with real dedupe semantics (records processed dedupe keys; captures raw payloads).
+- `Scheduler` (`scheduler.go`) — Injectable delay seam: `WallClockScheduler` (default; real `time.AfterFunc` delays, `Wait()` blocks until every scheduled emission has been delivered) and `ImmediateScheduler` (runs synchronously).
+- `Harness` (`harness.go`) — Wires `client.NewClient(Provider: FakeAdapter, WebhookStore, Clock, Logger)`; `Config` injects every dependency as an interface with defaults; **`NewHarness` requires a non-nil `*Config` (it panics on nil)** — pass `&Config{}` for all-defaults; `EmitWebhookAfter(*WebhookEnvelope)` drives the REAL `WebhookService.HandleEvent` after the event's configured wall-clock delay; `WaitForWebhooks()` blocks until delivery; `WebhookErrors()` returns any delivery errors for assertions. `Harness` implements the `WebhookEmitter` interface.
+
+**Minimal usage example:**
+
+```go
+h := fake.NewHarness(&fake.Config{
+    WebhookDelays: map[domain.WebhookEventType]time.Duration{domain.EventSubCharged: 2 * time.Second},
+})
+h.Adapter.CreateOrderFunc = func(ctx context.Context, req *domain.CreateOrderRequest) (*domain.Order, error) {
+    return &domain.Order{OrderID: req.OrderID, Status: domain.OrderCreated, Checkout: &domain.CheckoutPayload{Provider: domain.ProviderCashfree, Environment: domain.EnvironmentProduction}}, nil
+}
+order, err := h.Client.Orders().CreateOrder(ctx, &domain.CreateOrderRequest{ /* ... */ })
+
+h.Client.Webhooks().RegisterHandler(domain.EventSubCharged, myHandler)
+h.EmitWebhookAfter(&fake.WebhookEnvelope{EventType: domain.EventSubCharged, DedupeKey: "dk1", Subscription: &domain.Subscription{SubscriptionID: "sub_1"}})
+h.WaitForWebhooks()
+if errs := h.WebhookErrors(); len(errs) != 0 { /* delivery failed */ }
+```
+
+Previous fake implementations (`providers/fake/multipay_client.go`, `order_service.go`, `payment_links_service.go`, and the entire `fakes/` package) were removed because they faked the wrong (concrete-return) seam and could never be invoked by production code.

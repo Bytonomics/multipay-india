@@ -11,6 +11,20 @@ import (
 	"github.com/Bytonomics/multipay-india/multipay-go/routing"
 )
 
+// MultiPayClientInterface defines the contract for payment operations.
+// This interface is implemented by MultiPayClient and can be used for mocking in tests.
+type MultiPayClientInterface interface {
+	Orders() *orchestration.OrderService
+	Payments() *orchestration.PaymentService
+	Refunds() *orchestration.RefundService
+	Instruments() *orchestration.InstrumentService
+	PaymentLinks() *orchestration.PaymentLinkService
+	Webhooks() *orchestration.WebhookService
+	Capabilities() *orchestration.CapabilityService
+	Plans() *orchestration.PlanService
+	Subscriptions() *orchestration.SubscriptionService
+}
+
 // MultiPayClient is the main public API for the payment adapter.
 // It provides orchestration services for orders, payments, refunds, instruments,
 // payment links, webhooks, and capability queries for a single payment provider.
@@ -46,16 +60,16 @@ func NewClient(cfg *ClientConfig) (*MultiPayClient, error) {
 		return nil, errors.New("config cannot be nil")
 	}
 
-	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid config: %w", err)
-	}
-
 	if cfg.WebhookStore == nil {
 		panic("ClientConfig.WebhookStore is required (cannot be nil); WebhookStore provides durable event capture for webhook replay and idempotency")
 	}
 
 	if cfg.Provider == nil {
 		panic("ClientConfig.Provider is required (cannot be nil); a payment client must be bound to exactly one provider adapter")
+	}
+
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
 	adapter := cfg.Provider

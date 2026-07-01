@@ -10,7 +10,7 @@ import (
 // It specifies the configured payment provider adapter implementation,
 // and optional stores/services for hooks, webhooks, logging, and time operations.
 //
-// Provider must be configured; all other fields are optional (nil = defaults or noop).
+// Provider and WebhookStore are REQUIRED (NewClient panics on nil); Hooks/Logger/Clock are optional (nil = defaults or noop).
 type ClientConfig struct {
 	// Provider is the configured payment provider adapter implementation.
 	Provider ports.ProviderAdapter
@@ -20,8 +20,8 @@ type ClientConfig struct {
 	// If nil or empty, no hooks are executed.
 	Hooks []ports.Hook
 
-	// WebhookStore is an optional webhook durability store.
-	// If nil, webhooks are not persisted (fire-and-forget semantics).
+	// WebhookStore is a REQUIRED webhook durability store: NewClient panics if it is nil.
+	// It provides durable raw-payload capture, dedupe, and replay for webhook processing.
 	WebhookStore ports.WebhookStore
 
 	// Logger is an optional structured logger.
