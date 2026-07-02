@@ -191,6 +191,12 @@ func cancelSubscription(ctx context.Context, adapter *Adapter, req *domain.Cance
 		}
 	}()
 	if err != nil {
+		// Retry-safe cancel: if the subscription is ALREADY cancelled, treat this as success so a
+		// replayed upgrade-finalize (charge succeeded, an earlier cancel/DB write failed) can complete
+		// instead of looping. Confirmed via a fetch of the live status, not by parsing the vendor error.
+		if already := fetchIfCancelled(ctx, adapter, req.SubscriptionID); already != nil {
+			return already, nil
+		}
 		return nil, fmt.Errorf("failed to cancel subscription on cashfree: %w", domain.ErrProviderError)
 	}
 
@@ -204,6 +210,35 @@ func cancelSubscription(ctx context.Context, adapter *Adapter, req *domain.Cance
 		return nil, fmt.Errorf("failed to map subscription: %w", err)
 	}
 	return subscription, nil
+}
+
+// fetchIfCancelled fetches the subscription and returns its canonical form ONLY if it is already
+// cancelled at the provider; otherwise returns nil. Used to make cancelSubscription idempotent on
+// replay (Cashfree errors when cancelling an already-cancelled subscription).
+func fetchIfCancelled(ctx context.Context, adapter *Adapter, subscriptionID string) *domain.Subscription {
+	cfSub, httpResp, ferr := adapter.cfClient.SubsFetchSubscriptionWithContext(
+		ctx,
+		subscriptionID,
+		nil, // xRequestId
+		nil, // xIdempotencyKey
+		adapter.httpClient,
+	)
+	defer func() {
+		if httpResp != nil && httpResp.Body != nil {
+			_ = httpResp.Body.Close()
+		}
+	}()
+	if ferr != nil || cfSub == nil {
+		return nil
+	}
+	sub, merr := MapSubscriptionEntityToCanonical(cfSub)
+	if merr != nil || sub == nil {
+		return nil
+	}
+	if sub.Status == domain.SubscriptionStatusCancelled {
+		return sub
+	}
+	return nil
 }
 
 // pauseSubscription pauses an active subscription.
@@ -456,12 +491,22 @@ func chargeSubscription(ctx context.Context, adapter *Adapter, req *domain.Charg
 		PaymentRemarks: optStr(req.Remarks),
 	}
 
+	// Engage Cashfree's NATIVE idempotency for the proration charge so a webhook replay (e.g. an
+	// upgrade-finalize where the charge succeeded but the subsequent cancel or the studio DB write
+	// failed) returns the ORIGINAL charge result instead of debiting the customer a second time.
+	// PaymentRef is the studio payment-attempt's stable id.
+	var idempotencyKey *string
+	if req.PaymentRef != "" {
+		k := req.PaymentRef
+		idempotencyKey = &k
+	}
+
 	// Call Cashfree SDK
 	cfPayment, httpResp, err := adapter.cfClient.SubsCreatePaymentWithContext(
 		ctx,
 		cfReq,
-		nil, // xRequestId
-		nil, // xIdempotencyKey
+		nil,            // xRequestId
+		idempotencyKey, // native idempotency key = PaymentRef (safe replay, no double debit)
 		adapter.httpClient,
 	)
 	defer func() {

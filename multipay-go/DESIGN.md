@@ -182,6 +182,9 @@ if err := createPlanValidator.Validate(req); err != nil {
 - Charges the prorated delta on the NEW mandate: `adapter.ChargeSubscription(SubscriptionID=req.NewSubscriptionID, PaymentRef=req.PaymentRef, AmountMinor=req.ProratedAmountMinor)`
 - Cancels the old subscription: `adapter.CancelSubscription(req.OldSubscriptionID)`
 - Returns the charge payment result
+- **Replay-safe (no double debit).** `FinalizeUpgrade` is not atomic across the charge→cancel→consumer-DB-write sequence, so a webhook replay can re-enter it. Two adapter-level guards make re-entry safe:
+  1. `chargeSubscription` passes `req.PaymentRef` as Cashfree's native `x-idempotency-key` header on `SubsCreatePayment`, so a replayed charge returns the ORIGINAL payment result instead of debiting the customer a second time.
+  2. `cancelSubscription` treats an already-cancelled subscription as success — on a provider error it fetches the subscription and, if its canonical status is `CANCELLED`, returns that subscription with `nil` error, so a replayed cancel does not loop or fail.
 
 **Razorpay**:
 - No-op success (no charge step needed; plan change is already effective)
