@@ -296,6 +296,41 @@ handler := svc.Handler("/webhooks")  // a plain http.Handler — mount it on any
 
 Non-`*http.ServeMux` routers like Echo/Gin require their adapter (`echo.WrapHandler()` / `gin.WrapH()`) to wrap the plain `http.Handler`.
 
+#### ReplayEvent(ctx, provider, accountID, payload, headers) error
+
+`ReplayEvent` replays a previously stored webhook event (typically from the webhook ledger) without re-verifying the signature or checking for duplicates. It is intended for admin/operator use when a webhook was lost, failed to process, or needs to be manually re-triggered.
+
+**Intended caller**: Admin dashboards or backend jobs with trusted access (not public webhooks).
+
+```go
+svc := client.WebhookService()
+// Retrieve raw event from ledger (admin API)
+event, err := svc.ReplayEvent(ctx, domain.ProviderCashfree, "account_id", rawPayload, headers)
+if err != nil {
+    log.Printf("Replay failed: %v", err)
+}
+// Handler is invoked, MarkProcessed is updated on success
+```
+
+**Flow** (8 steps, minus dedup steps):
+
+1. **Provider Guard**: Validate provider matches configured adapter; return `ErrProviderNotFound` if mismatch
+2. **Parse Event**: Call adapter's `ParseEvent()` to extract event type and dedup key
+3. **Before Hooks**: Execute registered before-hooks (same as HandleEvent)
+4. **Handler Dispatch**: Dispatch to registered handler for the event type (same as HandleEvent)
+5. **OnError Hooks**: If handler fails, execute error-hooks (same as HandleEvent)
+6. **Mark Processed**: Record the event as processed in WebhookStore (same as HandleEvent)
+7. **After Hooks**: Execute registered after-hooks (same as HandleEvent)
+8. **Return**: Return the parsed event or wrapped error
+
+**Differences from HandleEvent**:
+
+- **No StoreRawPayload**: Assumes the event is already persisted (it came from the ledger)
+- **No VerifySignature**: Trusted internal caller; signature was already verified when the event first arrived
+- **No IsDuplicate Check**: Operator explicitly requested re-processing; dedupe is not enforced
+
+**Error Handling**: Errors are wrapped with `%w` to preserve the call stack and enable `errors.Is()` checks. Provider mismatch, parse errors, handler errors, and mark-processed errors are all propagated.
+
 ## Capability Matrix Decision Tree
 
 ```mermaid

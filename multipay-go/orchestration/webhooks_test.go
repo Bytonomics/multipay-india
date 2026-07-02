@@ -107,7 +107,10 @@ func (stubProviderAdapter) VerifySignature(_ context.Context, _ []byte, _ map[st
 	return nil
 }
 func (stubProviderAdapter) ParseEvent(_ context.Context, _ []byte, _ map[string]string) (*domain.WebhookEvent, error) {
-	return &domain.WebhookEvent{}, nil
+	return &domain.WebhookEvent{
+		EventType: domain.EventSubCharged,
+		DedupeKey: "test_dedupe_key",
+	}, nil
 }
 func (stubProviderAdapter) SupportedWebhookEvents() []domain.WebhookEventType {
 	return []domain.WebhookEventType{}
@@ -134,5 +137,32 @@ func TestWebhookService_Handler_ReturnsNonNilHTTPHandler(t *testing.T) {
 	var h http.Handler = svc.Handler("/api/v1/subscriptions/webhooks")
 	if h == nil {
 		t.Fatal("Handler returned nil; expected a non-nil http.Handler")
+	}
+}
+
+// TestWebhookService_ReplayEvent_DispatchesDespiteDuplicate verifies ReplayEvent skips dedup checks.
+// It registers a handler, then calls ReplayEvent.
+// The handler should be invoked despite the duplicate (no IsDuplicate check in ReplayEvent).
+func TestWebhookService_ReplayEvent_DispatchesDespiteDuplicate(t *testing.T) {
+	handlerCalled := false
+	handler := func(_ context.Context, _ *domain.WebhookEvent) error {
+		handlerCalled = true
+		return nil
+	}
+
+	svc := NewWebhookService(domain.ProviderCashfree, stubProviderAdapter{}, &hooks.Pipeline{}, stubWebhookStore{}, &routing.EndpointRegistry{}, ports.NewNoopLogger())
+	svc.RegisterHandler(domain.EventSubCharged, handler)
+
+	ctx := context.Background()
+	event, err := svc.ReplayEvent(ctx, domain.ProviderCashfree, "test_account", []byte(`{}`), map[string]string{})
+
+	if err != nil {
+		t.Fatalf("ReplayEvent should not error, got: %v", err)
+	}
+	if event == nil {
+		t.Fatalf("ReplayEvent should return a WebhookEvent, got nil")
+	}
+	if !handlerCalled {
+		t.Fatalf("ReplayEvent should dispatch to handler despite being a replay")
 	}
 }

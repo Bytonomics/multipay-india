@@ -140,6 +140,65 @@ func (s *WebhookService) HandleEvent(ctx context.Context, provider domain.Provid
 	return event, nil
 }
 
+// ReplayEvent replays a previously stored webhook event identified by its deduplication key.
+// The payload is treated as a new incoming event with the same payload and headers as the original.
+// Mirrors HandleEvent but skips Store (already persisted), Verify (trusted internal caller), and
+// IsDuplicate checks. Returns the parsed webhook event and any error from parsing/hooks/handler.
+func (s *WebhookService) ReplayEvent(ctx context.Context, provider domain.Provider, accountID string, payload []byte, headers map[string]string) (*domain.WebhookEvent, error) {
+	// Step 1: Validate that the provider matches the configured adapter
+	if provider != s.provider {
+		return nil, fmt.Errorf("webhook provider %s does not match client provider %s: %w", provider, s.provider, domain.ErrProviderNotFound)
+	}
+	adapter := s.adapter
+
+	// Step 2: Parse event (no signature verification — trusted internal caller)
+	event, err := adapter.ParseEvent(ctx, payload, headers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse webhook event: %w", err)
+	}
+	if event == nil {
+		return nil, errors.New("webhook event parsing returned nil")
+	}
+
+	// Step 3: Execute before-hooks
+	hookCtx := &ports.HookContext{
+		Provider:    provider,
+		RequestType: "WebhookEvent",
+		RequestData: event,
+		StartTime:   time.Now(),
+	}
+	ctx, hookErr := s.pipeline.ExecuteBefore(ctx, hookCtx)
+	if hookErr != nil {
+		return nil, fmt.Errorf("webhook before-hook execution failed: %w", hookErr)
+	}
+
+	// Step 4: Dispatch to registered handler
+	if handler, exists := s.handlers[event.EventType]; exists {
+		if err := handler(ctx, event); err != nil {
+			if hookErr := s.pipeline.ExecuteOnError(ctx, hookCtx, err); hookErr != nil {
+				s.logger.Error(ctx, "failed to execute error hook", "error", hookErr.Error())
+			}
+			return nil, fmt.Errorf("webhook event handler failed: %w", err)
+		}
+	} else {
+		s.logger.Debug(ctx, "no handler registered for webhook event type", "eventType", string(event.EventType))
+	}
+
+	// Step 5: Mark processed
+	if s.store != nil {
+		if err := s.store.MarkProcessed(ctx, provider, accountID, event.DedupeKey); err != nil {
+			s.logger.Error(ctx, "failed to mark webhook as processed", "error", err.Error(), "provider", string(provider), "accountID", accountID)
+		}
+	}
+
+	// Step 6: Execute after-hooks
+	if err := s.pipeline.ExecuteAfter(ctx, hookCtx); err != nil {
+		s.logger.Error(ctx, "failed to execute after-hook", "error", err.Error())
+	}
+
+	return event, nil
+}
+
 // Handler returns the webhook endpoint as a framework-agnostic http.Handler. This is the single,
 // portable way to mount webhook handling on ANY Go HTTP router — net/http, chi, Echo (via
 // echo.WrapHandler), gin (via gin.WrapH), Fiber, etc. Because every router accepts an http.Handler,
