@@ -44,9 +44,9 @@ func createSubscription(ctx context.Context, adapter *Adapter, req *domain.Creat
 		}
 	}
 
-	// Convert and set subscription tags (convert from map[string]string to map[string]interface{})
+	// Convert and set subscription tags (convert from map[string]string to map[string]any)
 	if len(req.Tags) > 0 {
-		tags := make(map[string]interface{}, len(req.Tags))
+		tags := make(map[string]any, len(req.Tags))
 		for k, v := range req.Tags {
 			tags[k] = v
 		}

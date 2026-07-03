@@ -13,7 +13,7 @@ import (
 
 // TestCreatePaymentLink_ForwardsParameters verifies that CreatePaymentLink forwards customer, callback_url, reference_id, and accept_partial to Razorpay.
 func TestCreatePaymentLink_ForwardsParameters(t *testing.T) {
-	var capturedBody map[string]interface{}
+	var capturedBody map[string]any
 	mockHTTPClient := &http.Client{
 		Transport: rzRoundTripFunc(func(req *http.Request) (*http.Response, error) {
 			body, err := io.ReadAll(req.Body)
@@ -24,7 +24,7 @@ func TestCreatePaymentLink_ForwardsParameters(t *testing.T) {
 				t.Fatalf("failed to unmarshal request body: %v (body: %s)", unmarshalErr, string(body))
 			}
 
-			mockResp := map[string]interface{}{
+			mockResp := map[string]any{
 				"id":     "link_123",
 				"status": "created",
 				"amount": 50000,
@@ -75,7 +75,7 @@ func TestCreatePaymentLink_ForwardsParameters(t *testing.T) {
 	}
 
 	// Assert customer is forwarded
-	customer, custOk := capturedBody["customer"].(map[string]interface{})
+	customer, custOk := capturedBody["customer"].(map[string]any)
 	if !custOk || len(customer) == 0 {
 		t.Error("customer not forwarded")
 	} else {

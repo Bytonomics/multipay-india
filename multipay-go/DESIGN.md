@@ -575,10 +575,10 @@ func MapOrderEntityToCanonical(ctx context.Context, entity *cashfree_pg.OrderEnt
 }
 ```
 
-For Razorpay (untyped SDK), helpers extract fields from `map[string]interface{}`:
+For Razorpay (untyped SDK), helpers extract fields from `map[string]any`:
 
 ```go
-func GetOrder(ctx context.Context, resp map[string]interface{}, ...) *domain.Order {
+func GetOrder(ctx context.Context, resp map[string]any, ...) *domain.Order {
     return &domain.Order{
         // ... canonical fields ...
         ProviderDetails: &domain.OrderProviderDetail{

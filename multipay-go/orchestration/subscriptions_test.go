@@ -176,15 +176,15 @@ func (f *fakeAdapter) SupportedWebhookEvents() []domain.WebhookEventType {
 
 // --- MetadataMapper methods ---
 
-func (f *fakeAdapter) MapOrderMetadata(ctx context.Context, metadata domain.Metadata) (map[string]interface{}, error) {
+func (f *fakeAdapter) MapOrderMetadata(ctx context.Context, metadata domain.Metadata) (map[string]any, error) {
 	return nil, nil
 }
 
-func (f *fakeAdapter) MapRefundMetadata(ctx context.Context, metadata domain.Metadata) (map[string]interface{}, error) {
+func (f *fakeAdapter) MapRefundMetadata(ctx context.Context, metadata domain.Metadata) (map[string]any, error) {
 	return nil, nil
 }
 
-func (f *fakeAdapter) MapPaymentLinkMetadata(ctx context.Context, metadata domain.Metadata) (map[string]interface{}, error) {
+func (f *fakeAdapter) MapPaymentLinkMetadata(ctx context.Context, metadata domain.Metadata) (map[string]any, error) {
 	return nil, nil
 }
 

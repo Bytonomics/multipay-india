@@ -115,14 +115,14 @@ func (stubProviderAdapter) ParseEvent(_ context.Context, _ []byte, _ map[string]
 func (stubProviderAdapter) SupportedWebhookEvents() []domain.WebhookEventType {
 	return []domain.WebhookEventType{}
 }
-func (stubProviderAdapter) MapOrderMetadata(_ context.Context, _ domain.Metadata) (map[string]interface{}, error) {
-	return map[string]interface{}{}, nil
+func (stubProviderAdapter) MapOrderMetadata(_ context.Context, _ domain.Metadata) (map[string]any, error) {
+	return map[string]any{}, nil
 }
-func (stubProviderAdapter) MapRefundMetadata(_ context.Context, _ domain.Metadata) (map[string]interface{}, error) {
-	return map[string]interface{}{}, nil
+func (stubProviderAdapter) MapRefundMetadata(_ context.Context, _ domain.Metadata) (map[string]any, error) {
+	return map[string]any{}, nil
 }
-func (stubProviderAdapter) MapPaymentLinkMetadata(_ context.Context, _ domain.Metadata) (map[string]interface{}, error) {
-	return map[string]interface{}{}, nil
+func (stubProviderAdapter) MapPaymentLinkMetadata(_ context.Context, _ domain.Metadata) (map[string]any, error) {
+	return map[string]any{}, nil
 }
 func (stubProviderAdapter) ProviderName() domain.Provider {
 	return domain.ProviderCashfree

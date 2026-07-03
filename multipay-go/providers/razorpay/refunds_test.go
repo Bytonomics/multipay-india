@@ -14,7 +14,7 @@ import (
 // TestCreateRefund_ForwardsPaymentID verifies that CreateRefund uses PaymentID (not OrderID) as the Razorpay payment_id,
 // and forwards RefundID as receipt and Metadata as notes.
 func TestCreateRefund_ForwardsPaymentID(t *testing.T) {
-	var capturedBody map[string]interface{}
+	var capturedBody map[string]any
 	mockHTTPClient := &http.Client{
 		Transport: rzRoundTripFunc(func(req *http.Request) (*http.Response, error) {
 			body, err := io.ReadAll(req.Body)
@@ -25,7 +25,7 @@ func TestCreateRefund_ForwardsPaymentID(t *testing.T) {
 				t.Fatalf("failed to unmarshal request body: %v (body: %s)", unmarshalErr, string(body))
 			}
 
-			mockResp := map[string]interface{}{
+			mockResp := map[string]any{
 				"id":       "refund_123",
 				"status":   "processed",
 				"amount":   250,
@@ -89,7 +89,7 @@ func TestCreateRefund_ForwardsPaymentID(t *testing.T) {
 	}
 
 	// Assert notes are forwarded from Metadata
-	notes, ok := capturedBody["notes"].(map[string]interface{})
+	notes, ok := capturedBody["notes"].(map[string]any)
 	if !ok || len(notes) == 0 {
 		t.Error("expected notes to be forwarded from Metadata")
 	}
@@ -104,10 +104,10 @@ func TestListRefunds_UsesPaymentScopedEndpoint(t *testing.T) {
 		Transport: rzRoundTripFunc(func(req *http.Request) (*http.Response, error) {
 			capturedMethod = req.Method
 			capturedPath = req.URL.Path
-			mockResp := map[string]interface{}{
+			mockResp := map[string]any{
 				"entity": "collection",
 				"count":  1,
-				"items": []map[string]interface{}{
+				"items": []map[string]any{
 					{"id": "refund_1", "payment_id": "pay_123", "status": "processed", "amount": 25000, "currency": "INR"},
 				},
 			}

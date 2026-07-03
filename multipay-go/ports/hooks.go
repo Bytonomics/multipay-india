@@ -28,7 +28,7 @@ type HookContext struct {
 	StartTime time.Time
 
 	// Metadata is for hooks to pass arbitrary data down the pipeline.
-	Metadata map[string]interface{}
+	Metadata map[string]any
 }
 
 // Hook defines lifecycle hooks for payment operations.

@@ -934,8 +934,8 @@ Hooks receive a HookContext with details about the operation:
 type HookContext struct {
     Provider     domain.Provider // domain.ProviderCashfree, domain.ProviderRazorpay
     RequestType  string          // "CreateOrder", "GetPayment", "CreateRefund", etc.
-    RequestData  interface{}     // Original request struct
-    ResponseData interface{}     // Response struct (nil in before/error-hook)
+    RequestData  any     // Original request struct
+    ResponseData any     // Response struct (nil in before/error-hook)
     Error        error           // Error (nil if no error)
     StartTime    time.Time       // When operation started
 }

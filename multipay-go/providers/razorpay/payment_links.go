@@ -120,7 +120,7 @@ func (a *Adapter) CreatePaymentLink(ctx context.Context, req *domain.CreatePayme
 	}
 
 	// Call Razorpay SDK to create payment link
-	// Razorpay PaymentLink.Create signature: Create(params map[string]interface{}, options map[string]string)
+	// Razorpay PaymentLink.Create signature: Create(params map[string]any, options map[string]string)
 	responseMap, err := a.client.PaymentLink.Create(params, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payment link: %w", err)
@@ -153,7 +153,7 @@ func (a *Adapter) GetPaymentLink(ctx context.Context, req *domain.GetPaymentLink
 	}
 
 	// Call Razorpay SDK to fetch payment link
-	// Razorpay PaymentLink.Fetch signature: Fetch(linkID string, options map[string]interface{}, headers map[string]string)
+	// Razorpay PaymentLink.Fetch signature: Fetch(linkID string, options map[string]any, headers map[string]string)
 	responseMap, err := a.client.PaymentLink.Fetch(req.LinkID, nil, nil)
 	if err != nil {
 		// Check if payment link not found
@@ -190,7 +190,7 @@ func (a *Adapter) CancelPaymentLink(ctx context.Context, req *domain.CancelPayme
 	}
 
 	// Call Razorpay SDK to cancel payment link
-	// Razorpay PaymentLink.Cancel signature: Cancel(linkID string, options map[string]interface{}, headers map[string]string)
+	// Razorpay PaymentLink.Cancel signature: Cancel(linkID string, options map[string]any, headers map[string]string)
 	responseMap, err := a.client.PaymentLink.Cancel(req.LinkID, nil, nil)
 	if err != nil {
 		// Check if payment link not found

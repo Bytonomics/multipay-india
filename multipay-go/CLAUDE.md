@@ -266,7 +266,7 @@ Rules:
 
 ### Typed Structs, Never Maps
 
-Build SDK requests and internal payloads with typed structs — never `map[string]interface{}`. The ONLY exception is decoding a raw vendor response body at the boundary, then immediately mapping it to a typed domain struct.
+Build SDK requests and internal payloads with typed structs — never `map[string]any`. The ONLY exception is decoding a raw vendor response body at the boundary, then immediately mapping it to a typed domain struct.
 
 ### Request Validation via pedantigo
 

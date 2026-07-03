@@ -105,7 +105,7 @@ func TestParseEvent_OrderPaid(t *testing.T) {
 	eventTimeStr := now.Format(time.RFC3339)
 
 	// Create data payload with minimal fields for ORDER.PAID
-	dataPayload := map[string]interface{}{
+	dataPayload := map[string]any{
 		"order_id": "order_123",
 		"amount":   500.0,
 	}
@@ -154,7 +154,7 @@ func TestParseEvent_PaymentAuthorized(t *testing.T) {
 	eventTimeStr := now.Format(time.RFC3339)
 
 	// Create data payload with payment_id
-	dataPayload := map[string]interface{}{
+	dataPayload := map[string]any{
 		"payment_id": "payment_123",
 	}
 	dataJSON, err := json.Marshal(dataPayload)
@@ -190,7 +190,7 @@ func TestParseEvent_RefundProcessed(t *testing.T) {
 	eventTimeStr := now.Format(time.RFC3339)
 
 	// Create data payload with refund details
-	dataPayload := map[string]interface{}{
+	dataPayload := map[string]any{
 		"refund_id": "refund_123",
 		"amount":    100.0,
 	}
@@ -347,7 +347,7 @@ func TestAdapterParseEvent(t *testing.T) {
 	eventTimeStr := now.Format(time.RFC3339)
 
 	// Create data payload with order_id
-	dataPayload := map[string]interface{}{
+	dataPayload := map[string]any{
 		"order_id": "order_123",
 	}
 	dataJSON, err := json.Marshal(dataPayload)
@@ -406,7 +406,7 @@ func BenchmarkParseEvent(b *testing.B) {
 	eventTimeStr := time.Now().Format(time.RFC3339)
 
 	// Create data payload with order details
-	dataPayload := map[string]interface{}{
+	dataPayload := map[string]any{
 		"order_id": "order_123",
 		"amount":   500.0,
 	}

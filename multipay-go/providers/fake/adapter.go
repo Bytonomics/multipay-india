@@ -394,16 +394,16 @@ func (f *FakeAdapter) SupportedWebhookEvents() []domain.WebhookEventType {
 
 // ---- MetadataMapper ----
 
-func (f *FakeAdapter) MapOrderMetadata(ctx context.Context, metadata domain.Metadata) (map[string]interface{}, error) {
-	return map[string]interface{}{}, nil
+func (f *FakeAdapter) MapOrderMetadata(ctx context.Context, metadata domain.Metadata) (map[string]any, error) {
+	return map[string]any{}, nil
 }
 
-func (f *FakeAdapter) MapRefundMetadata(ctx context.Context, metadata domain.Metadata) (map[string]interface{}, error) {
-	return map[string]interface{}{}, nil
+func (f *FakeAdapter) MapRefundMetadata(ctx context.Context, metadata domain.Metadata) (map[string]any, error) {
+	return map[string]any{}, nil
 }
 
-func (f *FakeAdapter) MapPaymentLinkMetadata(ctx context.Context, metadata domain.Metadata) (map[string]interface{}, error) {
-	return map[string]interface{}{}, nil
+func (f *FakeAdapter) MapPaymentLinkMetadata(ctx context.Context, metadata domain.Metadata) (map[string]any, error) {
+	return map[string]any{}, nil
 }
 
 // ---- identity ----

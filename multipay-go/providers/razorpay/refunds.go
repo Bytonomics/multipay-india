@@ -73,7 +73,7 @@ func (a *Adapter) CreateRefund(ctx context.Context, req *domain.CreateRefundRequ
 	}
 
 	// Call Razorpay SDK to create refund
-	// Razorpay Create refund method signature: Create(params map[string]interface{}, options map[string]string)
+	// Razorpay Create refund method signature: Create(params map[string]any, options map[string]string)
 	responseMap, err := a.client.Refund.Create(params, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create refund: %w", err)

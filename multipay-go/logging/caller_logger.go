@@ -52,7 +52,7 @@ func (cl *CallerLogger) callerInfo(depth int) string {
 
 // Error logs an error message with caller information automatically prepended.
 // Additional key-value pairs can be provided for structured logging context.
-func (cl *CallerLogger) Error(ctx context.Context, message string, keysAndValues ...interface{}) {
+func (cl *CallerLogger) Error(ctx context.Context, message string, keysAndValues ...any) {
 	caller := cl.callerInfo(1)
 	fullMessage := fmt.Sprintf("%s %s", caller, message)
 	cl.delegate.Error(ctx, fullMessage, keysAndValues...)
@@ -60,7 +60,7 @@ func (cl *CallerLogger) Error(ctx context.Context, message string, keysAndValues
 
 // Info logs an info message with caller information automatically prepended.
 // Additional key-value pairs can be provided for structured logging context.
-func (cl *CallerLogger) Info(ctx context.Context, message string, keysAndValues ...interface{}) {
+func (cl *CallerLogger) Info(ctx context.Context, message string, keysAndValues ...any) {
 	caller := cl.callerInfo(1)
 	fullMessage := fmt.Sprintf("%s %s", caller, message)
 	cl.delegate.Info(ctx, fullMessage, keysAndValues...)
@@ -68,7 +68,7 @@ func (cl *CallerLogger) Info(ctx context.Context, message string, keysAndValues 
 
 // Debug logs a debug message with caller information automatically prepended.
 // Additional key-value pairs can be provided for structured logging context.
-func (cl *CallerLogger) Debug(ctx context.Context, message string, keysAndValues ...interface{}) {
+func (cl *CallerLogger) Debug(ctx context.Context, message string, keysAndValues ...any) {
 	caller := cl.callerInfo(1)
 	fullMessage := fmt.Sprintf("%s %s", caller, message)
 	cl.delegate.Debug(ctx, fullMessage, keysAndValues...)

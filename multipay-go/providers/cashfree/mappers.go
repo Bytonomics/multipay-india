@@ -472,7 +472,7 @@ func derefBool(b *bool) bool {
 }
 
 // rawResponse marshals a Cashfree SDK entity to JSON and returns it as RawProviderResponse.
-func rawResponse(v interface{}) (domain.RawProviderResponse, error) {
+func rawResponse(v any) (domain.RawProviderResponse, error) {
 	data, err := json.Marshal(v)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal response: %w", err)

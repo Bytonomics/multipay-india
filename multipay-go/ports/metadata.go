@@ -10,7 +10,7 @@ import (
 // Different payment providers have different metadata structures and requirements.
 // Implementations of this interface handle provider-specific translation logic.
 type MetadataMapper interface {
-	MapOrderMetadata(ctx context.Context, metadata domain.Metadata) (map[string]interface{}, error)
-	MapRefundMetadata(ctx context.Context, metadata domain.Metadata) (map[string]interface{}, error)
-	MapPaymentLinkMetadata(ctx context.Context, metadata domain.Metadata) (map[string]interface{}, error)
+	MapOrderMetadata(ctx context.Context, metadata domain.Metadata) (map[string]any, error)
+	MapRefundMetadata(ctx context.Context, metadata domain.Metadata) (map[string]any, error)
+	MapPaymentLinkMetadata(ctx context.Context, metadata domain.Metadata) (map[string]any, error)
 }
