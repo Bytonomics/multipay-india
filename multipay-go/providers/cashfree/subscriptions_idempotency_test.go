@@ -11,6 +11,7 @@ import (
 	cf "github.com/cashfree/cashfree-pg/v6"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/ports"
 )
 
 // jsonResp builds an HTTP response with a JSON content type so the Cashfree SDK decodes it
@@ -60,6 +61,7 @@ func TestChargeSubscription_SendsIdempotencyKey(t *testing.T) {
 		ClientSecret: "test_client_secret",
 		Environment:  domain.EnvironmentSandbox,
 		AccountID:    "test_account",
+		Logger:       ports.NewNoopLogger(),
 		HTTPClient:   mockHTTPClient,
 	})
 	if err != nil {
@@ -105,6 +107,7 @@ func TestCancelSubscription_AlreadyCancelled_IsIdempotent(t *testing.T) {
 		ClientSecret: "test_client_secret",
 		Environment:  domain.EnvironmentSandbox,
 		AccountID:    "test_account",
+		Logger:       ports.NewNoopLogger(),
 		HTTPClient:   mockHTTPClient,
 	})
 	if err != nil {

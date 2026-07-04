@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/ports"
 )
 
 // cfSign reproduces Cashfree's webhook signature: base64(HMAC-SHA256(timestamp+body, secret)).
@@ -329,6 +330,7 @@ func TestAdapterVerifySignature(t *testing.T) {
 		ClientSecret:  clientSecret,
 		WebhookSecret: "test_webhook_secret", // unused for Cashfree signature verification
 		Environment:   domain.EnvironmentSandbox,
+		Logger:        ports.NewNoopLogger(),
 	}
 
 	adapter, err := NewAdapter(config)
@@ -350,6 +352,133 @@ func TestAdapterVerifySignature(t *testing.T) {
 	}
 }
 
+// capturingLogger is a ports.Logger that records the last Info/Error message and its keyvals,
+// so tests can assert which secret the adapter reported using during signature verification.
+type capturingLogger struct {
+	infoMsg     string
+	infoKV      []any
+	errorMsg    string
+	errorCalled bool
+}
+
+func (l *capturingLogger) Info(_ context.Context, message string, keyvals ...any) {
+	l.infoMsg = message
+	l.infoKV = keyvals
+}
+func (l *capturingLogger) Error(_ context.Context, message string, keyvals ...any) {
+	l.errorMsg = message
+	l.errorCalled = true
+}
+func (l *capturingLogger) Debug(_ context.Context, _ string, _ ...any) {}
+
+// kvValue returns the value following key in an alternating key/value slice, or "" if absent.
+func kvValue(kv []any, key string) string {
+	for i := 0; i+1 < len(kv); i += 2 {
+		if k, ok := kv[i].(string); ok && k == key {
+			if v, ok := kv[i+1].(string); ok {
+				return v
+			}
+		}
+	}
+	return ""
+}
+
+// TestAdapterVerifySignature_LogsClientSecretUsed asserts the primary (client-secret) path logs
+// secret_used=client_secret.
+func TestAdapterVerifySignature_LogsClientSecretUsed(t *testing.T) {
+	logger := &capturingLogger{}
+	clientSecret := "client_secret_v"
+	adapter, err := NewAdapter(&Config{
+		ClientID:      "id",
+		ClientSecret:  clientSecret,
+		WebhookSecret: "different_webhook_secret",
+		Environment:   domain.EnvironmentSandbox,
+		Logger:        logger,
+	})
+	if err != nil {
+		t.Fatalf("NewAdapter: %v", err)
+	}
+
+	body := []byte(`{"event_id":"evt","type":"ORDER.PAID","data":{}}`)
+	timestamp := "1700000000"
+	headers := map[string]string{
+		"X-Webhook-Signature": cfSign(clientSecret, timestamp, body),
+		"X-Webhook-Timestamp": timestamp,
+	}
+
+	if err := adapter.VerifySignature(context.Background(), body, headers); err != nil {
+		t.Fatalf("expected verification to succeed with client secret, got %v", err)
+	}
+	if got := kvValue(logger.infoKV, "secret_used"); got != "client_secret" {
+		t.Fatalf("expected secret_used=client_secret, got %q (msg=%q)", got, logger.infoMsg)
+	}
+}
+
+// TestAdapterVerifySignature_FallsBackToWebhookSecret asserts that when the payload is signed with
+// the WebhookSecret (not the ClientSecret), the adapter still verifies via the fallback and logs
+// secret_used=webhook_secret.
+func TestAdapterVerifySignature_FallsBackToWebhookSecret(t *testing.T) {
+	logger := &capturingLogger{}
+	clientSecret := "client_secret_v"
+	webhookSecret := "endpoint_generated_secret"
+	adapter, err := NewAdapter(&Config{
+		ClientID:      "id",
+		ClientSecret:  clientSecret,
+		WebhookSecret: webhookSecret,
+		Environment:   domain.EnvironmentSandbox,
+		Logger:        logger,
+	})
+	if err != nil {
+		t.Fatalf("NewAdapter: %v", err)
+	}
+
+	body := []byte(`{"event_id":"evt","type":"ORDER.PAID","data":{}}`)
+	timestamp := "1700000000"
+	// Sign with the WEBHOOK secret — the client-secret attempt must fail, then fallback succeeds.
+	headers := map[string]string{
+		"X-Webhook-Signature": cfSign(webhookSecret, timestamp, body),
+		"X-Webhook-Timestamp": timestamp,
+	}
+
+	if err := adapter.VerifySignature(context.Background(), body, headers); err != nil {
+		t.Fatalf("expected verification to succeed via webhook-secret fallback, got %v", err)
+	}
+	if got := kvValue(logger.infoKV, "secret_used"); got != "webhook_secret" {
+		t.Fatalf("expected secret_used=webhook_secret, got %q (msg=%q)", got, logger.infoMsg)
+	}
+}
+
+// TestAdapterVerifySignature_BothSecretsFail asserts that when neither secret matches, the adapter
+// returns an error and logs at Error level.
+func TestAdapterVerifySignature_BothSecretsFail(t *testing.T) {
+	logger := &capturingLogger{}
+	adapter, err := NewAdapter(&Config{
+		ClientID:      "id",
+		ClientSecret:  "client_secret_v",
+		WebhookSecret: "endpoint_generated_secret",
+		Environment:   domain.EnvironmentSandbox,
+		Logger:        logger,
+	})
+	if err != nil {
+		t.Fatalf("NewAdapter: %v", err)
+	}
+
+	body := []byte(`{"event_id":"evt","type":"ORDER.PAID","data":{}}`)
+	timestamp := "1700000000"
+	// Sign with a secret matching NEITHER configured secret.
+	headers := map[string]string{
+		"X-Webhook-Signature": cfSign("some_other_secret", timestamp, body),
+		"X-Webhook-Timestamp": timestamp,
+	}
+
+	if err := adapter.VerifySignature(context.Background(), body, headers); err == nil {
+		t.Fatal("expected verification to fail when neither secret matches, got nil")
+	}
+	if !logger.errorCalled {
+		t.Fatalf("expected an Error log when both secrets fail, got none")
+	}
+}
+
 // TestAdapterParseEvent verifies the adapter's ParseEvent method.
 func TestAdapterParseEvent(t *testing.T) {
 	config := &Config{
@@ -357,6 +486,7 @@ func TestAdapterParseEvent(t *testing.T) {
 		ClientSecret:  "test_client_secret",
 		WebhookSecret: "test_webhook_secret",
 		Environment:   domain.EnvironmentSandbox,
+		Logger:        ports.NewNoopLogger(),
 	}
 
 	adapter, err := NewAdapter(config)

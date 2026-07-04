@@ -11,6 +11,7 @@ import (
 	cf "github.com/cashfree/cashfree-pg/v6"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/ports"
 )
 
 // cfRoundTripFunc implements http.RoundTripper for mocking HTTP calls
@@ -143,6 +144,7 @@ func TestCreateOrder_PopulatesCheckout(t *testing.T) {
 		ClientSecret: "test_client_secret",
 		Environment:  domain.EnvironmentSandbox,
 		AccountID:    "test_account",
+		Logger:       ports.NewNoopLogger(),
 		HTTPClient:   mockHTTPClient,
 	}
 
@@ -301,6 +303,7 @@ func TestCreateOrder_ForwardsParameters(t *testing.T) {
 				ClientSecret: "test_client_secret",
 				Environment:  domain.EnvironmentSandbox,
 				AccountID:    "test_account",
+				Logger:       ports.NewNoopLogger(),
 				HTTPClient:   mockHTTPClient,
 			}
 

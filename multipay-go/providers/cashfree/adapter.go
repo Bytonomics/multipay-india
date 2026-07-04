@@ -33,6 +33,12 @@ type Config struct {
 	// HTTPClient is an optional HTTP client. If nil, the adapter builds a default
 	// client it owns. Callers may inject their own tuned client or a mock for testing.
 	HTTPClient *http.Client
+
+	// Logger is a mandatory structured logger (NewAdapter panics if nil). Production wires a real
+	// logger via the observability bundle; unit tests pass ports.NewNoopLogger() explicitly. It
+	// records webhook signature verification outcomes (which secret verified, or that both secrets
+	// failed) so operators can diagnose secret misconfiguration.
+	Logger ports.Logger
 }
 
 // Adapter implements the ProviderAdapter interface for Cashfree payments.
@@ -40,6 +46,7 @@ type Adapter struct {
 	config     *Config
 	cfClient   *cf.Cashfree
 	httpClient *http.Client
+	logger     ports.Logger
 }
 
 // Compile-time assertion that Adapter implements ProviderAdapter interface.
@@ -58,6 +65,13 @@ func NewAdapter(config *Config) (*Adapter, error) {
 
 	if config.ClientSecret == "" {
 		return nil, fmt.Errorf("ClientSecret is required: %w", domain.ErrInvalidRequest)
+	}
+
+	// Logger is mandatory and must never be nil — production wires a real logger via the
+	// observability bundle. A nil logger is a broken caller, so crash at construction rather than
+	// silently degrading to a no-op (unit tests pass ports.NewNoopLogger() explicitly).
+	if config.Logger == nil {
+		panic("cashfree adapter requires a non-nil Logger (pass NewNoopLogger only in unit tests)")
 	}
 
 	if !config.Environment.IsValid() {
@@ -86,6 +100,7 @@ func NewAdapter(config *Config) (*Adapter, error) {
 		config:     config,
 		cfClient:   cfClient,
 		httpClient: httpClient,
+		logger:     config.Logger,
 	}, nil
 }
 
@@ -238,10 +253,47 @@ func (a *Adapter) GetPlan(ctx context.Context, req *domain.GetPlanRequest) (*dom
 }
 
 // VerifySignature verifies the authenticity of a webhook request.
-// Cashfree signs webhooks with the merchant Secret Key (client secret) — NOT a separate webhook
-// secret — so verification uses a.config.ClientSecret. See webhooks.go for the exact scheme.
+//
+// Cashfree's documented default is to sign webhooks with the merchant Secret Key (client secret),
+// so the PRIMARY attempt uses a.config.ClientSecret. However, Cashfree also lets you generate a
+// per-endpoint webhook secret in the dashboard; when configured, that endpoint may sign with the
+// generated secret instead. To tolerate both without guessing, this method tries the client secret
+// first and, on failure, FALLS BACK to a.config.WebhookSecret (when set and different).
+//
+// Every path logs which secret was tried and the outcome (see the "secret_used" key), so operators
+// can inspect logs to learn which secret Cashfree actually signs with and then pin the config. This
+// fallback is a diagnostic convenience — once the working secret is known it can be simplified back
+// to a single attempt. See webhooks.go for the exact signing scheme.
 func (a *Adapter) VerifySignature(ctx context.Context, payload []byte, headers map[string]string) error {
-	return verifySignature(payload, headers, a.config.ClientSecret)
+	// Primary attempt: the merchant client secret (Cashfree's documented default).
+	primaryErr := verifySignature(payload, headers, a.config.ClientSecret)
+	if primaryErr == nil {
+		a.logger.Info(ctx, "cashfree webhook signature verified", "secret_used", "client_secret")
+		return nil
+	}
+
+	// Fallback attempt: the per-endpoint webhook secret, only when it is set AND differs from the
+	// client secret (otherwise the retry is pointless — same key, same result).
+	if a.config.WebhookSecret != "" && a.config.WebhookSecret != a.config.ClientSecret {
+		fallbackErr := verifySignature(payload, headers, a.config.WebhookSecret)
+		if fallbackErr == nil {
+			a.logger.Info(ctx, "cashfree webhook signature verified via fallback",
+				"secret_used", "webhook_secret",
+				"client_secret_error", primaryErr.Error())
+			return nil
+		}
+		a.logger.Error(ctx, "cashfree webhook signature verification failed with BOTH secrets",
+			"client_secret_error", primaryErr.Error(),
+			"webhook_secret_error", fallbackErr.Error())
+		return fallbackErr
+	}
+
+	// No usable fallback secret — report the primary failure.
+	a.logger.Error(ctx, "cashfree webhook signature verification failed",
+		"secret_used", "client_secret",
+		"webhook_secret_available", a.config.WebhookSecret != "" && a.config.WebhookSecret != a.config.ClientSecret,
+		"error", primaryErr.Error())
+	return primaryErr
 }
 
 // ParseEvent parses and unmarshals a webhook payload into a domain event.

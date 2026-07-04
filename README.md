@@ -91,7 +91,7 @@ operational facts):
 | Amount units on the wire | major (rupees) — adapter converts from `AmountMinor` via ISO-4217 | minor (paisa) — passed through as-is |
 | Webhook signature header | `x-webhook-signature` (+ `x-webhook-timestamp`) | `X-Razorpay-Signature` |
 | Webhook signature scheme | `base64(HMAC-SHA256(timestamp + rawBody))` | `hex(HMAC-SHA256(rawBody))` |
-| **Webhook signing secret** | the **merchant Secret Key (client secret)** — Cashfree has **no** separate webhook secret | a **separate webhook secret** you set in the Razorpay dashboard, distinct from the API key secret |
+| **Webhook signing secret** | **client secret** by default (merchant Secret Key); the adapter falls back to a per-endpoint `WebhookSecret` when one is generated and set | a **separate webhook secret** you set in the Razorpay dashboard, distinct from the API key secret |
 | Environment values | `SANDBOX` / `PRODUCTION` (uppercase) | `SANDBOX` / `PRODUCTION` (uppercase) |
 
 Because of the webhook-secret difference, the adapter `Config` carries a generic `WebhookSecret` field
@@ -100,13 +100,16 @@ alongside the API secret (`ClientSecret` for Cashfree, `Secret` for Razorpay). H
 - **Razorpay — two different values.** `Secret` = your API key secret, and `WebhookSecret` = the separate
   webhook secret you set in the Razorpay dashboard. They are genuinely distinct; the adapter verifies webhook
   signatures with `WebhookSecret`.
-- **Cashfree — the same value in both.** Cashfree has no separate webhook secret; it signs webhooks with the
-  client secret. The Cashfree adapter verifies with `ClientSecret`, so set `WebhookSecret` to the **same**
-  value as `ClientSecret` (your Cashfree Secret Key). It's required to be present but is not used for
-  verification — filling it with the Secret Key keeps a single source of truth.
+- **Cashfree — client secret first, webhook secret as fallback.** Cashfree's documented default is to sign
+  webhooks with the client secret (merchant Secret Key), so the adapter verifies with `ClientSecret` first.
+  Some Cashfree dashboards also let you **generate a per-endpoint webhook secret**; if you set `WebhookSecret`
+  to a value that differs from `ClientSecret`, the adapter **falls back** to it when the client-secret attempt
+  fails. Set `ClientSecret` = your Cashfree Secret Key always; set `WebhookSecret` = the generated endpoint
+  secret if you created one (else the same value as `ClientSecret`). The adapter logs which secret verified
+  (see `Config.Logger`), so you can confirm which one Cashfree actually signs with and then pin it.
 
-So a Cashfree integration really has one secret (the Secret Key, duplicated into both fields), whereas
-Razorpay has two (API secret + dashboard webhook secret).
+So a Cashfree integration may have one secret (the Secret Key in both fields) or two (Secret Key + a generated
+per-endpoint webhook secret); Razorpay always has two (API secret + dashboard webhook secret).
 
 **Webhook account segregation.** Each client is one provider bound to one merchant account. The webhook URL
 is `{basePath}/{provider}/{accountID}`, where `accountID` is a **caller-chosen** label (not a vendor value)

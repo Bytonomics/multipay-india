@@ -11,6 +11,7 @@ import (
 	cf "github.com/cashfree/cashfree-pg/v6"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/ports"
 )
 
 // TestBuildInlinePlanDetails_AllFields verifies that buildInlinePlanDetails correctly maps all inline plan fields,
@@ -100,6 +101,7 @@ func TestCreateSubscription_ForwardsCustomerName(t *testing.T) {
 		ClientSecret: "test_client_secret",
 		Environment:  domain.EnvironmentSandbox,
 		AccountID:    "test_account",
+		Logger:       ports.NewNoopLogger(),
 		HTTPClient:   mockHTTPClient,
 	}
 

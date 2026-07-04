@@ -11,6 +11,7 @@ import (
 	cf "github.com/cashfree/cashfree-pg/v6"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/ports"
 )
 
 // TestCreatePaymentLink_ForwardsParameters verifies that createPaymentLink forwards all parameters to Cashfree,
@@ -84,6 +85,7 @@ func TestCreatePaymentLink_ForwardsParameters(t *testing.T) {
 				ClientSecret: "test_client_secret",
 				Environment:  domain.EnvironmentSandbox,
 				AccountID:    "test_account",
+				Logger:       ports.NewNoopLogger(),
 				HTTPClient:   mockHTTPClient,
 			}
 

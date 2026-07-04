@@ -11,6 +11,7 @@ import (
 	cf "github.com/cashfree/cashfree-pg/v6"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
+	"github.com/Bytonomics/multipay-india/multipay-go/ports"
 )
 
 // TestCreateRefund_ForwardsRefundId verifies that createRefund forwards refund_id and converts amount correctly.
@@ -46,6 +47,7 @@ func TestCreateRefund_ForwardsRefundId(t *testing.T) {
 		ClientSecret: "test_client_secret",
 		Environment:  domain.EnvironmentSandbox,
 		AccountID:    "test_account",
+		Logger:       ports.NewNoopLogger(),
 		HTTPClient:   mockHTTPClient,
 	}
 
