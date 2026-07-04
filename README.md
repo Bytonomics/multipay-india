@@ -65,6 +65,54 @@ moves — a **webhook** later confirms the real-world outcome.
 > `domain.WebhookEvent`; turning that into "mark the order paid", "activate the subscription", or "grant
 > access" is your application's business logic.
 
+## Compatibility across payment aggregators
+
+The promise is "write once, swap the provider by config". That holds because the library draws a hard line
+between what is **guaranteed identical** across every provider and what is **provider-specific and gated**.
+
+**Guaranteed identical (first-class surface).** Every provider adapter implements the *entire* set below, so
+your code never branches on the provider and these are **never** capability-checked: orders, payments,
+refunds, instruments/tokens, payment links, plans, subscriptions, and webhook consumption. The **canonical
+request/response types, enum string values (including casing), and the webhook event taxonomy** are one
+contract shared across providers *and* across language ports — swapping Cashfree ↔ Razorpay is a config
+change, not a rewrite.
+
+**Provider-specific (capability-gated).** Anything only some providers support, or support with materially
+different scope, lives behind a capability check and must be guarded with
+`client.Capabilities().Supports(...)` before use — e.g. customer CRUD, some list operations, manual
+subscription charge, upgrade-proration, webhook-endpoint CRUD. Calling an unsupported capability fails
+early with a deterministic error, **before** any provider SDK call.
+
+**Provider differences you must still account for** (the library normalizes the API, not the vendors'
+operational facts):
+
+| Concern | Cashfree | Razorpay |
+|---|---|---|
+| Amount units on the wire | major (rupees) — adapter converts from `AmountMinor` via ISO-4217 | minor (paisa) — passed through as-is |
+| Webhook signature header | `x-webhook-signature` (+ `x-webhook-timestamp`) | `X-Razorpay-Signature` |
+| Webhook signature scheme | `base64(HMAC-SHA256(timestamp + rawBody))` | `hex(HMAC-SHA256(rawBody))` |
+| **Webhook signing secret** | the **merchant Secret Key (client secret)** — Cashfree has **no** separate webhook secret | a **separate webhook secret** you set in the Razorpay dashboard, distinct from the API key secret |
+| Environment values | `SANDBOX` / `PRODUCTION` (uppercase) | `SANDBOX` / `PRODUCTION` (uppercase) |
+
+Because of the webhook-secret difference, the adapter `Config` carries a generic `WebhookSecret` field
+alongside the API secret (`ClientSecret` for Cashfree, `Secret` for Razorpay). How to fill them:
+
+- **Razorpay — two different values.** `Secret` = your API key secret, and `WebhookSecret` = the separate
+  webhook secret you set in the Razorpay dashboard. They are genuinely distinct; the adapter verifies webhook
+  signatures with `WebhookSecret`.
+- **Cashfree — the same value in both.** Cashfree has no separate webhook secret; it signs webhooks with the
+  client secret. The Cashfree adapter verifies with `ClientSecret`, so set `WebhookSecret` to the **same**
+  value as `ClientSecret` (your Cashfree Secret Key). It's required to be present but is not used for
+  verification — filling it with the Secret Key keeps a single source of truth.
+
+So a Cashfree integration really has one secret (the Secret Key, duplicated into both fields), whereas
+Razorpay has two (API secret + dashboard webhook secret).
+
+**Webhook account segregation.** Each client is one provider bound to one merchant account. The webhook URL
+is `{basePath}/{provider}/{accountID}`, where `accountID` is a **caller-chosen** label (not a vendor value)
+used to namespace routing, dedup, and stored payloads. Run multiple merchant accounts by constructing one
+client per account, each with its own credentials and a distinct `accountID`.
+
 ## Layout
 
 | Folder | What it is | Status |

@@ -238,9 +238,10 @@ func (a *Adapter) GetPlan(ctx context.Context, req *domain.GetPlanRequest) (*dom
 }
 
 // VerifySignature verifies the authenticity of a webhook request.
-// See webhooks.go for implementation.
+// Cashfree signs webhooks with the merchant Secret Key (client secret) — NOT a separate webhook
+// secret — so verification uses a.config.ClientSecret. See webhooks.go for the exact scheme.
 func (a *Adapter) VerifySignature(ctx context.Context, payload []byte, headers map[string]string) error {
-	return verifySignature(payload, headers, a.config.WebhookSecret)
+	return verifySignature(payload, headers, a.config.ClientSecret)
 }
 
 // ParseEvent parses and unmarshals a webhook payload into a domain event.

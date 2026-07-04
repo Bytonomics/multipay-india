@@ -726,7 +726,7 @@ Logger is mandatory (panics on nil at construction). All log methods accept `con
 
 ## Security Considerations
 
-1. **Webhook Signature Verification**: HMAC-SHA256 verification per provider (Cashfree uses `X-Cashfree-Signature`, Razorpay uses `X-Razorpay-Signature`); constant-time comparison via `crypto/subtle`
+1. **Webhook Signature Verification**: HMAC-SHA256 verification per provider, constant-time compare via `crypto/subtle`. **Cashfree**: `base64(HMAC-SHA256(x-webhook-timestamp + rawBody, clientSecret))` compared against the `x-webhook-signature` header (Cashfree signs with the merchant Secret Key / client secret — there is no separate Cashfree webhook secret; both `x-webhook-signature` and `x-webhook-timestamp` headers are required). **Razorpay**: `X-Razorpay-Signature`.
 2. **Credential Isolation**: Provider credentials are never logged; `CallerLogger` only adds caller location, not request data
 3. **Provider Client Architecture**: Cashfree SDK v6 uses instance-based `*Cashfree` struct (no package-level globals); each adapter instance owns its client, ensuring thread-safe concurrent calls without mutexes
 4. **POST-Only Webhooks**: `WebhookHandler.ServeHTTP` rejects non-POST requests with 405

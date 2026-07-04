@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
-	"encoding/hex"
+	"encoding/base64"
 	"encoding/json"
 	"testing"
 	"time"
@@ -12,19 +12,23 @@ import (
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 )
 
-// TestVerifySignature_ValidSignature verifies that a valid HMAC-SHA256 signature is accepted.
+// cfSign reproduces Cashfree's webhook signature: base64(HMAC-SHA256(timestamp+body, secret)).
+func cfSign(secret, timestamp string, body []byte) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(timestamp))
+	mac.Write(body)
+	return base64.StdEncoding.EncodeToString(mac.Sum(nil))
+}
+
+// TestVerifySignature_ValidSignature verifies that a valid Cashfree signature is accepted.
 func TestVerifySignature_ValidSignature(t *testing.T) {
 	secret := "test_secret_key"
+	timestamp := "1700000000"
 	body := []byte(`{"event_id":"evt_123","type":"ORDER.PAID","data":{}}`)
 
-	// Compute the expected signature.
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write(body)
-	signature := hex.EncodeToString(mac.Sum(nil))
-
-	// Verify the signature.
 	headers := map[string]string{
-		"X-Cashfree-Signature": signature,
+		"X-Webhook-Signature": cfSign(secret, timestamp, body),
+		"X-Webhook-Timestamp": timestamp,
 	}
 
 	err := verifySignature(body, headers, secret)
@@ -38,9 +42,10 @@ func TestVerifySignature_InvalidSignature(t *testing.T) {
 	secret := "test_secret_key"
 	body := []byte(`{"event_id":"evt_123","type":"ORDER.PAID","data":{}}`)
 
-	// Use a wrong signature.
+	// Correct timestamp but a wrong signature.
 	headers := map[string]string{
-		"X-Cashfree-Signature": "invalid_signature_hash",
+		"X-Webhook-Signature": "aW52YWxpZF9zaWduYXR1cmU=",
+		"X-Webhook-Timestamp": "1700000000",
 	}
 
 	err := verifySignature(body, headers, secret)
@@ -49,13 +54,15 @@ func TestVerifySignature_InvalidSignature(t *testing.T) {
 	}
 }
 
-// TestVerifySignature_MissingHeader verifies that a missing signature header is rejected.
-func TestVerifySignature_MissingHeader(t *testing.T) {
+// TestVerifySignature_MissingSignatureHeader verifies that a missing signature header is rejected.
+func TestVerifySignature_MissingSignatureHeader(t *testing.T) {
 	secret := "test_secret_key"
 	body := []byte(`{"event_id":"evt_123","type":"ORDER.PAID","data":{}}`)
 
-	// No signature header.
-	headers := map[string]string{}
+	// Timestamp present, signature absent.
+	headers := map[string]string{
+		"X-Webhook-Timestamp": "1700000000",
+	}
 
 	err := verifySignature(body, headers, secret)
 	if err == nil {
@@ -63,19 +70,34 @@ func TestVerifySignature_MissingHeader(t *testing.T) {
 	}
 }
 
+// TestVerifySignature_MissingTimestampHeader verifies that a missing timestamp header is rejected.
+// Cashfree signs timestamp+body, so verification cannot proceed without the timestamp.
+func TestVerifySignature_MissingTimestampHeader(t *testing.T) {
+	secret := "test_secret_key"
+	timestamp := "1700000000"
+	body := []byte(`{"event_id":"evt_123","type":"ORDER.PAID","data":{}}`)
+
+	// Signature present, timestamp absent.
+	headers := map[string]string{
+		"X-Webhook-Signature": cfSign(secret, timestamp, body),
+	}
+
+	err := verifySignature(body, headers, secret)
+	if err == nil {
+		t.Fatal("expected error for missing timestamp header, got nil")
+	}
+}
+
 // TestVerifySignature_CaseInsensitiveHeader verifies that header names are case-insensitive.
 func TestVerifySignature_CaseInsensitiveHeader(t *testing.T) {
 	secret := "test_secret_key"
+	timestamp := "1700000000"
 	body := []byte(`{"event_id":"evt_123","type":"ORDER.PAID","data":{}}`)
 
-	// Compute the expected signature.
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write(body)
-	signature := hex.EncodeToString(mac.Sum(nil))
-
-	// Use lowercase header name.
+	// Use lowercase header names (as Cashfree documents them).
 	headers := map[string]string{
-		"x-cashfree-signature": signature,
+		"x-webhook-signature": cfSign(secret, timestamp, body),
+		"x-webhook-timestamp": timestamp,
 	}
 
 	err := verifySignature(body, headers, secret)
@@ -90,7 +112,8 @@ func TestVerifySignature_EmptyBody(t *testing.T) {
 	body := []byte{}
 
 	headers := map[string]string{
-		"X-Cashfree-Signature": "any_signature",
+		"X-Webhook-Signature": "any_signature",
+		"X-Webhook-Timestamp": "1700000000",
 	}
 
 	err := verifySignature(body, headers, secret)
@@ -297,13 +320,14 @@ func TestParseEvent_DefaultTimestamp(t *testing.T) {
 	}
 }
 
-// TestAdapterVerifySignature verifies the adapter's VerifySignature method.
+// TestAdapterVerifySignature verifies the adapter's VerifySignature method. The adapter verifies with
+// the merchant Secret Key (ClientSecret) — Cashfree signs webhooks with the client secret.
 func TestAdapterVerifySignature(t *testing.T) {
-	webhookSecret := "test_webhook_secret"
+	clientSecret := "test_client_secret"
 	config := &Config{
 		ClientID:      "test_client_id",
-		ClientSecret:  "test_client_secret",
-		WebhookSecret: webhookSecret,
+		ClientSecret:  clientSecret,
+		WebhookSecret: "test_webhook_secret", // unused for Cashfree signature verification
 		Environment:   domain.EnvironmentSandbox,
 	}
 
@@ -313,15 +337,12 @@ func TestAdapterVerifySignature(t *testing.T) {
 	}
 
 	body := []byte(`{"event_id":"evt_123","type":"ORDER.PAID","data":{}}`)
+	timestamp := "1700000000"
 
-	// Compute the expected signature using the webhook secret.
-	mac := hmac.New(sha256.New, []byte(webhookSecret))
-	mac.Write(body)
-	signature := hex.EncodeToString(mac.Sum(nil))
-
-	// Verify the signature using the adapter method.
+	// Verify the signature using the adapter method (signed with the client secret).
 	headers := map[string]string{
-		"X-Cashfree-Signature": signature,
+		"X-Webhook-Signature": cfSign(clientSecret, timestamp, body),
+		"X-Webhook-Timestamp": timestamp,
 	}
 	err = adapter.VerifySignature(context.Background(), body, headers)
 	if err != nil {
@@ -384,15 +405,12 @@ func TestAdapterParseEvent(t *testing.T) {
 // BenchmarkVerifySignature benchmarks the signature verification.
 func BenchmarkVerifySignature(b *testing.B) {
 	secret := "test_secret_key"
+	timestamp := "1700000000"
 	body := []byte(`{"event_id":"evt_123","type":"ORDER.PAID","data":{}}`)
 
-	// Compute the expected signature once.
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write(body)
-	signature := hex.EncodeToString(mac.Sum(nil))
-
 	headers := map[string]string{
-		"X-Cashfree-Signature": signature,
+		"X-Webhook-Signature": cfSign(secret, timestamp, body),
+		"X-Webhook-Timestamp": timestamp,
 	}
 
 	b.ResetTimer()

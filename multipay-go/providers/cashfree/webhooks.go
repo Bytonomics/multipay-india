@@ -5,7 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/hex"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -49,18 +49,25 @@ type cfCardExpiryData struct {
 	} `json:"subscription_status_webhook"`
 }
 
-// verifySignature verifies the HMAC-SHA256 signature of a Cashfree webhook payload.
-// Cashfree sends the signature in the "X-Cashfree-Signature" header.
-// The signature is computed as HMAC-SHA256(payload, secret).
+// verifySignature verifies a Cashfree webhook signature per Cashfree's documented scheme:
+// the signature (header "x-webhook-signature") is
+//
+//	base64( HMAC-SHA256( x-webhook-timestamp + rawBody, secret ) )
+//
+// i.e. the timestamp is concatenated BEFORE the raw body, HMAC-SHA256'd, and base64 (std) encoded.
+// The `secret` MUST be the Cashfree **Secret Key** (the merchant client secret) — Cashfree signs
+// webhooks with the client secret; there is no separate Cashfree "webhook secret".
+// Refs: https://www.cashfree.com/docs/api-reference/vrs/webhook-signature-verification and the
+// official sample at github.com/cashfree/cashfree-pg-webhook (go/main.go).
 //
 // Parameters:
-//   - body: The raw webhook payload bytes
-//   - headers: The HTTP headers from the webhook request (header names should be lowercase or normalized)
-//   - secret: The webhook secret (Cashfree merchant secret)
+//   - body: The raw webhook payload bytes (must be the exact, unmodified body)
+//   - headers: The HTTP headers from the webhook request (looked up case-insensitively)
+//   - secret: The Cashfree Secret Key (client secret)
 //
 // Returns:
 //   - nil if the signature is valid
-//   - domain.ErrWebhookVerificationFailed if the signature is missing or invalid
+//   - domain.ErrWebhookVerificationFailed if a required header/secret is missing or the signature mismatches
 func verifySignature(body []byte, headers map[string]string, secret string) error {
 	if len(body) == 0 {
 		return fmt.Errorf("webhook body is empty: %w", domain.ErrWebhookVerificationFailed)
@@ -70,25 +77,21 @@ func verifySignature(body []byte, headers map[string]string, secret string) erro
 		return fmt.Errorf("webhook secret is required: %w", domain.ErrWebhookVerificationFailed)
 	}
 
-	// Extract the signature from headers.
-	// Cashfree uses "X-Cashfree-Signature" header.
-	// Normalize header name to lowercase for case-insensitive lookup.
-	var signature string
-	for key, value := range headers {
-		if strings.EqualFold(key, "X-Cashfree-Signature") {
-			signature = value
-			break
-		}
-	}
-
+	signature := headerValue(headers, "x-webhook-signature")
 	if signature == "" {
-		return fmt.Errorf("X-Cashfree-Signature header is missing: %w", domain.ErrWebhookVerificationFailed)
+		return fmt.Errorf("x-webhook-signature header is missing: %w", domain.ErrWebhookVerificationFailed)
 	}
 
-	// Compute the expected HMAC-SHA256 signature.
+	timestamp := headerValue(headers, "x-webhook-timestamp")
+	if timestamp == "" {
+		return fmt.Errorf("x-webhook-timestamp header is missing: %w", domain.ErrWebhookVerificationFailed)
+	}
+
+	// Cashfree signs the concatenation of timestamp + raw body (timestamp first).
 	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(timestamp))
 	mac.Write(body)
-	expectedSignature := hex.EncodeToString(mac.Sum(nil))
+	expectedSignature := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 
 	// Use constant-time comparison to prevent timing attacks.
 	if subtle.ConstantTimeCompare([]byte(signature), []byte(expectedSignature)) != 1 {
@@ -96,6 +99,18 @@ func verifySignature(body []byte, headers map[string]string, secret string) erro
 	}
 
 	return nil
+}
+
+// headerValue returns the value of the header named `name`, matched case-insensitively.
+// Go's net/http canonicalizes incoming header keys (e.g. "X-Webhook-Signature"); Cashfree documents
+// them in lowercase — case-insensitive lookup covers both.
+func headerValue(headers map[string]string, name string) string {
+	for key, value := range headers {
+		if strings.EqualFold(key, name) {
+			return value
+		}
+	}
+	return ""
 }
 
 // parseEvent parses a Cashfree webhook payload and returns a domain.WebhookEvent.
