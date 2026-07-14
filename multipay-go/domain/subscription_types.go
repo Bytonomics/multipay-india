@@ -127,7 +127,7 @@ type CreatePlanRequest struct {
 	PlanName       string           `json:"plan_name" pedantigo:"required,minLength=1,maxLength=250"`
 	PlanType       PlanType         `json:"plan_type" pedantigo:"required,oneof=PERIODIC ON_DEMAND"`
 	MaxAmountMinor AmountMinor      `json:"max_amount_minor" pedantigo:"required,gt=0"`
-	Currency       Currency         `json:"currency,omitempty" pedantigo:"omitempty,iso4217"`
+	Currency       Currency         `json:"currency" pedantigo:"required,iso4217"`
 	AmountMinor    AmountMinor      `json:"amount_minor,omitempty" pedantigo:"skip_unless=PlanType PERIODIC,required,gt=0"`
 	Interval       int32            `json:"interval,omitempty" pedantigo:"skip_unless=PlanType PERIODIC,required,gte=1"`
 	IntervalType   PlanIntervalType `json:"interval_type,omitempty" pedantigo:"skip_unless=PlanType PERIODIC,required,oneof=DAY WEEK MONTH YEAR"`
@@ -137,7 +137,9 @@ type CreatePlanRequest struct {
 
 // Validate enforces presence of the mandatory plan fields (pedantigo's Validate() does not
 // enforce the `required` tag), plus the PERIODIC-only conditional fields. ON_DEMAND plans
-// legitimately omit AmountMinor/Interval/IntervalType.
+// legitimately omit AmountMinor/Interval/IntervalType. Currency is always mandatory: providers
+// (e.g. Cashfree) require plan_currency and reject a blank value, and the amount conversion to
+// major units depends on the currency's ISO-4217 exponent.
 func (r *CreatePlanRequest) Validate() error {
 	if r.PlanID == "" {
 		return errors.New("plan_id is required")
@@ -150,6 +152,9 @@ func (r *CreatePlanRequest) Validate() error {
 	}
 	if r.MaxAmountMinor <= 0 {
 		return errors.New("max_amount_minor must be greater than 0")
+	}
+	if r.Currency == "" {
+		return errors.New("currency is required")
 	}
 	if r.PlanType == PlanTypePeriodic {
 		if r.AmountMinor <= 0 {

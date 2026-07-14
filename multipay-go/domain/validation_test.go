@@ -176,6 +176,56 @@ func TestCreateSubscriptionRequest_Validate(t *testing.T) {
 	}
 }
 
+func TestCreatePlanRequest_Validate(t *testing.T) {
+	tests := []struct {
+		name    string
+		req     *CreatePlanRequest
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "valid periodic plan",
+			req: &CreatePlanRequest{
+				PlanID:         "plan_123",
+				PlanName:       "Pro MONTHLY IN",
+				PlanType:       PlanTypePeriodic,
+				MaxAmountMinor: 100000,
+				Currency:       "INR",
+				AmountMinor:    50000,
+				Interval:       1,
+				IntervalType:   PlanIntervalMonth,
+			},
+			wantErr: false,
+		},
+		{
+			name: "missing currency",
+			req: &CreatePlanRequest{
+				PlanID:         "plan_123",
+				PlanName:       "Pro MONTHLY IN",
+				PlanType:       PlanTypePeriodic,
+				MaxAmountMinor: 100000,
+				AmountMinor:    50000,
+				Interval:       1,
+				IntervalType:   PlanIntervalMonth,
+			},
+			wantErr: true,
+			errMsg:  "currency is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.req.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr && err.Error() != tt.errMsg {
+				t.Errorf("Validate() error = %v, want %v", err.Error(), tt.errMsg)
+			}
+		})
+	}
+}
+
 func TestListRefundsRequest_Validate(t *testing.T) {
 	tests := []struct {
 		name    string

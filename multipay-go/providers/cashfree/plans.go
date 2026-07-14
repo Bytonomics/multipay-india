@@ -30,6 +30,7 @@ func createPlan(ctx context.Context, a *Adapter, req *domain.CreatePlanRequest) 
 		PlanId:        req.PlanID,
 		PlanName:      req.PlanName,
 		PlanType:      string(req.PlanType),
+		PlanCurrency:  ptrString(string(req.Currency)),
 		PlanMaxAmount: maxAmount32,
 		PlanMaxCycles: optInt32(req.MaxCycles),
 		PlanNote:      optStr(req.Note),
