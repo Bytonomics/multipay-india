@@ -133,6 +133,9 @@ type CreatePlanRequest struct {
 	IntervalType   PlanIntervalType `json:"interval_type,omitempty" pedantigo:"skip_unless=PlanType PERIODIC,required,oneof=DAY WEEK MONTH YEAR"`
 	MaxCycles      int32            `json:"max_cycles,omitempty" pedantigo:"omitempty,gte=0"`
 	Note           string           `json:"note,omitempty" pedantigo:"omitempty,maxLength=500"`
+	// Description populates the Razorpay plan item description (item.description). Cashfree has
+	// no per-plan description field (it uses PlanNote, mapped from Note). Optional.
+	Description string `json:"description,omitempty" pedantigo:"omitempty,maxLength=500"`
 }
 
 // Validate enforces presence of the mandatory plan fields (pedantigo's Validate() does not
@@ -189,6 +192,38 @@ type CreateSubscriptionRequest struct {
 	ExpiresAt       *time.Time        `json:"expires_at,omitempty"`
 	FirstChargeTime *time.Time        `json:"first_charge_time,omitempty"`
 	Tags            map[string]string `json:"tags,omitempty" pedantigo:"omitempty,maxItems=10"`
+
+	// TotalCount is the number of billing cycles the customer will be charged. Razorpay
+	// treats this as MANDATORY (unless end_at is supplied); the Razorpay adapter sends it
+	// UNCONDITIONALLY, preferring this field and falling back to PlanDetails.MaxCycles. When
+	// zero and no inline plan bounds cycles, the mapper omits it. Cashfree ignores it (the
+	// plan's own max_cycles governs cycle count). Optional in the canonical contract.
+	TotalCount int32 `json:"total_count,omitempty" pedantigo:"omitempty,gte=0"`
+	// Quantity multiplies the plan amount per invoice (Razorpay-only, defaults to 1).
+	Quantity int32 `json:"quantity,omitempty" pedantigo:"omitempty,gte=1"`
+	// OfferID links a Razorpay offer to the subscription (Razorpay-only).
+	OfferID string `json:"offer_id,omitempty" pedantigo:"omitempty,maxLength=250"`
+	// Addons are items collected upfront during authorization (Razorpay-only).
+	Addons []SubscriptionAddon `json:"addons,omitempty"`
+
+	// AuthorizationDetails controls the Cashfree mandate-authorization step (Cashfree-only).
+	AuthorizationDetails *SubscriptionAuthorizationDetails `json:"authorization_details,omitempty"`
+	// Meta carries Cashfree subscription_meta extras beyond ReturnURL (Cashfree-only).
+	Meta *SubscriptionMeta `json:"subscription_meta,omitempty"`
+	// BankDetails pre-binds the customer's bank account for a TPV eNACH mandate (Cashfree-only).
+	BankDetails *SubscriptionBankDetails `json:"customer_bank_details,omitempty"`
+	// PaymentSplits configure Cashfree Easy Split for the subscription (Cashfree-only).
+	PaymentSplits []SubscriptionPaymentSplit `json:"subscription_payment_splits,omitempty"`
+
+	// CustomerNotify controls whether Razorpay notifies the customer (emails/SMSes the auth link).
+	// Razorpay-only. The adapter forwards exactly what the caller sets and imposes NO default:
+	// nil ⇒ customer_notify is omitted (Razorpay applies its own default). The caller (e.g. the
+	// cloud) is responsible for choosing the value. Cashfree ignores it.
+	CustomerNotify *bool `json:"customer_notify,omitempty"`
+	// CfOrderID forwards Cashfree's cf_order_id on the create-subscription request (present on the
+	// vendored Cashfree SDK struct; attaches the subscription to a pre-created Cashfree order).
+	// Cashfree-only; ignored by Razorpay. Empty ⇒ not sent.
+	CfOrderID string `json:"cf_order_id,omitempty" pedantigo:"omitempty,maxLength=250"`
 }
 
 // Validate enforces cross-field rules:
@@ -227,16 +262,49 @@ type GetSubscriptionRequest struct {
 // CancelSubscriptionRequest represents a request to cancel a subscription.
 type CancelSubscriptionRequest struct {
 	SubscriptionID string `json:"subscription_id" pedantigo:"required,minLength=1"`
+	// CancelAtCycleEnd is Razorpay's cancel_at_cycle_end (Boolean per Razorpay docs):
+	// nil/false = cancel immediately, true = cancel at the end of the current billing cycle.
+	// Razorpay-only — Cashfree's Manage Subscription CANCEL is immediate-only and ignores it.
+	CancelAtCycleEnd *bool `json:"cancel_at_cycle_end,omitempty"`
 }
 
 // PauseSubscriptionRequest represents a request to pause a subscription.
 type PauseSubscriptionRequest struct {
 	SubscriptionID string `json:"subscription_id" pedantigo:"required,minLength=1"`
+	// PauseAt is Razorpay's pause_at. The ONLY value Razorpay accepts is "now" (pause immediately);
+	// Validate() rejects anything else. Razorpay-only — Cashfree pause is action-based and ignores it.
+	PauseAt string `json:"pause_at,omitempty" pedantigo:"omitempty"`
+}
+
+// Validate rejects any pause_at value other than "now" (the only value the vendor accepts).
+func (r *PauseSubscriptionRequest) Validate() error {
+	if r.PauseAt != "" && r.PauseAt != "now" {
+		return fmt.Errorf("pause_at must be \"now\" if set, got %q", r.PauseAt)
+	}
+	return nil
 }
 
 // ResumeSubscriptionRequest represents a request to resume a subscription.
 type ResumeSubscriptionRequest struct {
 	SubscriptionID string `json:"subscription_id" pedantigo:"required,minLength=1"`
+	// NextScheduledTime is REQUIRED by Cashfree's Manage Subscription ACTIVATE action
+	// (action_details.next_scheduled_time) — it is the date the resumed subscription's next
+	// charge is scheduled. Cashfree rejects an ACTIVATE with no action_details. Razorpay's
+	// Resume has no equivalent (it resumes on its own schedule), so the Razorpay adapter
+	// ignores this field. Optional in the canonical contract because it is Cashfree-specific;
+	// the Cashfree adapter forwards it when set.
+	NextScheduledTime *time.Time `json:"next_scheduled_time,omitempty"`
+	// ResumeAt is Razorpay's resume_at. The ONLY value Razorpay accepts is "now" (resume immediately);
+	// Validate() rejects anything else. Razorpay-only — Cashfree resume is action-based and ignores it.
+	ResumeAt string `json:"resume_at,omitempty" pedantigo:"omitempty"`
+}
+
+// Validate rejects any resume_at value other than "now" (the only value the vendor accepts).
+func (r *ResumeSubscriptionRequest) Validate() error {
+	if r.ResumeAt != "" && r.ResumeAt != "now" {
+		return fmt.Errorf("resume_at must be \"now\" if set, got %q", r.ResumeAt)
+	}
+	return nil
 }
 
 // ChangePlanRequest represents a request to change the plan of a subscription.
@@ -244,6 +312,18 @@ type ChangePlanRequest struct {
 	SubscriptionID string           `json:"subscription_id" pedantigo:"required,minLength=1"`
 	NewPlanID      string           `json:"new_plan_id" pedantigo:"required,minLength=1"`
 	ScheduleAt     ScheduleChangeAt `json:"schedule_at,omitempty" pedantigo:"omitempty,oneof=NOW CYCLE_END"`
+	// The fields below are Razorpay Update-Subscription optional params. Cashfree's Manage
+	// Subscription CHANGE_PLAN action supports only plan_id, so the Cashfree adapter ignores them.
+	// OfferID links a Razorpay offer to the subscription.
+	OfferID string `json:"offer_id,omitempty" pedantigo:"omitempty,maxLength=250"`
+	// Quantity multiplies the plan charge per invoice (Razorpay, defaults to 1).
+	Quantity int32 `json:"quantity,omitempty" pedantigo:"omitempty,gte=1"`
+	// RemainingCount updates the subscription's total_count (Razorpay).
+	RemainingCount int32 `json:"remaining_count,omitempty" pedantigo:"omitempty,gte=0"`
+	// StartAt is the new start date for the subscription (Razorpay, Unix seconds).
+	StartAt *time.Time `json:"start_at,omitempty"`
+	// CustomerNotify controls whether Razorpay notifies the customer (nil = use Razorpay default).
+	CustomerNotify *bool `json:"customer_notify,omitempty"`
 }
 
 // GetSubscriptionPaymentsRequest represents a request to get payments for a subscription.
@@ -337,6 +417,13 @@ type ChargeSubscriptionRequest struct {
 	AmountMinor    AmountMinor `json:"amount_minor" pedantigo:"required,gt=0"`
 	Currency       Currency    `json:"currency" pedantigo:"required,iso4217"`
 	Remarks        string      `json:"remarks,omitempty" pedantigo:"omitempty,maxLength=500"`
+	// PaymentScheduleDate future-dates the charge (Cashfree payment_schedule_date, date-only
+	// "YYYY-MM-DD"). When zero, Cashfree charges immediately. Cashfree-only; Razorpay's
+	// CreateAddon has no scheduled-date concept.
+	PaymentScheduleDate *time.Time `json:"payment_schedule_date,omitempty"`
+	// Description populates the addon item description on Razorpay (item.description).
+	// Cashfree uses PaymentRemarks (mapped from Remarks) instead.
+	Description string `json:"description,omitempty" pedantigo:"omitempty,maxLength=500"`
 }
 
 // Validate enforces presence of mandatory fields.

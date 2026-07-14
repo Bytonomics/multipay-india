@@ -10,10 +10,12 @@ import (
 
 // D17: Typed request struct for Razorpay Create Order API.
 type razorpayCreateOrderRequest struct {
-	Amount   int64           `json:"amount"`
-	Currency string          `json:"currency"`
-	Notes    domain.Metadata `json:"notes,omitempty"`
-	Receipt  string          `json:"receipt,omitempty"`
+	Amount                int64           `json:"amount"`
+	Currency              string          `json:"currency"`
+	Notes                 domain.Metadata `json:"notes,omitempty"`
+	Receipt               string          `json:"receipt,omitempty"`
+	PartialPayment        bool            `json:"partial_payment,omitempty"`
+	FirstPaymentMinAmount int64           `json:"first_payment_min_amount,omitempty"`
 }
 
 // D17: Typed response struct for Razorpay Order API responses.
@@ -40,12 +42,17 @@ func (a *Adapter) CreateOrder(ctx context.Context, req *domain.CreateOrderReques
 	}
 
 	// Build Razorpay order creation parameters
-	params, err := encodeRequest(&razorpayCreateOrderRequest{
-		Amount:   int64(req.AmountMinor),
-		Currency: string(req.Currency),
-		Notes:    req.Metadata,
-		Receipt:  req.OrderID,
-	})
+	orderReq := &razorpayCreateOrderRequest{
+		Amount:                int64(req.AmountMinor),
+		Currency:              string(req.Currency),
+		Notes:                 req.Metadata,
+		Receipt:               req.OrderID,
+		FirstPaymentMinAmount: int64(req.FirstPaymentMinAmount),
+	}
+	if req.PartialPayment != nil {
+		orderReq.PartialPayment = *req.PartialPayment
+	}
+	params, err := encodeRequest(orderReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode create order request: %w", err)
 	}

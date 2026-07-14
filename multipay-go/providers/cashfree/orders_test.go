@@ -318,6 +318,7 @@ func TestCreateOrder_ForwardsParameters(t *testing.T) {
 				Currency:    domain.Currency("INR"),
 				Customer: &domain.CustomerInfo{
 					CustomerID: "cust_123",
+					Name:       "John Doe",
 					Email:      "test@example.com",
 					Phone:      "+919876543210",
 				},
@@ -369,6 +370,11 @@ func TestCreateOrder_ForwardsParameters(t *testing.T) {
 			// Assert OrderTags are forwarded
 			if capturedReq.OrderTags == nil || len(*capturedReq.OrderTags) == 0 {
 				t.Error("OrderTags not forwarded")
+			}
+
+			// Assert customer_name is forwarded (regression guard: it was previously dropped)
+			if capturedReq.CustomerDetails == nil || capturedReq.CustomerDetails.CustomerName == nil || *capturedReq.CustomerDetails.CustomerName != "John Doe" {
+				t.Errorf("CustomerDetails.CustomerName not forwarded: %v", capturedReq.CustomerDetails)
 			}
 		})
 	}

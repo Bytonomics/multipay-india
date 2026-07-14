@@ -13,7 +13,22 @@ type razorpayCreateRefundRequest struct {
 	PaymentID string            `json:"payment_id"`
 	Amount    int64             `json:"amount,omitempty"`
 	Receipt   string            `json:"receipt,omitempty"`
+	Speed     string            `json:"speed,omitempty"`
 	Notes     map[string]string `json:"notes,omitempty"`
+}
+
+// mapRefundSpeed maps the canonical RefundSpeed to Razorpay's wire value.
+// Razorpay uses lowercase normal|optimum; canonical is STANDARD|INSTANT.
+// Empty canonical → empty (Razorpay defaults to "normal").
+func mapRefundSpeed(s domain.RefundSpeed) string {
+	switch s {
+	case domain.RefundSpeedStandard:
+		return "normal"
+	case domain.RefundSpeedInstant:
+		return "optimum"
+	default:
+		return ""
+	}
 }
 
 // D17: Typed response struct for Razorpay Refund API responses.
@@ -55,6 +70,7 @@ func (a *Adapter) CreateRefund(ctx context.Context, req *domain.CreateRefundRequ
 		PaymentID: req.PaymentID,
 		Amount:    int64(req.AmountMinor), // 0 = full refund; omitempty drops it
 		Receipt:   req.RefundID,
+		Speed:     mapRefundSpeed(req.RefundSpeed),
 	}
 	// Merge metadata with reason as "note" key
 	if len(req.Metadata) > 0 || req.Reason != "" {

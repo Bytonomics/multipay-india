@@ -12,9 +12,23 @@ type RawProviderResponse json.RawMessage
 
 type CustomerInfo struct {
 	CustomerID string `json:"customer_id" pedantigo:"required,minLength=1,maxLength=250"`
-	Name       string `json:"name,omitempty"`
+	Name       string `json:"name,omitempty" pedantigo:"omitempty,maxLength=200"`
 	Email      string `json:"email,omitempty" pedantigo:"omitempty,email"`
 	Phone      string `json:"phone" pedantigo:"required,minLength=5,maxLength=20"`
+
+	// --- Cashfree TPV (Third-Party Validation) bank fields (Cashfree-only; ignored by Razorpay) ---
+	// BankAccountNumber → cf CustomerDetails.customer_bank_account_number / link customer_bank_account_number.
+	BankAccountNumber string `json:"bank_account_number,omitempty" pedantigo:"omitempty,maxLength=50"`
+	// BankIFSC → cf customer_bank_ifsc.
+	BankIFSC string `json:"bank_ifsc,omitempty" pedantigo:"omitempty,maxLength=20"`
+	// BankCode → cf customer_bank_code (net-banking code). Cashfree wire type is numeric.
+	BankCode int32 `json:"bank_code,omitempty" pedantigo:"omitempty"`
+	// BankAccountHolderName → cf link customer_bank_acoount_holder_name (note the vendor's
+	// misspelling on the wire) and subscription customer_bank_account_holder_name. Cashfree-only;
+	// ignored by Razorpay.
+	BankAccountHolderName string `json:"bank_account_holder_name,omitempty" pedantigo:"omitempty,maxLength=250"`
+	// UID → cf customer_uid (Cashfree customer identifier). Order-only.
+	UID string `json:"uid,omitempty" pedantigo:"omitempty,maxLength=250"`
 }
 
 type Metadata map[string]string
@@ -31,6 +45,31 @@ type CreateOrderRequest struct {
 	ExpiryTime  *time.Time    `json:"expiry_time,omitempty"`
 	Note        string        `json:"note,omitempty" pedantigo:"omitempty,maxLength=500"`
 	Metadata    Metadata      `json:"metadata,omitempty"`
+
+	// --- Cashfree-only optional fields (ignored by the Razorpay adapter) ---
+	// CartDetails → cf CreateOrderRequest.cart_details.
+	CartDetails *CartDetails `json:"cart_details,omitempty"`
+	// Terminal → cf CreateOrderRequest.terminal (softPOS terminal binding).
+	Terminal *TerminalDetails `json:"terminal,omitempty"`
+	// OrderSplits → cf CreateOrderRequest.order_splits (Easy Split).
+	OrderSplits []VendorSplit `json:"order_splits,omitempty"`
+	// Products → cf CreateOrderRequest.products (One-Click-Checkout / Verify-and-Pay toggles).
+	Products *OrderProducts `json:"products,omitempty"`
+	// PaymentMethods → cf order_meta.payment_methods (comma-separated allowed modes, e.g. "cc,dc,upi").
+	PaymentMethods string `json:"payment_methods,omitempty" pedantigo:"omitempty,maxLength=500"`
+	// PaymentMethodsFilters → cf order_meta.payment_methods_filters (card bin/scheme/bank/suffix filters).
+	PaymentMethodsFilters *OrderPaymentMethodsFilters `json:"payment_methods_filters,omitempty"`
+	// OfferFilters → cf order_meta.offer_filters (allow/deny offer ids).
+	OfferFilters *OfferFilters `json:"offer_filters,omitempty"`
+	// UpiAppPriority → cf order_meta.upi_app_priority (ordered UPI-app hint list).
+	UpiAppPriority []string `json:"upi_app_priority,omitempty"`
+
+	// --- Razorpay-only optional fields (ignored by the Cashfree adapter) ---
+	// PartialPayment enables customer partial payment on the order (rzp partial_payment).
+	PartialPayment *bool `json:"partial_payment,omitempty"`
+	// FirstPaymentMinAmount is the minimum first installment when partial payment is on.
+	// Minor units (rzp first_payment_min_amount). Only meaningful with PartialPayment=true.
+	FirstPaymentMinAmount AmountMinor `json:"first_payment_min_amount_minor,omitempty" pedantigo:"omitempty,gte=0"`
 }
 
 // Validate enforces presence and non-empty constraints on CreateOrderRequest fields.
@@ -135,6 +174,27 @@ type CreateRefundRequest struct {
 	Currency    Currency    `json:"currency" pedantigo:"required,iso4217"`
 	Reason      string      `json:"reason,omitempty" pedantigo:"omitempty,maxLength=500"`
 	Metadata    Metadata    `json:"metadata,omitempty"`
+
+	// RefundSpeed selects how fast the provider settles the refund. The two vendors
+	// spell the values differently, so this carries the CANONICAL casing and each
+	// adapter maps it to its wire value:
+	//   Cashfree refund_speed: STANDARD | INSTANT
+	//   Razorpay speed:        normal   | optimum
+	// Empty means "provider default" (STANDARD / normal). The Cashfree adapter forwards
+	// STANDARD/INSTANT verbatim; the Razorpay adapter maps STANDARD→normal, INSTANT→optimum.
+	RefundSpeed RefundSpeed `json:"refund_speed,omitempty" pedantigo:"omitempty,oneof=STANDARD INSTANT"`
+
+	// RefundSplits reverses an Easy-Split order proportionally across vendors.
+	// Cashfree-only (cf refund_splits); ignored by the Razorpay adapter.
+	RefundSplits []RefundSplit `json:"refund_splits,omitempty"`
+}
+
+// RefundSplit mirrors cf OrderCreateRefundRequestRefundSplitsInner. VendorID is
+// mandatory on the vendor struct; Amount is minor units.
+type RefundSplit struct {
+	VendorID string            `json:"vendor_id" pedantigo:"required,maxLength=250"`
+	Amount   AmountMinor       `json:"amount_minor,omitempty" pedantigo:"omitempty,gte=0"`
+	Tags     map[string]string `json:"tags,omitempty"`
 }
 
 // Validate enforces the cross-field rule: at least one of OrderID or PaymentID must be provided.

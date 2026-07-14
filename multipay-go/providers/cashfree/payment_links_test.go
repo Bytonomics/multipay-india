@@ -173,3 +173,92 @@ func TestCreatePaymentLink_ForwardsParameters(t *testing.T) {
 		})
 	}
 }
+
+// TestCreatePaymentLink_ForwardsInvoiceSubscriptionHolderName verifies createPaymentLink forwards
+// enable_invoice, the nested link subscription (with reused CreatePlanRequest plan_details), and the
+// customer_bank_acoount_holder_name (vendor's misspelling) to Cashfree.
+func TestCreatePaymentLink_ForwardsInvoiceSubscriptionHolderName(t *testing.T) {
+	var capturedReq *cf.CreateLinkRequest
+	mockHTTPClient := &http.Client{
+		Transport: cfRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+			body, err := io.ReadAll(req.Body)
+			if err != nil {
+				return nil, err
+			}
+			if unmarshalErr := json.Unmarshal(body, &capturedReq); unmarshalErr != nil {
+				t.Fatalf("failed to unmarshal request body: %v (body: %s)", unmarshalErr, string(body))
+			}
+			linkID := "link_1"
+			status := "ACTIVE"
+			amount := float32(500.0)
+			currency := "INR"
+			mockLink := &cf.LinkEntity{LinkId: &linkID, LinkStatus: &status, LinkAmount: &amount, LinkCurrency: &currency}
+			jsonData, merr := json.Marshal(mockLink)
+			if merr != nil {
+				return nil, merr
+			}
+			return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(string(jsonData)))}, nil
+		}),
+	}
+	adapter, err := NewAdapter(&Config{ClientID: "test_client_id", ClientSecret: "test_client_secret", Environment: domain.EnvironmentSandbox, AccountID: "test_account", Logger: ports.NewNoopLogger(), HTTPClient: mockHTTPClient})
+	if err != nil {
+		t.Fatalf("failed to create adapter: %v", err)
+	}
+
+	enableInvoice := true
+	req := &domain.CreatePaymentLinkRequest{
+		AmountMinor: 50000,
+		Currency:    domain.Currency("INR"),
+		Purpose:     "Payment",
+		Customer: &domain.CustomerInfo{
+			CustomerID:            "cust_1",
+			Phone:                 "+919876543210",
+			BankAccountHolderName: "Jane Doe",
+		},
+		EnableInvoice: &enableInvoice,
+		Subscription: &domain.LinkSubscription{
+			SubscriptionID:           "linksub_1",
+			AuthorizationAmountMinor: 100000,
+			PlanDetails: &domain.CreatePlanRequest{
+				PlanID:         "plan_1",
+				PlanName:       "Pro",
+				PlanType:       domain.PlanTypePeriodic,
+				Currency:       domain.Currency("INR"),
+				MaxAmountMinor: 100000,
+				AmountMinor:    50000,
+				Interval:       1,
+				IntervalType:   domain.PlanIntervalMonth,
+			},
+		},
+	}
+
+	createPaymentLink(context.Background(), adapter, req)
+
+	if capturedReq == nil {
+		t.Fatal("request was not captured")
+	}
+	// enable_invoice forwarded
+	if capturedReq.EnableInvoice == nil || !*capturedReq.EnableInvoice {
+		t.Errorf("expected enable_invoice=true, got %v", capturedReq.EnableInvoice)
+	}
+	// customer_bank_acoount_holder_name forwarded (vendor misspelling)
+	if capturedReq.CustomerDetails.CustomerBankAcoountHolderName == nil || *capturedReq.CustomerDetails.CustomerBankAcoountHolderName != "Jane Doe" {
+		t.Errorf("expected customer_bank_acoount_holder_name=Jane Doe, got %v", capturedReq.CustomerDetails.CustomerBankAcoountHolderName)
+	}
+	// subscription forwarded with reused plan_details (amount converted minor→major)
+	if capturedReq.Subscription == nil {
+		t.Fatal("subscription not forwarded")
+	}
+	if capturedReq.Subscription.SubscriptionId == nil || *capturedReq.Subscription.SubscriptionId != "linksub_1" {
+		t.Errorf("expected subscription.subscription_id=linksub_1, got %v", capturedReq.Subscription.SubscriptionId)
+	}
+	if capturedReq.Subscription.AuthorizationAmount == nil || *capturedReq.Subscription.AuthorizationAmount != float32(1000.0) {
+		t.Errorf("expected subscription.authorization_amount=1000.00 (100000 minor INR), got %v", capturedReq.Subscription.AuthorizationAmount)
+	}
+	if capturedReq.Subscription.PlanDetails == nil || capturedReq.Subscription.PlanDetails.PlanId != "plan_1" {
+		t.Errorf("expected subscription.plan_details.plan_id=plan_1, got %v", capturedReq.Subscription.PlanDetails)
+	}
+	if capturedReq.Subscription.PlanDetails != nil && capturedReq.Subscription.PlanDetails.PlanMaxAmount != float32(1000.0) {
+		t.Errorf("expected plan_max_amount=1000.00 (100000 minor INR), got %v", capturedReq.Subscription.PlanDetails.PlanMaxAmount)
+	}
+}

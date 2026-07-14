@@ -157,6 +157,43 @@ if err := createPlanValidator.Validate(req); err != nil {
   - **Note**: CreateSubscription auto-creates a plan if PlanDetails is provided (2-step SDK call internally)
   - Update supports `schedule_change_at` ("now" or "cycle_end")
 
+### Subscription Request Field Coverage (both providers)
+
+The canonical subscription request structs (`CreatePlanRequest`, `CreateSubscriptionRequest`,
+`ChargeSubscriptionRequest`, `ChangePlanRequest`, `ResumeSubscriptionRequest`) carry the **union** of
+fields both vendors support. Each adapter copies only the fields its vendor understands; the other
+adapter ignores the rest (that is correct, not a drop). Nested vendor structures are mirrored as typed
+canonical structs in `domain/subscription_extras.go` (never `map[string]any`). All money fields are
+minor units; the Cashfree adapter converts to major units via `currencyutils.AmountMinorToMajor`, while
+Razorpay passes minor units through.
+
+**`CreatePlanRequest`** — adds `Description` (Razorpay `item.description`; Cashfree uses `Note`→`plan_note`).
+
+**`CreateSubscriptionRequest`** — adds:
+- `TotalCount` (Razorpay `total_count`, MANDATORY unless `end_at`): the adapter sends it
+  UNCONDITIONALLY, preferring `TotalCount` and falling back to `PlanDetails.MaxCycles`. Cashfree ignores it.
+- `Quantity`, `OfferID`, `Addons` (Razorpay-only).
+- `AuthorizationDetails` (`authorization_amount`(minor→major), `authorization_amount_refund`,
+  `payment_methods`), `Meta` (`notification_channel`, `session_id_expiry`; `return_url` stays first-class),
+  `BankDetails` (TPV `customer_bank_*` on the subscription customer), `PaymentSplits` (Easy Split) — all Cashfree-only.
+- `CustomerNotify` (`*bool`, Razorpay `customer_notify`): the adapter forwards it ONLY when the caller sets
+  it (true→1, false→0) and imposes NO default — nil omits the field. Cashfree ignores it.
+- `CfOrderID` (Cashfree `cf_order_id`, on the vendored SDK request struct; attaches the subscription to a
+  pre-created order). Empty ⇒ omitted. Razorpay ignores it.
+
+**`ChargeSubscriptionRequest`** — adds `PaymentScheduleDate` (Cashfree `payment_schedule_date`, date-only,
+future-dated charge) and `Description` (Razorpay addon `item.description`). `subscription_session_id` /
+`payment_method` on the Cashfree SDK payment struct belong to the AUTH path, not this CHARGE-only adapter,
+and are intentionally left unset.
+
+**`ChangePlanRequest`** — adds `OfferID`, `Quantity`, `RemainingCount`, `StartAt`, `CustomerNotify`
+(Razorpay Update-Subscription params). Cashfree's `CHANGE_PLAN` action supports only `plan_id`, so it
+ignores these.
+
+**`ResumeSubscriptionRequest`** — adds `NextScheduledTime`. Cashfree REQUIRES
+`action_details.next_scheduled_time` for the `ACTIVATE` action (it rejects an ACTIVATE with no
+action_details); the adapter forwards it when set. Razorpay's Resume has no equivalent and ignores it.
+
 ### Subscription Upgrade Orchestration
 
 **UpgradeSubscription(ctx, *UpgradeSubscriptionRequest) (*UpgradeResult, error)**
@@ -443,6 +480,8 @@ type ProviderAdapter interface {
 ```
 
 All methods accept typed request structs from `domain/` (e.g., `*domain.CreateOrderRequest`) and return typed response structs (e.g., `*domain.Order`). Request structs and client methods do not carry a provider field; provider selection happens once at client construction via `ClientConfig.Provider`. Provider SDK types never leak outside adapters. Both adapters have compile-time interface checks: `var _ ports.ProviderAdapter = (*Adapter)(nil)`.
+
+**Full vendor field parity.** The shared `CreateOrderRequest` / `CreateRefundRequest` / `CreatePaymentLinkRequest` carry the UNION of every field either vendor's payload supports, mirrored as typed nested structs in `domain/order_extras.go` (`CartDetails`, `CartAddress`, `CartItem`, `TerminalDetails`, `VendorSplit`, `OrderProducts`, `OrderPaymentMethodsFilters`/`CardBinFilters`/`CardFilter`, `OfferFilters`, `RefundSplit`) — never `map[string]any`. Each adapter copies the fields its vendor supports and ignores the rest (Cashfree: cart/terminal/splits/order_meta filters/products/TPV bank fields/refund_speed+splits/link_meta; Razorpay: partial_payment + first_payment_min_amount, refund `speed`, link `reminder_enable` + `first_min_partial_amount` + `upi_link`). Cashfree payment-link-only additions: `EnableInvoice` (`enable_invoice`), `Subscription` (`LinkSubscription`, whose `PlanDetails` REUSES `CreatePlanRequest` — no duplicate plan type), and `CustomerInfo.BankAccountHolderName` (`customer_bank_acoount_holder_name`, vendor's misspelling). Money nested fields are `AmountMinor`; the Cashfree adapter converts to major units via `currencyutils`. `RefundSpeed` is a canonical UPPERCASE enum (`STANDARD`/`INSTANT`) mapped per-adapter (Cashfree verbatim; Razorpay `STANDARD→normal`, `INSTANT→optimum`). **The library imposes NO default on any optional field — a nil/empty canonical value means the field is omitted from the vendor request, so the caller (e.g. the cloud) owns every value (including `customer_notify`, `enable_invoice`, `upi_link`).** Optional-field forwarding is covered by adapter outbound-capture tests (`providers/*/parity_test.go` + `*_test.go`).
 
 ### 5.1 Provider-Specific Details Capture (Discriminated Union Pattern)
 

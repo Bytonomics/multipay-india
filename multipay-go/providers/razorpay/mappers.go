@@ -50,19 +50,39 @@ type razorpayPlanCreateRequest struct {
 }
 
 type razorpaySubscriptionCreateRequest struct {
-	PlanID         string         `json:"plan_id"`
-	CustomerNotify int            `json:"customer_notify"`
-	CustomerEmail  string         `json:"customer_email,omitempty"`
-	CustomerPhone  string         `json:"customer_phone,omitempty"`
-	CustomerName   string         `json:"customer_name,omitempty"`
-	ExpireBy       int64          `json:"expire_by,omitempty"`
-	StartAt        int64          `json:"start_at,omitempty"`
-	Notes          map[string]any `json:"notes,omitempty"`
+	PlanID string `json:"plan_id"`
+	// CustomerNotify is a *int with omitempty so the library sends customer_notify ONLY when the
+	// caller set canonical CustomerNotify; nil ⇒ omitted (Razorpay applies its own default). The
+	// library imposes no default of its own.
+	CustomerNotify *int `json:"customer_notify,omitempty"`
+	// TotalCount is Razorpay's number of billing cycles the customer will be charged.
+	// Sourced from the canonical plan's MaxCycles (which otherwise only reached the plan's
+	// notes as free-form metadata Razorpay ignores). Omitted when the caller did not bound cycles.
+	TotalCount    int64           `json:"total_count,omitempty"`
+	Quantity      int32           `json:"quantity,omitempty"`
+	OfferID       string          `json:"offer_id,omitempty"`
+	Addons        []razorpayAddon `json:"addons,omitempty"`
+	CustomerEmail string          `json:"customer_email,omitempty"`
+	CustomerPhone string          `json:"customer_phone,omitempty"`
+	CustomerName  string          `json:"customer_name,omitempty"`
+	ExpireBy      int64           `json:"expire_by,omitempty"`
+	StartAt       int64           `json:"start_at,omitempty"`
+	Notes         map[string]any  `json:"notes,omitempty"`
+}
+
+// razorpayAddon is a subscription addon (item collected upfront during authorization).
+type razorpayAddon struct {
+	Item razorpayItem `json:"item"`
 }
 
 type razorpayChangePlanRequest struct {
-	PlanID           string `json:"plan_id"`
+	PlanID           string `json:"plan_id,omitempty"`
 	ScheduleChangeAt string `json:"schedule_change_at"`
+	OfferID          string `json:"offer_id,omitempty"`
+	Quantity         int32  `json:"quantity,omitempty"`
+	RemainingCount   int32  `json:"remaining_count,omitempty"`
+	StartAt          int64  `json:"start_at,omitempty"`
+	CustomerNotify   *bool  `json:"customer_notify,omitempty"`
 }
 
 type razorpayInvoiceListRequest struct {

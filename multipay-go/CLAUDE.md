@@ -16,6 +16,47 @@ The library is a **dependency** (imported by other Go projects), not a standalon
 
 ---
 
+## Vendor API Documentation Reference
+
+The official documentation page for every vendor API this library calls. When changing an adapter mapper,
+the authority for which request fields exist and which are mandatory is the vendor's official docs (NOT the
+vendored SDK — Razorpay's SDK is map-based and does not encode mandatory-ness). Keep this table in sync when
+adding or changing an operation.
+
+### Cashfree (PG / next-gen — `docs.cashfree.com`)
+
+| Operation | Canonical request type | Adapter file | Official doc |
+|-----------|------------------------|--------------|--------------|
+| Create Order | `CreateOrderRequest` | `providers/cashfree/orders.go` | https://www.cashfree.com/docs/reference/pgcreateorder |
+| Create Refund | `CreateRefundRequest` | `providers/cashfree/refunds.go` | https://www.cashfree.com/docs/api-reference/payments/latest/refunds/create |
+| Create Payment Link | `CreatePaymentLinkRequest` | `providers/cashfree/payment_links.go` | https://www.cashfree.com/docs/reference/pgcreatelink |
+| Create Plan | `CreatePlanRequest` | `providers/cashfree/plans.go` | https://www.cashfree.com/docs/api-reference/payments/latest/subscription/plans/create |
+| Create Subscription | `CreateSubscriptionRequest` | `providers/cashfree/subscriptions.go` | https://www.cashfree.com/docs/api-reference/payments/latest/subscription/mandate/create |
+| Raise Charge (Create Payment) | `ChargeSubscriptionRequest` | `providers/cashfree/subscriptions.go` | https://www.cashfree.com/docs/api-reference/payments/latest/subscription/payment/raise |
+| Manage Subscription (cancel/pause/activate/change-plan) | `Cancel/Pause/Resume/ChangePlanRequest` | `providers/cashfree/subscriptions.go` | https://www.cashfree.com/docs/api-reference/payments/latest/subscription/mandate/manage |
+| Subscription Webhooks | — (event parsing) | `providers/cashfree/webhooks.go` | https://www.cashfree.com/docs/api-reference/payments/latest/subscription/webhooks |
+
+### Razorpay (`razorpay.com/docs/api`)
+
+| Operation | Canonical request type | Adapter file | Official doc |
+|-----------|------------------------|--------------|--------------|
+| Create Order | `CreateOrderRequest` | `providers/razorpay/orders.go` | https://razorpay.com/docs/api/orders/create/ |
+| Capture Payment | `CapturePaymentRequest` | `providers/razorpay/payments.go` | https://razorpay.com/docs/api/payments/capture/ |
+| Create Refund | `CreateRefundRequest` | `providers/razorpay/refunds.go` | https://razorpay.com/docs/api/refunds/create-normal/ |
+| Create Payment Link | `CreatePaymentLinkRequest` | `providers/razorpay/payment_links.go` | https://razorpay.com/docs/api/payments/payment-links/create-standard/ |
+| Create Plan | `CreatePlanRequest` | `providers/razorpay/plans.go` | https://razorpay.com/docs/api/payments/subscriptions/create-plan/ |
+| Create Subscription | `CreateSubscriptionRequest` | `providers/razorpay/subscriptions.go` | https://razorpay.com/docs/api/payments/subscriptions/create-subscription/ |
+| Create Addon (charge) | `ChargeSubscriptionRequest` | `providers/razorpay/subscriptions.go` | https://razorpay.com/docs/api/payments/subscriptions/#create-an-addon |
+| Update Subscription (change plan) | `ChangePlanRequest` | `providers/razorpay/subscriptions.go` | https://razorpay.com/docs/api/payments/subscriptions/update-subscription/ |
+| Subscription Webhooks | — (event parsing) | `providers/razorpay/webhooks.go` | https://razorpay.com/docs/webhooks/subscriptions/ |
+
+> **Field-coverage rule.** Every field the vendor payload supports (mandatory AND optional) should have a
+> canonical request field and be copied by the adapter. When a vendor mandatory field is missing from the
+> canonical struct or not forwarded, it is a correctness bug. Verify against the doc pages above, not the
+> vendored SDK.
+
+---
+
 ## Build, Test, and Lint Commands
 
 **Never run `go` commands directly. Always use Makefile targets.**

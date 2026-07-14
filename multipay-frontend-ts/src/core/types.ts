@@ -156,4 +156,8 @@ export interface ChargeSubscriptionRequest {
   amount_minor: number;
   currency: string;
   remarks?: string;
+  /** Future-dated charge (Cashfree payment_schedule_date, date-only "YYYY-MM-DD"). Cashfree-only. */
+  payment_schedule_date?: string;
+  /** Addon item description (Razorpay item.description). Razorpay-only. */
+  description?: string;
 }

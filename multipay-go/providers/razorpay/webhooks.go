@@ -35,6 +35,7 @@ var webhookEventMap = map[string]domain.WebhookEventType{
 	"subscription.cancelled":      domain.EventSubCancelled,
 	"subscription.completed":      domain.EventSubCompleted,
 	"subscription.updated":        domain.EventSubUpdated,
+	"subscription.expired":        domain.EventSubExpired, // mandate/subscription expiry (drives EXPIRED status)
 }
 
 // razorpayWebhookPayload represents the Razorpay webhook payload structure.

@@ -36,12 +36,64 @@ func createSubscription(ctx context.Context, adapter *Adapter, req *domain.Creat
 		cfReq.CustomerDetails.CustomerName = &req.CustomerName
 	}
 
-	// Set subscription metadata (ReturnUrl for mandate-authorization redirect)
-	if req.ReturnURL != "" {
-		returnUrl := req.ReturnURL
-		cfReq.SubscriptionMeta = &cf.CreateSubscriptionRequestSubscriptionMeta{
-			ReturnUrl: &returnUrl,
+	// TPV bank details on the subscription customer (eNACH / physical-NACH pre-binding).
+	if req.BankDetails != nil {
+		cfReq.CustomerDetails.CustomerBankAccountHolderName = optStr(req.BankDetails.AccountHolderName)
+		cfReq.CustomerDetails.CustomerBankAccountNumber = optStr(req.BankDetails.AccountNumber)
+		cfReq.CustomerDetails.CustomerBankIfsc = optStr(req.BankDetails.IFSC)
+		cfReq.CustomerDetails.CustomerBankCode = optStr(req.BankDetails.BankCode)
+		cfReq.CustomerDetails.CustomerBankAccountType = optStr(req.BankDetails.AccountType)
+	}
+
+	// Resolve the request currency for the authorization-amount conversion. Prefer the inline
+	// plan's currency (subscriptions with an existing PlanID carry currency on the plan itself,
+	// which Cashfree already knows, so the authorization amount for those is expected in that
+	// currency). Default to INR when no inline plan currency is present.
+	subCurrency := "INR"
+	if req.PlanDetails != nil && req.PlanDetails.Currency != "" {
+		subCurrency = string(req.PlanDetails.Currency)
+	}
+
+	// Authorization details (mandate-authorization step).
+	if req.AuthorizationDetails != nil {
+		authDetails := &cf.CreateSubscriptionRequestAuthorizationDetails{
+			AuthorizationAmountRefund: req.AuthorizationDetails.AuthorizationAmountRefund,
+			PaymentMethods:            req.AuthorizationDetails.PaymentMethods,
 		}
+		if req.AuthorizationDetails.AuthorizationAmountMinor > 0 {
+			authAmt := float32(currencyutils.AmountMinorToMajor(int64(req.AuthorizationDetails.AuthorizationAmountMinor), subCurrency))
+			authDetails.AuthorizationAmount = &authAmt
+		}
+		cfReq.AuthorizationDetails = authDetails
+	}
+
+	// Set subscription metadata (ReturnUrl for mandate-authorization redirect, plus optional
+	// notification_channel / session_id_expiry extras).
+	if req.ReturnURL != "" || req.Meta != nil {
+		meta := &cf.CreateSubscriptionRequestSubscriptionMeta{}
+		if req.ReturnURL != "" {
+			returnUrl := req.ReturnURL
+			meta.ReturnUrl = &returnUrl
+		}
+		if req.Meta != nil {
+			meta.NotificationChannel = req.Meta.NotificationChannel
+			meta.SessionIdExpiry = optStr(req.Meta.SessionIDExpiry)
+		}
+		cfReq.SubscriptionMeta = meta
+	}
+
+	// Easy Split payment splits.
+	if len(req.PaymentSplits) > 0 {
+		splits := make([]cf.SubscriptionPaymentSplitItem, 0, len(req.PaymentSplits))
+		for i := range req.PaymentSplits {
+			vendorID := req.PaymentSplits[i].VendorID
+			pct := float32(req.PaymentSplits[i].Percentage)
+			splits = append(splits, cf.SubscriptionPaymentSplitItem{
+				VendorId:   optStr(vendorID),
+				Percentage: &pct,
+			})
+		}
+		cfReq.SubscriptionPaymentSplits = splits
 	}
 
 	// Convert and set subscription tags (convert from map[string]string to map[string]any)
@@ -73,6 +125,10 @@ func createSubscription(ctx context.Context, adapter *Adapter, req *domain.Creat
 		chargeStr := req.FirstChargeTime.Format("2006-01-02T15:04:05-07:00")
 		cfReq.SubscriptionFirstChargeTime = &chargeStr
 	}
+
+	// Forward optional cf_order_id (attaches the subscription to a pre-created Cashfree order).
+	// optStr returns nil for "" so an empty value is omitted (the library imposes no default).
+	cfReq.CfOrderId = optStr(req.CfOrderID)
 
 	// Call Cashfree SDK
 	cfSub, httpResp, err := adapter.cfClient.SubsCreateSubscriptionWithContext(
@@ -290,9 +346,18 @@ func resumeSubscription(ctx context.Context, adapter *Adapter, req *domain.Resum
 		return nil, fmt.Errorf("request is required: %w", domain.ErrInvalidRequest)
 	}
 
+	// Cashfree REQUIRES action_details.next_scheduled_time for the ACTIVATE action — it is the
+	// date the resumed subscription's next charge is scheduled. Send it when the caller provides
+	// NextScheduledTime; Cashfree rejects an ACTIVATE with no action_details.
 	cfReq := &cf.ManageSubscriptionRequest{
 		SubscriptionId: req.SubscriptionID,
 		Action:         "ACTIVATE",
+	}
+	if req.NextScheduledTime != nil {
+		nextStr := req.NextScheduledTime.Format("2006-01-02T15:04:05-07:00")
+		cfReq.ActionDetails = &cf.ManageSubscriptionRequestActionDetails{
+			NextScheduledTime: &nextStr,
+		}
 	}
 
 	// Call Cashfree SDK
@@ -482,13 +547,22 @@ func chargeSubscription(ctx context.Context, adapter *Adapter, req *domain.Charg
 	// Convert amount from minor to major units
 	amountMajor := currencyutils.AmountMinorToMajor(int64(req.AmountMinor), string(req.Currency))
 
-	// Build Cashfree CreateSubscriptionPaymentRequest
+	// Build Cashfree CreateSubscriptionPaymentRequest.
+	// NOTE: cf.CreateSubscriptionPaymentRequest also carries SubscriptionSessionId and
+	// PaymentMethod fields — those belong to the AUTH (mandate-authorization) path, not the
+	// CHARGE path this adapter implements, so they are intentionally left unset here.
 	cfReq := &cf.CreateSubscriptionPaymentRequest{
 		SubscriptionId: req.SubscriptionID,
 		PaymentId:      req.PaymentRef, // caller-supplied unique id
 		PaymentAmount:  ptrFloat32(float32(amountMajor)),
 		PaymentType:    "CHARGE",
 		PaymentRemarks: optStr(req.Remarks),
+	}
+
+	// Future-dated charge (date-only). Cashfree expects "YYYY-MM-DD".
+	if req.PaymentScheduleDate != nil {
+		scheduleStr := req.PaymentScheduleDate.Format("2006-01-02")
+		cfReq.PaymentScheduleDate = &scheduleStr
 	}
 
 	// Engage Cashfree's NATIVE idempotency for the proration charge so a webhook replay (e.g. an

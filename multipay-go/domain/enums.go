@@ -208,6 +208,32 @@ func (w WebhookEventType) IsValid() bool {
 	return false
 }
 
+// RefundSpeed is the canonical refund-settlement speed. Values are UPPERCASE and
+// map per-adapter to each vendor's wire spelling:
+//
+//	Cashfree refund_speed: STANDARD | INSTANT (verbatim)
+//	Razorpay speed:        STANDARD→normal, INSTANT→optimum
+type RefundSpeed string
+
+const (
+	RefundSpeedStandard RefundSpeed = "STANDARD"
+	RefundSpeedInstant  RefundSpeed = "INSTANT"
+)
+
+// String returns the string representation of the RefundSpeed.
+func (r RefundSpeed) String() string {
+	return string(r)
+}
+
+// IsValid checks if the RefundSpeed value is valid.
+func (r RefundSpeed) IsValid() bool {
+	switch r {
+	case RefundSpeedStandard, RefundSpeedInstant:
+		return true
+	}
+	return false
+}
+
 // PaymentLinkStatus represents the payment link lifecycle.
 type PaymentLinkStatus string
 

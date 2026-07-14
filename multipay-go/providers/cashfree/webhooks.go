@@ -187,11 +187,11 @@ func parseEvent(ctx context.Context, body []byte, headers map[string]string) (*d
 		event.EventType = domain.EventSubPreDebitNotice
 		populateSubscriptionFromEventData(event, envelope.Data)
 
-	case "SUBSCRIPTION_PAYMENT_CONTROLLED_NOTIFICATION_STATUS":
+	case "SUBSCRIPTION_CONTROLLED_NOTIFICATION_STATUS":
 		event.EventType = domain.EventSubPreDebitNotice
 		populateSubscriptionFromEventData(event, envelope.Data)
 
-	case "SUBSCRIPTION_PAYMENT_CONTROLLED_EXECUTION_STATUS":
+	case "SUBSCRIPTION_CONTROLLED_EXECUTION_STATUS":
 		// Route by inner status: SUCCESS → EventSubCharged, FAILED → EventSubPaymentFailed
 		type cfControlledExecutionData struct {
 			SubscriptionDetails struct {

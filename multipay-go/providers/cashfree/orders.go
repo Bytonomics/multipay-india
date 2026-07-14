@@ -40,6 +40,31 @@ func createOrder(ctx context.Context, adapter *Adapter, req *domain.CreateOrderR
 		cfReq.CustomerDetails.CustomerEmail = &email
 	}
 
+	// Guard optional CustomerName (only if non-empty) — mirrors the payment-link and
+	// subscription adapters, which both forward customer_name to Cashfree.
+	if req.Customer.Name != "" {
+		name := req.Customer.Name
+		cfReq.CustomerDetails.CustomerName = &name
+	}
+
+	// Forward optional TPV (Third-Party Validation) bank fields on the customer.
+	if req.Customer.BankAccountNumber != "" {
+		v := req.Customer.BankAccountNumber
+		cfReq.CustomerDetails.CustomerBankAccountNumber = &v
+	}
+	if req.Customer.BankIFSC != "" {
+		v := req.Customer.BankIFSC
+		cfReq.CustomerDetails.CustomerBankIfsc = &v
+	}
+	if req.Customer.BankCode != 0 {
+		v := float32(req.Customer.BankCode)
+		cfReq.CustomerDetails.CustomerBankCode = &v
+	}
+	if req.Customer.UID != "" {
+		v := req.Customer.UID
+		cfReq.CustomerDetails.CustomerUid = &v
+	}
+
 	// Add optional OrderId
 	if req.OrderID != "" {
 		orderId := req.OrderID
@@ -74,7 +99,43 @@ func createOrder(ctx context.Context, adapter *Adapter, req *domain.CreateOrderR
 		notifyUrl := req.NotifyURL
 		orderMeta.NotifyUrl = &notifyUrl
 	}
+	// Forward optional order_meta.payment_methods (comma-separated allowed modes).
+	if req.PaymentMethods != "" {
+		orderMeta.PaymentMethods = req.PaymentMethods
+	}
+	// Forward optional order_meta.payment_methods_filters (card bin/scheme/bank/suffix).
+	if req.PaymentMethodsFilters != nil {
+		orderMeta.PaymentMethodsFilters = mapPaymentMethodsFilters(req.PaymentMethodsFilters)
+	}
+	// Forward optional order_meta.offer_filters (allow/deny offers).
+	if req.OfferFilters != nil {
+		action := req.OfferFilters.Action
+		orderMeta.OfferFilters = &cf.OrderMetaOfferFilters{
+			Values: req.OfferFilters.Values,
+		}
+		if action != "" {
+			orderMeta.OfferFilters.Action = &action
+		}
+	}
+	// Forward optional order_meta.upi_app_priority.
+	if len(req.UpiAppPriority) > 0 {
+		orderMeta.UpiAppPriority = req.UpiAppPriority
+	}
 	cfReq.OrderMeta = orderMeta
+
+	// Forward optional cart_details, terminal, order_splits and products.
+	if req.CartDetails != nil {
+		cfReq.CartDetails = mapCartDetails(req.CartDetails, string(req.Currency))
+	}
+	if req.Terminal != nil {
+		cfReq.Terminal = mapTerminalDetails(req.Terminal)
+	}
+	if len(req.OrderSplits) > 0 {
+		cfReq.OrderSplits = mapVendorSplits(req.OrderSplits, string(req.Currency))
+	}
+	if req.Products != nil {
+		cfReq.Products = mapOrderProducts(req.Products)
+	}
 
 	// Call Cashfree SDK
 	cfOrder, httpResp, err := adapter.cfClient.PGCreateOrderWithContext(

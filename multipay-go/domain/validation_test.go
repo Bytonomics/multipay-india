@@ -226,6 +226,46 @@ func TestCreatePlanRequest_Validate(t *testing.T) {
 	}
 }
 
+func TestPauseSubscriptionRequest_Validate(t *testing.T) {
+	cases := []struct {
+		name    string
+		pauseAt string
+		wantErr bool
+	}{
+		{"unset ok", "", false},
+		{"now ok", "now", false},
+		{"other value rejected", "later", true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			r := &PauseSubscriptionRequest{SubscriptionID: "sub_1", PauseAt: c.pauseAt}
+			if err := r.Validate(); (err != nil) != c.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, c.wantErr)
+			}
+		})
+	}
+}
+
+func TestResumeSubscriptionRequest_Validate(t *testing.T) {
+	cases := []struct {
+		name     string
+		resumeAt string
+		wantErr  bool
+	}{
+		{"unset ok", "", false},
+		{"now ok", "now", false},
+		{"other value rejected", "later", true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			r := &ResumeSubscriptionRequest{SubscriptionID: "sub_1", ResumeAt: c.resumeAt}
+			if err := r.Validate(); (err != nil) != c.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, c.wantErr)
+			}
+		})
+	}
+}
+
 func TestListRefundsRequest_Validate(t *testing.T) {
 	tests := []struct {
 		name    string

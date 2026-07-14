@@ -46,14 +46,53 @@ func createSubscription(ctx context.Context, adapter *Adapter, req *domain.Creat
 
 	// Build subscription data as typed struct
 	subData := &razorpaySubscriptionCreateRequest{
-		PlanID:         planID,
-		CustomerNotify: 1,
-		CustomerEmail:  req.CustomerEmail,
-		CustomerPhone:  req.CustomerPhone,
-		CustomerName:   req.CustomerName,
+		PlanID:        planID,
+		CustomerEmail: req.CustomerEmail,
+		CustomerPhone: req.CustomerPhone,
+		CustomerName:  req.CustomerName,
+	}
+	// customer_notify: forward the caller's choice verbatim (true→1, false→0). The library imposes
+	// NO default — nil leaves it omitted so Razorpay applies its own default.
+	if req.CustomerNotify != nil {
+		notify := 0
+		if *req.CustomerNotify {
+			notify = 1
+		}
+		subData.CustomerNotify = &notify
+	}
+
+	// total_count is MANDATORY for Razorpay (unless end_at is used) — send it unconditionally.
+	// Prefer the top-level canonical TotalCount (which the existing-PlanID path can supply);
+	// fall back to the inline plan's MaxCycles. When neither bounds the cycles, it is omitted
+	// (omitempty) — the caller must then supply total_count via TotalCount or Razorpay rejects
+	// the subscription.
+	switch {
+	case req.TotalCount > 0:
+		subData.TotalCount = int64(req.TotalCount)
+	case req.PlanDetails != nil && req.PlanDetails.MaxCycles > 0:
+		subData.TotalCount = int64(req.PlanDetails.MaxCycles)
 	}
 
 	// Add optional fields
+	if req.Quantity > 0 {
+		subData.Quantity = req.Quantity
+	}
+	if req.OfferID != "" {
+		subData.OfferID = req.OfferID
+	}
+	if len(req.Addons) > 0 {
+		addons := make([]razorpayAddon, 0, len(req.Addons))
+		for i := range req.Addons {
+			addons = append(addons, razorpayAddon{
+				Item: razorpayItem{
+					Name:     req.Addons[i].Name,
+					Amount:   int64(req.Addons[i].AmountMinor), // Razorpay native minor units
+					Currency: string(req.Addons[i].Currency),
+				},
+			})
+		}
+		subData.Addons = addons
+	}
 	if req.ExpiresAt != nil {
 		subData.ExpireBy = req.ExpiresAt.Unix()
 	}
@@ -134,8 +173,15 @@ func cancelSubscription(ctx context.Context, adapter *Adapter, req *domain.Cance
 		return nil, fmt.Errorf("request is required: %w", domain.ErrInvalidRequest)
 	}
 
+	// Forward the optional cancel_at_cycle_end body param (Razorpay Cancel Subscription).
+	// nil → immediate cancel (nil data map); non-nil → cancel per the requested timing.
+	var cancelData map[string]any
+	if req.CancelAtCycleEnd != nil {
+		cancelData = map[string]any{"cancel_at_cycle_end": *req.CancelAtCycleEnd}
+	}
+
 	// Call Razorpay Subscription.Cancel()
-	subResp, err := adapter.client.Subscription.Cancel(req.SubscriptionID, nil, nil)
+	subResp, err := adapter.client.Subscription.Cancel(req.SubscriptionID, cancelData, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to cancel subscription on razorpay: %w", domain.ErrProviderError)
 	}
@@ -162,8 +208,14 @@ func pauseSubscription(ctx context.Context, adapter *Adapter, req *domain.PauseS
 		return nil, fmt.Errorf("request is required: %w", domain.ErrInvalidRequest)
 	}
 
+	// Forward the optional pause_at body param (only "now" is accepted; validated at the boundary).
+	var pauseData map[string]any
+	if req.PauseAt != "" {
+		pauseData = map[string]any{"pause_at": req.PauseAt}
+	}
+
 	// Call Razorpay Subscription.Pause()
-	subResp, err := adapter.client.Subscription.Pause(req.SubscriptionID, nil, nil)
+	subResp, err := adapter.client.Subscription.Pause(req.SubscriptionID, pauseData, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to pause subscription on razorpay: %w", domain.ErrProviderError)
 	}
@@ -190,8 +242,14 @@ func resumeSubscription(ctx context.Context, adapter *Adapter, req *domain.Resum
 		return nil, fmt.Errorf("request is required: %w", domain.ErrInvalidRequest)
 	}
 
+	// Forward the optional resume_at body param (only "now" is accepted; validated at the boundary).
+	var resumeData map[string]any
+	if req.ResumeAt != "" {
+		resumeData = map[string]any{"resume_at": req.ResumeAt}
+	}
+
 	// Call Razorpay Subscription.Resume()
-	subResp, err := adapter.client.Subscription.Resume(req.SubscriptionID, nil, nil)
+	subResp, err := adapter.client.Subscription.Resume(req.SubscriptionID, resumeData, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resume subscription on razorpay: %w", domain.ErrProviderError)
 	}
@@ -231,6 +289,13 @@ func changePlan(ctx context.Context, adapter *Adapter, req *domain.ChangePlanReq
 	updateReq := &razorpayChangePlanRequest{
 		PlanID:           req.NewPlanID,
 		ScheduleChangeAt: scheduleAt,
+		OfferID:          req.OfferID,
+		Quantity:         req.Quantity,
+		RemainingCount:   req.RemainingCount,
+		CustomerNotify:   req.CustomerNotify,
+	}
+	if req.StartAt != nil {
+		updateReq.StartAt = req.StartAt.Unix()
 	}
 
 	// Convert typed struct to map for SDK
@@ -306,12 +371,17 @@ func chargeSubscription(ctx context.Context, adapter *Adapter, req *domain.Charg
 		return nil, fmt.Errorf("request is required: %w", domain.ErrInvalidRequest)
 	}
 
-	// Build addon request data as typed struct
+	// Build addon request data as typed struct.
+	// NOTE: item.name is a mandatory Razorpay addon field. We source it from Remarks; if the
+	// caller leaves Remarks empty, Razorpay will reject the addon (mandatory-field risk). The
+	// canonical ChargeSubscriptionRequest keeps Remarks optional because Cashfree's charge path
+	// does not require it — callers targeting Razorpay MUST supply Remarks.
 	addonData := &razorpayAddonRequest{
 		Item: razorpayItem{
-			Name:     req.Remarks,
-			Amount:   int64(req.AmountMinor), // Razorpay native minor units
-			Currency: string(req.Currency),
+			Name:        req.Remarks,
+			Amount:      int64(req.AmountMinor), // Razorpay native minor units
+			Currency:    string(req.Currency),
+			Description: req.Description,
 		},
 		Quantity: 1,
 	}

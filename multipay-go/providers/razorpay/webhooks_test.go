@@ -25,6 +25,7 @@ func TestRazorpayParseEvent_SubscriptionEvents(t *testing.T) {
 		{"subscription.resumed", domain.EventSubResumed},
 		{"subscription.cancelled", domain.EventSubCancelled},
 		{"subscription.completed", domain.EventSubCompleted},
+		{"subscription.expired", domain.EventSubExpired}, // mandate/subscription expiry (was previously unmapped)
 	}
 
 	for _, tt := range tests {

@@ -107,3 +107,72 @@ func TestCreatePaymentLink_ForwardsParameters(t *testing.T) {
 		t.Errorf("expected accept_partial=true, got %v", capturedBody["accept_partial"])
 	}
 }
+
+// TestCreatePaymentLink_ForwardsUpiLink verifies that CreatePaymentLink forwards the canonical
+// UpiLink to Razorpay's upi_link, and omits it when the caller leaves it nil (no imposed default).
+func TestCreatePaymentLink_ForwardsUpiLink(t *testing.T) {
+	newAdapter := func(t *testing.T, capture *map[string]any) *Adapter {
+		t.Helper()
+		mockHTTPClient := &http.Client{
+			Transport: rzRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+				body, err := io.ReadAll(req.Body)
+				if err != nil {
+					return nil, err
+				}
+				if unmarshalErr := json.Unmarshal(body, capture); unmarshalErr != nil {
+					t.Fatalf("failed to unmarshal request body: %v (body: %s)", unmarshalErr, string(body))
+				}
+				resp := map[string]any{"id": "link_1", "status": "created", "amount": 50000}
+				jsonData, merr := json.Marshal(resp)
+				if merr != nil {
+					return nil, merr
+				}
+				return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(string(jsonData)))}, nil
+			}),
+		}
+		adapter, err := NewAdapter(&Config{Key: "rzp_mock_testonly", Secret: "test_secret", Environment: domain.EnvironmentSandbox, HTTPClient: mockHTTPClient})
+		if err != nil {
+			t.Fatalf("failed to create adapter: %v", err)
+		}
+		return adapter
+	}
+
+	baseReq := func() *domain.CreatePaymentLinkRequest {
+		return &domain.CreatePaymentLinkRequest{
+			LinkID:      "link_1",
+			AmountMinor: 50000,
+			Currency:    domain.Currency("INR"),
+			Purpose:     "Payment",
+			Customer:    &domain.CustomerInfo{CustomerID: "c1", Phone: "+919876543210"},
+		}
+	}
+
+	// UpiLink=true → upi_link true forwarded.
+	t.Run("true forwarded", func(t *testing.T) {
+		var captured map[string]any
+		adapter := newAdapter(t, &captured)
+		upiLink := true
+		req := baseReq()
+		req.UpiLink = &upiLink
+		adapter.CreatePaymentLink(context.Background(), req)
+		if captured == nil {
+			t.Fatal("request was not captured")
+		}
+		if v, ok := captured["upi_link"].(bool); !ok || !v {
+			t.Errorf("expected upi_link=true, got %v", captured["upi_link"])
+		}
+	})
+
+	// UpiLink=nil → upi_link omitted (library imposes no default).
+	t.Run("nil omitted", func(t *testing.T) {
+		var captured map[string]any
+		adapter := newAdapter(t, &captured)
+		adapter.CreatePaymentLink(context.Background(), baseReq())
+		if captured == nil {
+			t.Fatal("request was not captured")
+		}
+		if _, present := captured["upi_link"]; present {
+			t.Errorf("expected upi_link to be omitted when nil, got %v", captured["upi_link"])
+		}
+	})
+}

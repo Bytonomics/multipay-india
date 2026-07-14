@@ -15,9 +15,10 @@ func buildPlanCreateData(req *domain.CreatePlanRequest) (map[string]any, error) 
 		Period:   mapPlanIntervalTypeToRazorpay(req.IntervalType),
 		Interval: req.Interval,
 		Item: razorpayItem{
-			Name:     req.PlanName,
-			Amount:   int64(req.AmountMinor),
-			Currency: string(req.Currency),
+			Name:        req.PlanName,
+			Amount:      int64(req.AmountMinor),
+			Currency:    string(req.Currency),
+			Description: req.Description,
 		},
 	}
 	notes := map[string]string{}

@@ -108,9 +108,12 @@ func (a *Adapter) CapturePayment(ctx context.Context, req *domain.CapturePayment
 		return nil, domain.ErrInvalidRequest
 	}
 
-	// Call Razorpay SDK to capture payment
-	// Razorpay Capture method signature: Capture(paymentID string, amount int, options, headers map[string]string)
-	responseMap, err := a.client.Payment.Capture(req.PaymentID, int(req.AmountMinor), nil, nil)
+	// Call Razorpay SDK to capture payment.
+	// Razorpay Capture signature: Capture(paymentID string, amount int, data map[string]any, headers map[string]string).
+	// `currency` is a MANDATORY capture-body param (per Razorpay docs); it is passed via the data map —
+	// the SDK merges `amount` into the same body. Omitting currency causes Razorpay to reject the capture.
+	captureData := map[string]any{"currency": string(req.Currency)}
+	responseMap, err := a.client.Payment.Capture(req.PaymentID, int(req.AmountMinor), captureData, nil)
 	if err != nil {
 		// Check if payment not found
 		if isNotFoundError(err) {

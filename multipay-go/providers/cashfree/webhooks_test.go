@@ -595,6 +595,10 @@ func TestCashfreeParseEvent_DirectSubscriptionEvents(t *testing.T) {
 		{"SUBSCRIPTION_REFUND_STATUS", "SUBSCRIPTION_REFUND_STATUS", domain.EventSubRefund},
 		{"SUBSCRIPTION_PAYMENT_CANCELLED", "SUBSCRIPTION_PAYMENT_CANCELLED", domain.EventSubPaymentCancelled},
 		{"SUBSCRIPTION_PAYMENT_NOTIFICATION_INITIATED", "SUBSCRIPTION_PAYMENT_NOTIFICATION_INITIATED", domain.EventSubPreDebitNotice},
+		// Regression guard: the "controlled" events use SUBSCRIPTION_CONTROLLED_* (NOT
+		// SUBSCRIPTION_PAYMENT_CONTROLLED_*) per Cashfree docs; the adapter previously used the
+		// wrong prefix so these silently fell through to EventUnknown.
+		{"SUBSCRIPTION_CONTROLLED_NOTIFICATION_STATUS", "SUBSCRIPTION_CONTROLLED_NOTIFICATION_STATUS", domain.EventSubPreDebitNotice},
 	}
 
 	for _, tt := range tests {

@@ -21,17 +21,20 @@ type razorpayLinkCustomer struct {
 }
 
 type razorpayCreatePaymentLinkRequest struct {
-	Amount         int64                  `json:"amount"`
-	Currency       string                 `json:"currency"`
-	Description    string                 `json:"description,omitempty"`
-	Notes          domain.Metadata        `json:"notes,omitempty"`
-	Notify         *razorpayNotifyOptions `json:"notify,omitempty"`
-	ExpireBy       int64                  `json:"expire_by,omitempty"`
-	Customer       *razorpayLinkCustomer  `json:"customer,omitempty"`
-	CallbackURL    string                 `json:"callback_url,omitempty"`
-	CallbackMethod string                 `json:"callback_method,omitempty"`
-	ReferenceID    string                 `json:"reference_id,omitempty"`
-	AcceptPartial  bool                   `json:"accept_partial,omitempty"`
+	Amount                int64                  `json:"amount"`
+	Currency              string                 `json:"currency"`
+	Description           string                 `json:"description,omitempty"`
+	Notes                 domain.Metadata        `json:"notes,omitempty"`
+	Notify                *razorpayNotifyOptions `json:"notify,omitempty"`
+	ReminderEnable        bool                   `json:"reminder_enable,omitempty"`
+	ExpireBy              int64                  `json:"expire_by,omitempty"`
+	Customer              *razorpayLinkCustomer  `json:"customer,omitempty"`
+	CallbackURL           string                 `json:"callback_url,omitempty"`
+	CallbackMethod        string                 `json:"callback_method,omitempty"`
+	ReferenceID           string                 `json:"reference_id,omitempty"`
+	AcceptPartial         bool                   `json:"accept_partial,omitempty"`
+	FirstMinPartialAmount int64                  `json:"first_min_partial_amount,omitempty"`
+	UpiLink               bool                   `json:"upi_link,omitempty"`
 }
 
 // D17: Typed response struct for Razorpay Payment Link API responses.
@@ -94,9 +97,21 @@ func (a *Adapter) CreatePaymentLink(ctx context.Context, req *domain.CreatePayme
 		linkReq.ReferenceID = req.LinkID
 	}
 
-	// Populate partial payment flag
+	// Populate partial payment flag + minimum first installment
 	if req.PartialPayment != nil {
 		linkReq.AcceptPartial = *req.PartialPayment
+	}
+	if req.MinPartialAmount != 0 {
+		linkReq.FirstMinPartialAmount = int64(req.MinPartialAmount)
+	}
+	// Populate reminder_enable (canonical AutoReminders → Razorpay reminder_enable).
+	if req.AutoReminders != nil {
+		linkReq.ReminderEnable = *req.AutoReminders
+	}
+	// Populate upi_link (canonical UpiLink → Razorpay upi_link). Forward exactly what the caller
+	// set; nil ⇒ omitted (the library imposes no default).
+	if req.UpiLink != nil {
+		linkReq.UpiLink = *req.UpiLink
 	}
 
 	if req.NotifyEmail != nil && *req.NotifyEmail {

@@ -43,6 +43,32 @@ func createRefund(ctx context.Context, adapter *Adapter, req *domain.CreateRefun
 		cfReq.RefundId = &refundId
 	}
 
+	// Forward optional refund_speed (STANDARD | INSTANT). Canonical values map 1:1 to Cashfree's.
+	if req.RefundSpeed != "" {
+		speed := string(req.RefundSpeed)
+		cfReq.RefundSpeed = &speed
+	}
+
+	// Forward optional refund_splits (reverse an Easy-Split order across vendors).
+	if len(req.RefundSplits) > 0 {
+		splits := make([]cf.OrderCreateRefundRequestRefundSplitsInner, 0, len(req.RefundSplits))
+		for i := range req.RefundSplits {
+			s := &req.RefundSplits[i]
+			inner := cf.OrderCreateRefundRequestRefundSplitsInner{
+				VendorId: s.VendorID,
+			}
+			if s.Amount != 0 {
+				amt := float32(currencyutils.AmountMinorToMajor(int64(s.Amount), string(req.Currency)))
+				inner.Amount = &amt
+			}
+			if len(s.Tags) > 0 {
+				inner.Tags = wrapSplitTags(s.Tags)
+			}
+			splits = append(splits, inner)
+		}
+		cfReq.RefundSplits = splits
+	}
+
 	// Call Cashfree SDK to create refund
 	cfRefund, httpResp, err := adapter.cfClient.PGOrderCreateRefundWithContext(
 		ctx,
