@@ -70,10 +70,16 @@ func TestMapSubscriptionFromResponse_AuthLinkAndCharge(t *testing.T) {
 		t.Fatalf("failed to marshal subscription: %v", err)
 	}
 
-	s := mapSubscriptionFromResponse(&sub, subBytes)
+	s := mapSubscriptionFromResponse(domain.EnvironmentSandbox, &sub, subBytes)
 
 	if s.AuthLink != "https://rzp.io/i/z3b1R61A9" {
 		t.Fatalf("expected AuthLink='https://rzp.io/i/z3b1R61A9', got '%s'", s.AuthLink)
+	}
+	if s.AuthSessionID != "" {
+		t.Fatalf("expected AuthSessionID empty for Razorpay, got '%s'", s.AuthSessionID)
+	}
+	if s.Environment != domain.EnvironmentSandbox {
+		t.Fatalf("expected Environment=SANDBOX, got '%s'", s.Environment)
 	}
 
 	if s.PlanID != "plan_00000000000001" {

@@ -75,17 +75,28 @@ All services share the same `Adapter`, `Validator`, `Pipeline`, `Logger`, and `C
 
 Plans and Subscriptions are **first-class services** on both Cashfree and Razorpay. Unlike capability-gated services (Orders, Payments, Refunds, Instruments, Payment Links), Plans and Subscriptions do NOT require capability validation — both providers fully support all operations.
 
-### Subscription AuthLink Population (Cashfree)
+### Subscription Authorization Fields (AuthLink / AuthSessionID / Environment)
 
-The canonical `domain.Subscription.AuthLink` field holds the session ID that the Cashfree JS SDK uses for the mandate authorization step. During mapping via `MapSubscriptionEntityToCanonical()`, the adapter populates `AuthLink` from the Cashfree response field `SubscriptionSessionId`:
+The canonical `domain.Subscription` exposes three provider-neutral authorization fields. They are populated
+differently per provider, but the canonical field names never carry a provider name:
 
-```go
-// Cashfree returns the mandate-authorization handle as the subscription session id
-// (used by the Cashfree JS SDK for the auth step); map it to the canonical AuthLink.
-authLink := StringPtrToStr(entity.SubscriptionSessionId)
-```
+- **`Subscription.AuthLink`** is now STRICTLY a redirect URL — Razorpay's `short_url`. It is EMPTY for
+  Cashfree (Cashfree does not authorize via a redirect URL).
+- **`Subscription.AuthSessionID`** (new) holds Cashfree's `subscription_session_id` — an opaque JS-SDK
+  mandate-auth handle consumed by the Cashfree JS SDK `subscriptionsCheckout`. It is empty for Razorpay.
+- **`Subscription.Environment`** (new) carries the client environment (`SANDBOX` / `PRODUCTION`), populated
+  from the adapter config, so the frontend SDK initializes in the right mode. This mirrors
+  `CheckoutPayload{Provider, Environment}`.
 
-This is the handle a frontend must pass to the Cashfree JS SDK to initiate mandate authorization. For Razorpay, the equivalent field (if any) may differ — refer to the Razorpay adapter's mapper for its specific mapping logic.
+Mapping per provider:
+
+- **Cashfree** — `MapSubscriptionEntityToCanonical(env, entity)` sets `AuthSessionID` from
+  `entity.SubscriptionSessionId` (leaving `AuthLink` empty), and sets `Environment` from the adapter config.
+- **Razorpay** — `mapSubscriptionFromResponse(env, r, raw)` sets `AuthLink` from `short_url` (leaving
+  `AuthSessionID` empty), and sets `Environment` from the adapter config.
+
+A frontend uses `AuthSessionID` (+ `Environment`) to drive the Cashfree JS SDK's `subscriptionsCheckout`,
+or `AuthLink` to redirect the user for Razorpay's mandate-authorization step.
 
 ### Supported Operations
 
@@ -204,6 +215,8 @@ action_details); the adapter forwards it when set. Razorpay's Resume has no equi
 - Creates a NEW subscription/mandate via `adapter.CreateSubscription(SubscriptionID=req.NewSubscriptionID, PlanID=req.NewPlanID, FirstChargeTime=clock.Now()+remainingDays)`
 - Returns: `RequiresReauthorization=true`, `AuthLink` (mandate authorization session from new subscription), `ProratedAmountMinor` (computed via `currencyutils.ProrateUpgrade(...)`), `RecurringEffective="CYCLE_END"`
 - The old mandate is NOT charged; old subscription remains active until `FinalizeUpgrade` cancels it
+
+`UpgradeResult` now also carries `AuthSessionID` and `Environment` (copied from the newly created subscription on the reauth path), alongside `AuthLink`, so the frontend has the full provider-neutral authorization context.
 
 **Razorpay (strategy `NATIVE_IMMEDIATE`)**:
 - Calls `adapter.ChangePlan(ScheduleAt=NOW)` to transition immediately

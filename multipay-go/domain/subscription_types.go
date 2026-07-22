@@ -91,18 +91,24 @@ type Plan struct {
 
 // Subscription represents a subscription.
 type Subscription struct {
-	SubscriptionID         string              `json:"subscription_id"`
-	ProviderSubscriptionID string              `json:"provider_subscription_id"`
-	PlanID                 string              `json:"plan_id"`
-	Status                 SubscriptionStatus  `json:"status"`
-	CustomerEmail          string              `json:"customer_email,omitempty"`
-	CustomerPhone          string              `json:"customer_phone,omitempty"`
-	AuthLink               string              `json:"auth_link,omitempty"`
-	ExpiresAt              *time.Time          `json:"expires_at,omitempty"`
-	FirstChargeTime        *time.Time          `json:"first_charge_time,omitempty"`
-	NextChargeDate         *time.Time          `json:"next_charge_date,omitempty"`
-	Provider               Provider            `json:"provider"`
-	Raw                    RawProviderResponse `json:"raw_provider_response,omitempty"`
+	SubscriptionID         string             `json:"subscription_id"`
+	ProviderSubscriptionID string             `json:"provider_subscription_id"`
+	PlanID                 string             `json:"plan_id"`
+	Status                 SubscriptionStatus `json:"status"`
+	CustomerEmail          string             `json:"customer_email,omitempty"`
+	CustomerPhone          string             `json:"customer_phone,omitempty"`
+	AuthLink               string             `json:"auth_link,omitempty"`
+	// AuthSessionID is an opaque provider SDK-auth session handle for the mandate-authorization step
+	// (Cashfree: subscription_session_id, consumed by the Cashfree JS SDK subscriptionsCheckout).
+	// Empty for providers that return a redirect URL in AuthLink instead (e.g. Razorpay).
+	AuthSessionID string `json:"auth_session_id,omitempty"`
+	// Environment is the client environment (SANDBOX/PRODUCTION) the frontend SDK must initialize with.
+	Environment     Environment         `json:"environment,omitempty"`
+	ExpiresAt       *time.Time          `json:"expires_at,omitempty"`
+	FirstChargeTime *time.Time          `json:"first_charge_time,omitempty"`
+	NextChargeDate  *time.Time          `json:"next_charge_date,omitempty"`
+	Provider        Provider            `json:"provider"`
+	Raw             RawProviderResponse `json:"raw_provider_response,omitempty"`
 }
 
 // SubscriptionPayment represents a subscription payment.
@@ -386,6 +392,8 @@ type UpgradeResult struct {
 	ProratedAmountMinor     AmountMinor     `json:"prorated_amount_minor"`
 	RequiresReauthorization bool            `json:"requires_reauthorization"`
 	AuthLink                string          `json:"auth_link,omitempty"`
+	AuthSessionID           string          `json:"auth_session_id,omitempty"`
+	Environment             Environment     `json:"environment,omitempty"`
 	NewSubscriptionID       string          `json:"new_subscription_id"`
 	RecurringEffective      string          `json:"recurring_effective"`
 }

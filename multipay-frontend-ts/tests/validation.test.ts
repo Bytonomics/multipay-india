@@ -1,7 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { validatePayload } from "../src/core/validation";
+import {
+  validatePayload,
+  validateSubscriptionPayload,
+} from "../src/core/validation";
 import { MultiPayError } from "../src/core/errors";
-import type { CheckoutPayload } from "../src/core/types";
+import type {
+  CheckoutPayload,
+  SubscriptionAuthorizationPayload,
+} from "../src/core/types";
 import { Provider, Environment } from "../src/core/types";
 
 describe("validatePayload", () => {
@@ -216,5 +222,42 @@ describe("validatePayload", () => {
         'Provider "stripe" is not yet supported',
       );
     });
+  });
+});
+
+describe("validateSubscriptionPayload", () => {
+  it("throws when auth_session_id missing for Cashfree", () => {
+    expect(() =>
+      validateSubscriptionPayload({
+        provider: Provider.CASHFREE,
+        environment: Environment.PRODUCTION,
+      } as SubscriptionAuthorizationPayload),
+    ).toThrow(
+      "auth_session_id is required for Cashfree subscription authorization",
+    );
+  });
+  it("throws when auth_link missing for Razorpay", () => {
+    expect(() =>
+      validateSubscriptionPayload({
+        provider: Provider.RAZORPAY,
+        environment: Environment.SANDBOX,
+      } as SubscriptionAuthorizationPayload),
+    ).toThrow("auth_link is required for Razorpay subscription authorization");
+  });
+  it("passes for valid cashfree/razorpay payloads", () => {
+    expect(() =>
+      validateSubscriptionPayload({
+        provider: Provider.CASHFREE,
+        environment: Environment.PRODUCTION,
+        auth_session_id: "s",
+      }),
+    ).not.toThrow();
+    expect(() =>
+      validateSubscriptionPayload({
+        provider: Provider.RAZORPAY,
+        environment: Environment.SANDBOX,
+        auth_link: "u",
+      }),
+    ).not.toThrow();
   });
 });

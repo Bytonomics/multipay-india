@@ -440,6 +440,8 @@ func (s *SubscriptionService) UpgradeSubscription(ctx context.Context, req *doma
 			ProratedAmountMinor:     prorated,
 			RequiresReauthorization: true,
 			AuthLink:                newSub.AuthLink,
+			AuthSessionID:           newSub.AuthSessionID,
+			Environment:             newSub.Environment,
 			NewSubscriptionID:       req.NewSubscriptionID,
 			RecurringEffective:      "CYCLE_END",
 		}

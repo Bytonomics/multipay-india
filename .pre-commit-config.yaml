@@ -16,10 +16,13 @@
 #   3. Go build check (verify code compiles)
 #   4. Go lint (format via goimports + gci, golangci-lint with NilAway)
 #   5. Go unit tests with coverage
+#   6. TypeScript frontend install (npm install — sync lockfile + install deps) — runs FIRST among TS hooks
+#   7. TypeScript frontend check (typecheck + lint + test)
 #
 # The Go hooks run inside the multipay-go/ subdirectory via `make -C multipay-go ...`.
-# As multipay-ts / multipay-py / multipay-frontend-ts ports are implemented, add their
-# hooks here scoped to their file types.
+# The TS hooks run inside multipay-frontend-ts/ via `make -C multipay-frontend-ts ...`.
+# As multipay-ts / multipay-py ports are implemented, add their hooks here scoped to
+# their file types.
 
 repos:
   # ============================================
@@ -72,6 +75,14 @@ repos:
   # ============================================
   - repo: local
     hooks:
+      - id: frontend-ts-install
+        name: TypeScript frontend install (sync lockfile)
+        description: Runs make -C multipay-frontend-ts install (npm install) FIRST so package.json/package-lock.json drift is reconciled and node_modules (incl. @types/react) is present before typecheck/lint/test. If npm install rewrites package-lock.json, pre-commit aborts so the synced lockfile must be committed.
+        entry: make -C multipay-frontend-ts install
+        language: system
+        files: ^multipay-frontend-ts/(src/.*\.(ts|tsx)|tests/.*\.(ts|tsx)|package\.json|package-lock\.json)$
+        pass_filenames: false
+
       - id: frontend-ts-check
         name: TypeScript frontend check
         description: Runs make -C multipay-frontend-ts check (typecheck + lint + test)

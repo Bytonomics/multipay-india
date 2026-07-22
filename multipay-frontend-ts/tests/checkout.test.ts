@@ -302,4 +302,49 @@ describe("MultiPay.checkout", () => {
       });
     });
   });
+
+  describe("Cashfree subscription authorization", () => {
+    let mockCashfreeInstance: { subscriptionsCheckout: Mock };
+    let mockCashfreeGlobal: { Cashfree: Mock };
+
+    beforeEach(() => {
+      mockCashfreeInstance = { subscriptionsCheckout: vi.fn() };
+      mockCashfreeGlobal = { Cashfree: vi.fn(() => mockCashfreeInstance) };
+      vi.stubGlobal("Cashfree", mockCashfreeGlobal.Cashfree);
+    });
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("calls subscriptionsCheckout with subsSessionId", async () => {
+      const mpay = new MultiPay();
+      await mpay.authorizeSubscription({
+        provider: Provider.CASHFREE,
+        environment: Environment.PRODUCTION,
+        auth_session_id: "sub_session_abc123",
+      });
+      expect(mockCashfreeGlobal.Cashfree).toHaveBeenCalledWith({
+        mode: "production",
+      });
+      expect(mockCashfreeInstance.subscriptionsCheckout).toHaveBeenCalledWith({
+        subsSessionId: "sub_session_abc123",
+        redirectTarget: "_self",
+      });
+    });
+  });
+
+  describe("Razorpay subscription authorization", () => {
+    it("redirects to auth_link", async () => {
+      const assign = vi.fn();
+      vi.stubGlobal("location", { assign } as unknown as Location);
+      const mpay = new MultiPay();
+      await mpay.authorizeSubscription({
+        provider: Provider.RAZORPAY,
+        environment: Environment.SANDBOX,
+        auth_link: "https://rzp.io/i/abc",
+      });
+      expect(assign).toHaveBeenCalledWith("https://rzp.io/i/abc");
+      vi.unstubAllGlobals();
+    });
+  });
 });

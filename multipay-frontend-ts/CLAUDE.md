@@ -64,6 +64,7 @@ It is hidden/disabled **only** via props (`ProviderEntry.visible` / `enabled`); 
 `multipay-frontend-ts` is a TypeScript/React npm library that provides two independent features:
 
 1. **Headless checkout** (`@bytonomics/multipay-frontend-ts/core`) — `MultiPay.checkout(payload)` redirects to the vendor's hosted payment page. Zero React — usable from vanilla JS, Vue, Angular, Svelte, or React.
+   - `/core` also exposes `MultiPay.authorizeSubscription(payload)` — the subscription-authorization mirror of `checkout(payload)`: for Cashfree it drives the v3 SDK `subscriptionsCheckout({subsSessionId})`; for Razorpay it calls `window.location.assign(auth_link)`. It takes a `SubscriptionAuthorizationPayload` discriminated union: `CashfreeSubscriptionAuthorizationPayload{provider, environment, auth_session_id}` | `RazorpaySubscriptionAuthorizationPayload{provider, environment, auth_link}`.
 2. **Picker micro-UI** (`@bytonomics/multipay-frontend-ts/react`) — `<PaymentPicker>` React component for aggregator selection with 4 visual variants, light/dark theming, and loading/error states. React 18+ is an **optional** peer dependency.
 
 The library is a **dependency** (imported by frontend apps), not a standalone application.
@@ -86,7 +87,11 @@ make clean          # Remove build artifacts
 
 ### Pre-commit Hooks
 
-Pre-commit runs one TypeScript hook: `frontend-ts-check` (typecheck + lint + test).
+Pre-commit runs two TypeScript hooks, in order: `frontend-ts-install` (`npm install` — reconciles
+`package-lock.json` against `package.json` and installs `node_modules`, incl. `@types/react`), then
+`frontend-ts-check` (typecheck + lint + test). The install hook runs FIRST so a stale lockfile or
+missing deps can never reach the typecheck; if `npm install` rewrites `package-lock.json`, pre-commit
+aborts and the synced lockfile must be committed.
 
 ---
 

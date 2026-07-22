@@ -525,7 +525,7 @@ func MapPlanEntityToCanonical(entity *cf.PlanEntity) (*domain.Plan, error) {
 
 // MapSubscriptionEntityToCanonical maps a Cashfree SubscriptionEntity to the canonical domain.Subscription type.
 // Handles status mapping and timestamp conversion.
-func MapSubscriptionEntityToCanonical(entity *cf.SubscriptionEntity) (*domain.Subscription, error) {
+func MapSubscriptionEntityToCanonical(env domain.Environment, entity *cf.SubscriptionEntity) (*domain.Subscription, error) {
 	if entity == nil {
 		return nil, fmt.Errorf("subscription entity is required: %w", domain.ErrInvalidRequest)
 	}
@@ -549,9 +549,10 @@ func MapSubscriptionEntityToCanonical(entity *cf.SubscriptionEntity) (*domain.Su
 		customerPhone = entity.CustomerDetails.CustomerPhone
 	}
 
-	// Cashfree returns the mandate-authorization handle as the subscription session id
-	// (used by the Cashfree JS SDK for the auth step); map it to the canonical AuthLink.
-	authLink := StringPtrToStr(entity.SubscriptionSessionId)
+	// Cashfree returns the mandate-authorization handle as the subscription session id.
+	// It is NOT a URL — it is consumed by the Cashfree JS SDK (subscriptionsCheckout).
+	// Map it to the provider-neutral AuthSessionID; AuthLink stays empty for Cashfree.
+	authSessionID := StringPtrToStr(entity.SubscriptionSessionId)
 
 	subscription := &domain.Subscription{
 		SubscriptionID:         StringPtrToStr(entity.SubscriptionId),
@@ -560,7 +561,8 @@ func MapSubscriptionEntityToCanonical(entity *cf.SubscriptionEntity) (*domain.Su
 		Status:                 mapSubscriptionStatus(entity.SubscriptionStatus),
 		CustomerEmail:          customerEmail,
 		CustomerPhone:          customerPhone,
-		AuthLink:               authLink,
+		AuthSessionID:          authSessionID,
+		Environment:            env,
 		ExpiresAt:              timePtr(TimeFromTimestamp(entity.SubscriptionExpiryTime)),
 		FirstChargeTime:        timePtr(TimeFromTimestamp(entity.SubscriptionFirstChargeTime)),
 		NextChargeDate:         timePtr(TimeFromTimestamp(entity.NextScheduleDate)),

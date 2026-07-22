@@ -77,6 +77,26 @@ export interface RazorpayCheckoutPayload {
  */
 export type CheckoutPayload = CashfreeCheckoutPayload | RazorpayCheckoutPayload;
 
+// --- Subscription mandate-authorization payloads (mirror of CheckoutPayload) ---
+// The consumer builds one of these from the backend subscription response and calls
+// MultiPay.authorizeSubscription(). All provider differences (JS-SDK session vs redirect URL)
+// are hidden inside the library.
+export interface CashfreeSubscriptionAuthorizationPayload {
+  provider: Provider.CASHFREE;
+  environment: Environment;
+  auth_session_id: string;
+}
+
+export interface RazorpaySubscriptionAuthorizationPayload {
+  provider: Provider.RAZORPAY;
+  environment: Environment;
+  auth_link: string;
+}
+
+export type SubscriptionAuthorizationPayload =
+  | CashfreeSubscriptionAuthorizationPayload
+  | RazorpaySubscriptionAuthorizationPayload;
+
 /**
  * Razorpay form fields for POST-based redirect
  */

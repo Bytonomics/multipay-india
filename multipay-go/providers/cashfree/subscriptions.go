@@ -144,7 +144,11 @@ func createSubscription(ctx context.Context, adapter *Adapter, req *domain.Creat
 		}
 	}()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create subscription on cashfree: %w", domain.ErrProviderError)
+		apiErr := &domain.ProviderAPIError{Provider: domain.ProviderCashfree, Message: err.Error()}
+		if httpResp != nil {
+			apiErr.StatusCode = httpResp.StatusCode
+		}
+		return nil, fmt.Errorf("failed to create subscription on cashfree: %w", apiErr)
 	}
 
 	if cfSub == nil {
@@ -152,9 +156,9 @@ func createSubscription(ctx context.Context, adapter *Adapter, req *domain.Creat
 	}
 
 	// Map response to canonical type
-	subscription, err := MapSubscriptionEntityToCanonical(cfSub)
+	subscription, err := MapSubscriptionEntityToCanonical(adapter.config.Environment, cfSub)
 	if err != nil {
-		return nil, fmt.Errorf("failed to map subscription: %w", err)
+		return nil, fmt.Errorf("failed to map subscription: [%w] %w", err, domain.ErrProviderError)
 	}
 	return subscription, nil
 }
@@ -205,7 +209,11 @@ func getSubscription(ctx context.Context, adapter *Adapter, req *domain.GetSubsc
 		}
 	}()
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch subscription from cashfree: %w", domain.ErrProviderError)
+		apiErr := &domain.ProviderAPIError{Provider: domain.ProviderCashfree, Message: err.Error()}
+		if httpResp != nil {
+			apiErr.StatusCode = httpResp.StatusCode
+		}
+		return nil, fmt.Errorf("failed to fetch subscription from cashfree: %w", apiErr)
 	}
 
 	if cfSub == nil {
@@ -213,7 +221,7 @@ func getSubscription(ctx context.Context, adapter *Adapter, req *domain.GetSubsc
 	}
 
 	// Map response to canonical type
-	subscription, err := MapSubscriptionEntityToCanonical(cfSub)
+	subscription, err := MapSubscriptionEntityToCanonical(adapter.config.Environment, cfSub)
 	if err != nil {
 		return nil, fmt.Errorf("failed to map subscription: %w", err)
 	}
@@ -253,7 +261,11 @@ func cancelSubscription(ctx context.Context, adapter *Adapter, req *domain.Cance
 		if already := fetchIfCancelled(ctx, adapter, req.SubscriptionID); already != nil {
 			return already, nil
 		}
-		return nil, fmt.Errorf("failed to cancel subscription on cashfree: %w", domain.ErrProviderError)
+		apiErr := &domain.ProviderAPIError{Provider: domain.ProviderCashfree, Message: err.Error()}
+		if httpResp != nil {
+			apiErr.StatusCode = httpResp.StatusCode
+		}
+		return nil, fmt.Errorf("failed to cancel subscription on cashfree: %w", apiErr)
 	}
 
 	if cfSub == nil {
@@ -261,7 +273,7 @@ func cancelSubscription(ctx context.Context, adapter *Adapter, req *domain.Cance
 	}
 
 	// Map response to canonical type
-	subscription, err := MapSubscriptionEntityToCanonical(cfSub)
+	subscription, err := MapSubscriptionEntityToCanonical(adapter.config.Environment, cfSub)
 	if err != nil {
 		return nil, fmt.Errorf("failed to map subscription: %w", err)
 	}
@@ -287,7 +299,7 @@ func fetchIfCancelled(ctx context.Context, adapter *Adapter, subscriptionID stri
 	if ferr != nil || cfSub == nil {
 		return nil
 	}
-	sub, merr := MapSubscriptionEntityToCanonical(cfSub)
+	sub, merr := MapSubscriptionEntityToCanonical(adapter.config.Environment, cfSub)
 	if merr != nil || sub == nil {
 		return nil
 	}
@@ -324,7 +336,11 @@ func pauseSubscription(ctx context.Context, adapter *Adapter, req *domain.PauseS
 		}
 	}()
 	if err != nil {
-		return nil, fmt.Errorf("failed to pause subscription on cashfree: %w", domain.ErrProviderError)
+		apiErr := &domain.ProviderAPIError{Provider: domain.ProviderCashfree, Message: err.Error()}
+		if httpResp != nil {
+			apiErr.StatusCode = httpResp.StatusCode
+		}
+		return nil, fmt.Errorf("failed to pause subscription on cashfree: %w", apiErr)
 	}
 
 	if cfSub == nil {
@@ -332,7 +348,7 @@ func pauseSubscription(ctx context.Context, adapter *Adapter, req *domain.PauseS
 	}
 
 	// Map response to canonical type
-	subscription, err := MapSubscriptionEntityToCanonical(cfSub)
+	subscription, err := MapSubscriptionEntityToCanonical(adapter.config.Environment, cfSub)
 	if err != nil {
 		return nil, fmt.Errorf("failed to map subscription: %w", err)
 	}
@@ -375,7 +391,11 @@ func resumeSubscription(ctx context.Context, adapter *Adapter, req *domain.Resum
 		}
 	}()
 	if err != nil {
-		return nil, fmt.Errorf("failed to resume subscription on cashfree: %w", domain.ErrProviderError)
+		apiErr := &domain.ProviderAPIError{Provider: domain.ProviderCashfree, Message: err.Error()}
+		if httpResp != nil {
+			apiErr.StatusCode = httpResp.StatusCode
+		}
+		return nil, fmt.Errorf("failed to resume subscription on cashfree: %w", apiErr)
 	}
 
 	if cfSub == nil {
@@ -383,7 +403,7 @@ func resumeSubscription(ctx context.Context, adapter *Adapter, req *domain.Resum
 	}
 
 	// Map response to canonical type
-	subscription, err := MapSubscriptionEntityToCanonical(cfSub)
+	subscription, err := MapSubscriptionEntityToCanonical(adapter.config.Environment, cfSub)
 	if err != nil {
 		return nil, fmt.Errorf("failed to map subscription: %w", err)
 	}
@@ -430,7 +450,11 @@ func changePlan(ctx context.Context, adapter *Adapter, req *domain.ChangePlanReq
 		}
 	}()
 	if err != nil {
-		return nil, fmt.Errorf("failed to change plan on cashfree: %w", domain.ErrProviderError)
+		apiErr := &domain.ProviderAPIError{Provider: domain.ProviderCashfree, Message: err.Error()}
+		if httpResp != nil {
+			apiErr.StatusCode = httpResp.StatusCode
+		}
+		return nil, fmt.Errorf("failed to change plan on cashfree: %w", apiErr)
 	}
 
 	if cfSub == nil {
@@ -438,7 +462,7 @@ func changePlan(ctx context.Context, adapter *Adapter, req *domain.ChangePlanReq
 	}
 
 	// Map response to canonical type
-	subscription, err := MapSubscriptionEntityToCanonical(cfSub)
+	subscription, err := MapSubscriptionEntityToCanonical(adapter.config.Environment, cfSub)
 	if err != nil {
 		return nil, fmt.Errorf("failed to map subscription: %w", err)
 	}
@@ -492,7 +516,11 @@ func getSubscriptionPayments(ctx context.Context, adapter *Adapter, req *domain.
 		}
 	}()
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch subscription payments from cashfree: %w", domain.ErrProviderError)
+		apiErr := &domain.ProviderAPIError{Provider: domain.ProviderCashfree, Message: err.Error()}
+		if httpResp != nil {
+			apiErr.StatusCode = httpResp.StatusCode
+		}
+		return nil, fmt.Errorf("failed to fetch subscription payments from cashfree: %w", apiErr)
 	}
 
 	// Map each payment entity to canonical type
@@ -589,7 +617,11 @@ func chargeSubscription(ctx context.Context, adapter *Adapter, req *domain.Charg
 		}
 	}()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create payment on cashfree: %w", domain.ErrProviderError)
+		apiErr := &domain.ProviderAPIError{Provider: domain.ProviderCashfree, Message: err.Error()}
+		if httpResp != nil {
+			apiErr.StatusCode = httpResp.StatusCode
+		}
+		return nil, fmt.Errorf("failed to create payment on cashfree: %w", apiErr)
 	}
 
 	if cfPayment == nil {

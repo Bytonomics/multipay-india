@@ -255,13 +255,14 @@ func mapPlanFromResponse(r *razorpayPlanResponse, rawJSON []byte) *domain.Plan {
 	}
 }
 
-func mapSubscriptionFromResponse(r *razorpaySubscriptionResponse, rawJSON []byte) *domain.Subscription {
+func mapSubscriptionFromResponse(env domain.Environment, r *razorpaySubscriptionResponse, rawJSON []byte) *domain.Subscription {
 	return &domain.Subscription{
 		SubscriptionID:         r.ID,
 		ProviderSubscriptionID: r.ID,
 		PlanID:                 r.PlanID,
 		Status:                 mapSubscriptionStatusFromRazorpay(r.Status),
 		AuthLink:               r.ShortURL,
+		Environment:            env,
 		ExpiresAt:              unixPtr(r.ExpireBy),
 		FirstChargeTime:        unixPtr(r.StartAt),
 		NextChargeDate:         unixPtr(r.ChargeAt),

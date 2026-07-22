@@ -1,9 +1,16 @@
 # multipay-frontend-ts (frontend checkout/picker library) — TypeScript build system
 # Dual-package build: core (vanilla TS) + react (React components with styles)
 
-.PHONY: all build lint test check format clean help typecheck build-check
+.PHONY: all build lint test check format clean help typecheck build-check install
 
 all: build
+
+# install runs npm install to reconcile package-lock.json against package.json and
+# ensure node_modules (incl. @types/react) is present. Run FIRST in the pre-commit
+# flow so a stale lockfile or missing deps can never reach typecheck/lint/test.
+install:
+	@echo "Installing dependencies (syncing package-lock.json against package.json)..."
+	@npm install
 
 typecheck:
 	@echo "Type-checking TypeScript..."

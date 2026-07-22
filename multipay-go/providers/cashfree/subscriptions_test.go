@@ -360,9 +360,9 @@ func TestResumeSubscription_SendsNextScheduledTime(t *testing.T) {
 	}
 }
 
-// TestMapSubscriptionEntityToCanonical_AuthLinkFromSessionID verifies that MapSubscriptionEntityToCanonical
-// populates domain.Subscription.AuthLink from Cashfree SubscriptionEntity.SubscriptionSessionId.
-func TestMapSubscriptionEntityToCanonical_AuthLinkFromSessionID(t *testing.T) {
+// TestMapSubscriptionEntityToCanonical_AuthSessionIDFromSessionID verifies that MapSubscriptionEntityToCanonical
+// populates domain.Subscription.AuthSessionID from Cashfree SubscriptionEntity.SubscriptionSessionId.
+func TestMapSubscriptionEntityToCanonical_AuthSessionIDFromSessionID(t *testing.T) {
 	subID := "sub_merchant_1"
 	cfSubID := "cf_sub_1"
 	status := "INITIALIZED"
@@ -375,15 +375,21 @@ func TestMapSubscriptionEntityToCanonical_AuthLinkFromSessionID(t *testing.T) {
 		SubscriptionSessionId: &sessionID,
 	}
 
-	got, err := MapSubscriptionEntityToCanonical(entity)
+	got, err := MapSubscriptionEntityToCanonical(domain.EnvironmentSandbox, entity)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if got == nil {
 		t.Fatal("expected non-nil subscription")
 	}
-	if got.AuthLink != sessionID {
-		t.Errorf("AuthLink = %q, want %q (must come from SubscriptionSessionId)", got.AuthLink, sessionID)
+	if got.AuthSessionID != sessionID {
+		t.Errorf("AuthSessionID = %q, want %q (must come from SubscriptionSessionId)", got.AuthSessionID, sessionID)
+	}
+	if got.AuthLink != "" {
+		t.Errorf("AuthLink = %q, want empty for Cashfree (session id no longer overloads AuthLink)", got.AuthLink)
+	}
+	if got.Environment != domain.EnvironmentSandbox {
+		t.Errorf("Environment = %q, want SANDBOX", got.Environment)
 	}
 	if got.ProviderSubscriptionID != cfSubID {
 		t.Errorf("ProviderSubscriptionID = %q, want %q", got.ProviderSubscriptionID, cfSubID)

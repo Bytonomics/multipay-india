@@ -34,6 +34,7 @@ func TestUpgradeSubscription_Cashfree_CreatesReauthSubscription(t *testing.T) {
 	createSubCalled := false
 	var capturedCreateReq *domain.CreateSubscriptionRequest
 	expectedAuthLink := "https://auth.cashfree.com/sub_123"
+	expectedAuthSessionID := "sub_session_test"
 
 	adapter := &fakeAdapter{
 		createSubscriptionFunc: func(ctx context.Context, req *domain.CreateSubscriptionRequest) (*domain.Subscription, error) {
@@ -42,6 +43,8 @@ func TestUpgradeSubscription_Cashfree_CreatesReauthSubscription(t *testing.T) {
 			return &domain.Subscription{
 				SubscriptionID: req.SubscriptionID,
 				AuthLink:       expectedAuthLink,
+				AuthSessionID:  expectedAuthSessionID,
+				Environment:    domain.EnvironmentSandbox,
 			}, nil
 		},
 	}
@@ -126,6 +129,16 @@ func TestUpgradeSubscription_Cashfree_CreatesReauthSubscription(t *testing.T) {
 	))
 	if result.ProratedAmountMinor != expectedProrated {
 		t.Errorf("expected ProratedAmountMinor=%d, got %d", expectedProrated, result.ProratedAmountMinor)
+	}
+
+	// Assert AuthSessionID is copied from new subscription
+	if result.AuthSessionID != expectedAuthSessionID {
+		t.Errorf("UpgradeResult.AuthSessionID = %q, want %q (must copy from new subscription)", result.AuthSessionID, expectedAuthSessionID)
+	}
+
+	// Assert Environment is copied from new subscription
+	if result.Environment != domain.EnvironmentSandbox {
+		t.Errorf("UpgradeResult.Environment = %q, want %q (must copy from new subscription)", result.Environment, domain.EnvironmentSandbox)
 	}
 }
 

@@ -173,7 +173,10 @@ func parseEvent(ctx context.Context, body []byte, headers map[string]string) (*d
 					event.ParseError = fmt.Sprintf("failed to marshal subscription: %v", merr)
 					event.Subscription = nil
 				} else {
-					event.Subscription = mapSubscriptionFromResponse(entity, rawJSON)
+					// Webhook-derived subscriptions never surface Environment to the frontend auth flow,
+					// so pass an empty Environment here (omitempty drops it). The API paths thread the
+					// real adapter.config.Environment; only this internal webhook mapping uses empty.
+					event.Subscription = mapSubscriptionFromResponse(domain.Environment(""), entity, rawJSON)
 					// Set RawVendorStatus for subscription events (D11)
 					if entity.Status != "" {
 						event.RawVendorStatus = entity.Status

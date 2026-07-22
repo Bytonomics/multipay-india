@@ -55,6 +55,11 @@ adding or changing an operation.
 > canonical struct or not forwarded, it is a correctness bug. Verify against the doc pages above, not the
 > vendored SDK.
 
+> **Subscription authorization fields (provider-neutral).** The canonical `Subscription`/`UpgradeResult`
+> expose `AuthLink` (a redirect URL, Razorpay `short_url`), `AuthSessionID` (a JS-SDK session handle,
+> Cashfree `subscription_session_id`), and `Environment` (`SANDBOX`/`PRODUCTION`). Canonical field names are
+> provider-neutral by design — no provider name appears in a canonical field name.
+
 ---
 
 ## Build, Test, and Lint Commands

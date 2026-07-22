@@ -1,4 +1,8 @@
-import type { RazorpayCheckoutPayload, RazorpayFormFields } from "./types";
+import type {
+  RazorpayCheckoutPayload,
+  RazorpayFormFields,
+  RazorpaySubscriptionAuthorizationPayload,
+} from "./types";
 
 export function checkoutRazorpay(payload: RazorpayCheckoutPayload): void {
   const form = document.createElement("form");
@@ -23,4 +27,10 @@ export function checkoutRazorpay(payload: RazorpayCheckoutPayload): void {
 
   document.body.appendChild(form);
   form.submit();
+}
+
+export function authorizeSubscriptionRazorpay(
+  payload: RazorpaySubscriptionAuthorizationPayload,
+): void {
+  window.location.assign(payload.auth_link);
 }
