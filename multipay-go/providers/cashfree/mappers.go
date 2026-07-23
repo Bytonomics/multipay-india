@@ -638,6 +638,8 @@ func mapPlanIntervalType(typePtr *string) domain.PlanIntervalType {
 }
 
 // mapSubscriptionStatus converts Cashfree subscription status strings to canonical domain.SubscriptionStatus.
+// Unknown Cashfree statuses default to ACTIVE to avoid breaking active subscriptions when new vendor
+// statuses are introduced; this ensures forward compatibility and prevents false negatives on status checks.
 func mapSubscriptionStatus(statusPtr *string) domain.SubscriptionStatus {
 	status := ""
 	if statusPtr != nil {
@@ -671,7 +673,7 @@ func mapSubscriptionStatus(statusPtr *string) domain.SubscriptionStatus {
 	case "EXPIRED":
 		return domain.SubscriptionStatusExpired
 	default:
-		return domain.SubscriptionStatusInitialized
+		return domain.SubscriptionStatusActive
 	}
 }
 

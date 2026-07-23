@@ -3,6 +3,7 @@ package razorpay
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
@@ -369,6 +370,11 @@ func getSubscriptionPayments(ctx context.Context, adapter *Adapter, req *domain.
 func chargeSubscription(ctx context.Context, adapter *Adapter, req *domain.ChargeSubscriptionRequest) (*domain.SubscriptionPayment, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required: %w", domain.ErrInvalidRequest)
+	}
+
+	// Remarks (addon item name) is mandatory for Razorpay addon creation
+	if len(req.Remarks) == 0 {
+		return nil, errors.New("razorpay charge: addon item name (Remarks) is required but empty")
 	}
 
 	// Build addon request data as typed struct.

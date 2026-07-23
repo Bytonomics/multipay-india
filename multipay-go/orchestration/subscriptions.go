@@ -23,6 +23,7 @@ var (
 	resumeSubscriptionValidator      = pedantigo.New[domain.ResumeSubscriptionRequest]()
 	changePlanValidator              = pedantigo.New[domain.ChangePlanRequest]()
 	getSubscriptionPaymentsValidator = pedantigo.New[domain.GetSubscriptionPaymentsRequest]()
+	planChangePreviewValidator       = pedantigo.New[domain.PlanChangePreviewRequest]()
 	upgradeSubscriptionValidator     = pedantigo.New[domain.UpgradeSubscriptionRequest]()
 	finalizeUpgradeValidator         = pedantigo.New[domain.FinalizeUpgradeRequest]()
 	chargeSubscriptionValidator      = pedantigo.New[domain.ChargeSubscriptionRequest]()
@@ -366,8 +367,72 @@ func (s *SubscriptionService) GetSubscriptionPayments(ctx context.Context, req *
 	return result, nil
 }
 
+// PreviewPlanChange computes the cost breakdown for a plan change without making any external calls.
+// This is a pure function that performs no mutations and requires no capability validation.
+// It validates the request and returns a quote with charge amounts and effective dates.
+func (s *SubscriptionService) PreviewPlanChange(req *domain.PlanChangePreviewRequest) (*domain.PlanChangeQuote, error) {
+	if req == nil {
+		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
+	}
+
+	if err := planChangePreviewValidator.Validate(req); err != nil {
+		return nil, fmt.Errorf("request validation failed: %w", err)
+	}
+
+	// Determine plan change kind and calculate amounts based on cycle type change
+	var kind domain.PlanChangeKind
+	var chargeNow, newRecurring int64
+	var recurringEffective string
+
+	// For same-cycle upgrades (no cycle type change), use ProrateUpgrade
+	// For cross-cycle upgrades (e.g., MONTHLY->YEARLY), use ProrateUnusedCredit
+	switch req.CycleType {
+	case "MONTHLY":
+		// Current cycle is MONTHLY; could be upgrading within MONTHLY or crossing to YEARLY
+		kind = domain.PlanChangeKindUpgrade
+		// Same-cycle upgrade: charge = (new - old) * remainingDays / cycleDays
+		prorated, err := currencyutils.ProrateUpgrade(
+			req.CurrentAmt,
+			req.NewAmt,
+			req.RemainingDays,
+			req.CycleDays,
+			"INR", // currency from context
+		)
+		if err != nil {
+			return nil, fmt.Errorf("upgrade proration failed: %w", err)
+		}
+		chargeNow = prorated
+		newRecurring = req.NewAmt // same recurring
+		recurringEffective = "CYCLE_END"
+	case "YEARLY":
+		// Cross-cycle upgrade: MONTHLY → YEARLY
+		kind = domain.PlanChangeKindUpgradeCross
+		unused := currencyutils.ProrateUnusedCredit(req.CurrentAmt, req.CycleDays, req.RemainingDays)
+		chargeNow = req.NewAmt - unused // new annual minus unused credit from current month
+		if chargeNow < 0 {
+			chargeNow = 0
+		}
+		newRecurring = req.NewAmt // the new annual amount
+		recurringEffective = "IMMEDIATE"
+	}
+
+	return &domain.PlanChangeQuote{
+		Kind:                    kind,
+		ChargeNowMinor:          chargeNow,
+		NewRecurringMinor:       newRecurring,
+		NewRecurringInterval:    req.CycleType,
+		RecurringEffective:      recurringEffective,
+		DaysRemaining:           req.RemainingDays,
+		CurrentUntilDate:        fmt.Sprintf("%d days", req.RemainingDays),
+		RequiresReauthorization: kind == domain.PlanChangeKindUpgradeCross,
+		RequiresPhone:           false,
+	}, nil
+}
+
 // UpgradeSubscription immediately charges the pro-rata amount on an existing subscription's mandate.
 // It computes the pro-rata upgrade charge and returns the charge details for the caller to finalize.
+// Supports both same-cycle upgrades (RecurringEffective="CYCLE_END") and cross-cycle upgrades
+// (e.g., MONTHLY→YEARLY with RecurringEffective="IMMEDIATE").
 // This operation requires CapSubscriptionUpgradeProration capability.
 func (s *SubscriptionService) UpgradeSubscription(ctx context.Context, req *domain.UpgradeSubscriptionRequest) (*domain.UpgradeResult, error) {
 	if req == nil {
@@ -385,13 +450,17 @@ func (s *SubscriptionService) UpgradeSubscription(ctx context.Context, req *doma
 		return nil, fmt.Errorf("capability check failed: %w", err)
 	}
 
-	prorated := domain.AmountMinor(currencyutils.ProrateUpgrade(
+	proratedAmount, err := currencyutils.ProrateUpgrade(
 		int64(req.OldAmountMinor),
 		int64(req.NewAmountMinor),
-		req.RemainingDays,
-		req.CycleDays,
+		int64(req.RemainingDays),
+		int64(req.CycleDays),
 		req.Currency.String(),
-	))
+	)
+	if err != nil {
+		return nil, fmt.Errorf("upgrade proration failed: %w", err)
+	}
+	prorated := domain.AmountMinor(proratedAmount)
 
 	hookCtx := &ports.HookContext{
 		Provider:    provider,
@@ -406,6 +475,8 @@ func (s *SubscriptionService) UpgradeSubscription(ctx context.Context, req *doma
 	}
 
 	var result *domain.UpgradeResult
+
+	var recurringEffective string
 
 	switch provider {
 	case domain.ProviderCashfree:
@@ -435,6 +506,13 @@ func (s *SubscriptionService) UpgradeSubscription(ctx context.Context, req *doma
 			return nil, fmt.Errorf("create subscription returned nil response: %w", domain.ErrProviderError)
 		}
 
+		// Determine recurring effective date based on cross-cycle flag
+		if req.CrossCycle {
+			recurringEffective = "IMMEDIATE"
+		} else {
+			recurringEffective = "CYCLE_END"
+		}
+
 		result = &domain.UpgradeResult{
 			Strategy:                domain.UpgradeReauthProrated,
 			ProratedAmountMinor:     prorated,
@@ -443,7 +521,7 @@ func (s *SubscriptionService) UpgradeSubscription(ctx context.Context, req *doma
 			AuthSessionID:           newSub.AuthSessionID,
 			Environment:             newSub.Environment,
 			NewSubscriptionID:       req.NewSubscriptionID,
-			RecurringEffective:      "CYCLE_END",
+			RecurringEffective:      recurringEffective,
 		}
 	case domain.ProviderRazorpay:
 		_, err := adapter.ChangePlan(ctx, &domain.ChangePlanRequest{

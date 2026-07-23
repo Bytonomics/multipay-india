@@ -346,6 +346,56 @@ const (
 	UpgradeCycleEnd        UpgradeStrategy = "CYCLE_END"
 )
 
+// PlanChangeKind represents the type of plan change operation.
+type PlanChangeKind string
+
+const (
+	PlanChangeKindCreate       PlanChangeKind = "CREATE"
+	PlanChangeKindUpgrade      PlanChangeKind = "UPGRADE"
+	PlanChangeKindUpgradeCross PlanChangeKind = "UPGRADE_CROSS_CYCLE"
+	PlanChangeKindDowngrade    PlanChangeKind = "DOWNGRADE"
+)
+
+// PlanChangePreviewRequest represents a request to preview the cost of a plan change.
+type PlanChangePreviewRequest struct {
+	PlanKey       string `json:"plan_key" pedantigo:"required,minLength=1"`
+	CycleType     string `json:"cycle_type" pedantigo:"required,oneof=MONTHLY YEARLY"`
+	CurrentAmt    int64  `json:"current_amt" pedantigo:"required,gte=0"`
+	NewAmt        int64  `json:"new_amt" pedantigo:"required,gte=0"`
+	CycleDays     int64  `json:"cycle_days" pedantigo:"required,gt=0"`
+	RemainingDays int64  `json:"remaining_days" pedantigo:"required,gte=0"`
+}
+
+// Validate enforces cross-field rules for plan change preview.
+func (r *PlanChangePreviewRequest) Validate() error {
+	if r.PlanKey == "" {
+		return errors.New("plan_key is required")
+	}
+	if r.CycleType != "MONTHLY" && r.CycleType != "YEARLY" {
+		return fmt.Errorf("cycle_type must be MONTHLY or YEARLY, got %q", r.CycleType)
+	}
+	if r.CycleDays <= 0 {
+		return errors.New("cycle_days must be > 0")
+	}
+	if r.RemainingDays < 0 || r.RemainingDays > r.CycleDays {
+		return errors.New("remaining_days must be within [0, cycle_days]")
+	}
+	return nil
+}
+
+// PlanChangeQuote represents the cost breakdown for a plan change.
+type PlanChangeQuote struct {
+	Kind                    PlanChangeKind `json:"kind"`
+	ChargeNowMinor          int64          `json:"charge_now_minor"`
+	NewRecurringMinor       int64          `json:"new_recurring_minor"`
+	NewRecurringInterval    string         `json:"new_recurring_interval"`
+	RecurringEffective      string         `json:"recurring_effective"`
+	DaysRemaining           int64          `json:"days_remaining"`
+	CurrentUntilDate        string         `json:"current_until_date"`
+	RequiresReauthorization bool           `json:"requires_reauthorization"`
+	RequiresPhone           bool           `json:"requires_phone"`
+}
+
 // UpgradeSubscriptionRequest represents a request to upgrade an existing subscription to a new plan.
 type UpgradeSubscriptionRequest struct {
 	SubscriptionID    string      `json:"subscription_id" pedantigo:"required,minLength=1"`
@@ -361,6 +411,7 @@ type UpgradeSubscriptionRequest struct {
 	CustomerPhone     string      `json:"customer_phone" pedantigo:"required,minLength=5,maxLength=20"`
 	CustomerName      string      `json:"customer_name" pedantigo:"omitempty,maxLength=200"`
 	ReturnURL         string      `json:"return_url" pedantigo:"required,url"`
+	CrossCycle        bool        `json:"cross_cycle"`
 }
 
 // Validate enforces presence of mandatory fields and cross-field constraints.

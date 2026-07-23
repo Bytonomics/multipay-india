@@ -85,3 +85,26 @@ func TestMapPlanEntityToCanonical_AmountConversion(t *testing.T) {
 		t.Fatalf("expected AmountMinor=500 for JPY (exp0), got %d", int64(p.AmountMinor))
 	}
 }
+
+// TestMapSubscriptionStatus_UnknownStatusDefault verifies that an unknown Cashfree
+// subscription status is mapped to a safe canonical status (not empty/panic).
+func TestMapSubscriptionStatus_UnknownStatusDefault(t *testing.T) {
+	// Call mapSubscriptionStatus with an unknown status pointer
+	unknownStatus := "UNKNOWN_CF_STATUS"
+	result := mapSubscriptionStatus(&unknownStatus)
+
+	// Should return a valid domain status, not empty
+	if result == "" {
+		t.Errorf("expected non-empty canonical status for unknown input, got empty string")
+	}
+
+	// Should be a known canonical status (one of the domain constants)
+	switch result {
+	case "INITIALIZED", "BANK_APPROVAL_PENDING", "AUTHENTICATED", "ACTIVE", "PENDING",
+		"ON_HOLD", "HALTED", "PAUSED", "CUSTOMER_PAUSED", "CANCELLED",
+		"CUSTOMER_CANCELLED", "COMPLETED", "EXPIRED":
+		// Valid status — OK
+	default:
+		t.Errorf("expected canonical status, got unknown value: %s", result)
+	}
+}

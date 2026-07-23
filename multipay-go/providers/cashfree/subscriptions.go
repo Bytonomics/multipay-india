@@ -412,20 +412,15 @@ func resumeSubscription(ctx context.Context, adapter *Adapter, req *domain.Resum
 
 // changePlan changes the plan of an existing subscription.
 // Uses the manage subscription endpoint with action "CHANGE_PLAN" and planId.
-// IMPORTANT: Cashfree always applies plan changes at the next billing cycle.
-// It ignores the ScheduleAt field. When ScheduleAt=NOW is requested, we log a warning
-// but proceed with the change (Cashfree will apply it at cycle end).
+// IMPORTANT: Cashfree apply changes immediately; the caller (studio) is responsible for cycle-end scheduling.
+// This adapter has no logger; no warning is emitted here.
 func changePlan(ctx context.Context, adapter *Adapter, req *domain.ChangePlanRequest) (*domain.Subscription, error) {
 	if req == nil {
 		return nil, fmt.Errorf("request is required: %w", domain.ErrInvalidRequest)
 	}
 
-	// Log warning if ScheduleAt=NOW (Cashfree ignores this and does cycle-end)
-	if req.ScheduleAt == domain.ScheduleChangeNow {
-		// Note: In production, this would be logged via a logger.
-		// For now, including as a comment for documentation purposes.
-		_ = "WARNING: Cashfree applies plan changes at cycle end, not immediately"
-	}
+	// ScheduleAt is not honored by Cashfree; cycle-end changes are scheduled server-side via ChangePlan.
+	// If req.ScheduleAt == domain.ScheduleChangeNow, the change will still be applied at the next billing cycle.
 
 	cfReq := &cf.ManageSubscriptionRequest{
 		SubscriptionId: req.SubscriptionID,

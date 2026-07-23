@@ -274,6 +274,112 @@ Both Cashfree and Razorpay support the upgrade orchestration capabilities:
   - Supported by: Cashfree ✓, Razorpay ✓
   - Behavior: Direct charge without plan transition; used by recovery flows and admin operations
 
+## Plan Change Library Functions
+
+The library provides utility functions for computing pro-rated amounts and previewing plan changes without making provider calls.
+
+### ProrateUpgrade Function
+
+**Signature**: `func ProrateUpgrade(charge, days, cycleDays int64) (int64, error)`
+
+**Purpose**: Calculate the pro-rated charge amount for a partial billing cycle when upgrading to a higher plan.
+
+**Inputs**:
+- `charge` — The additional charge amount (in minor units) for the upgrade, typically the difference between old and new plan amounts
+- `days` — The number of remaining days in the current billing cycle
+- `cycleDays` — The total number of days in the billing cycle
+
+**Returns**: The pro-rated amount (in minor units) to be charged immediately, or `ErrProrationOverflow` if the calculation would overflow
+
+**Overflow Guard**: The function checks `charge > math.MaxInt64 / days` before multiplication to prevent integer overflow. If the check fails, it returns `ErrProrationOverflow`.
+
+**Example**:
+```
+Scenario: Upgrade from ₹500/month to ₹1000/month mid-cycle
+- Old plan: ₹500/30 days = ₹16.67/day
+- New plan: ₹1000/30 days = ₹33.33/day
+- Charge delta: ₹500/month
+- Days remaining: 15 days out of 30
+- Pro-rated charge: 500 * 15 / 30 = ₹250 (in minor units: 25000)
+```
+
+### ProrateUnusedCredit Helper
+
+**Purpose**: Calculate the unused-credit refund amount when switching billing cycles (e.g., monthly to annual).
+
+**Formula**: `(paidAmount * (paidCycleDays - elapsedDays)) / paidCycleDays`
+
+**Inputs**:
+- `paidAmount` — The total amount already paid for the current cycle (in minor units)
+- `paidCycleDays` — The total days in the current billing cycle
+- `elapsedDays` — The number of days already elapsed in the current cycle
+
+**Returns**: The unused-credit amount to be refunded or applied as a credit against the new charge
+
+**Usage context**: Cross-cycle upgrades (monthly→annual) use this to compute the credit offset against the annual charge:
+```
+Example: Switch MONTHLY→YEARLY mid-cycle
+- Paid ₹500 for 30-day month
+- Already used 10 days
+- Unused credit: 500 * (30 - 10) / 30 = ₹333.33
+- This credit offsets the annual charge
+```
+
+### PreviewPlanChange Method
+
+**Signature**: `func PreviewPlanChange(planKey string, currentAmounts CurrentAmounts, cycleInfo CycleInfo) (*PlanChangeQuote, error)`
+
+**Pure Function**: No provider calls, no state changes, deterministic output based on inputs.
+
+**Inputs**:
+- `planKey` — The canonical plan key (e.g., "monthly_500", "annual_6000")
+- `currentAmounts` — Current plan charge, cycle days, prorated amounts
+- `cycleInfo` — Current cycle start/end dates, elapsed/remaining days
+
+**Returns**: `PlanChangeQuote` containing:
+- `FromPlan` — Current plan details
+- `ToPlan` — Target plan details
+- `ProratedChargeMinor` — Amount to charge immediately for the upgrade (computed via `ProrateUpgrade`)
+- `UnusedCreditMinor` — Credit applied if switching cycle types (computed via `ProrateUnusedCredit`)
+- `NetChargeMinor` — Final amount after credits: `ProratedChargeMinor - UnusedCreditMinor`
+- `RecurringEffectiveAt` — When the new recurring charge starts (e.g., `IMMEDIATE` for Razorpay, `CYCLE_END` for Cashfree)
+
+**Reuses**: Calls `ProrateUpgrade` for all amount calculations to maintain consistency.
+
+### Cross-Cycle Upgrade Support (D6)
+
+The library supports upgrading across different billing cycle types:
+
+**MONTHLY→YEARLY**:
+- Charge: `max(0, NewAmt - ProrateUnusedCredit(currentMonthly, cycleDays, remainingDays))` — the annual plan amount minus the unused-credit from the remaining monthly days, clamped to 0 if negative
+- Recurring: Effective immediately (next charge is annual amount on the anniversary date)
+- Provider: Cashfree (via `UpgradeSubscription` creating a new subscription with `FirstChargeTime`)
+
+**YEARLY→MONTHLY**:
+- Treated as a downgrade: Scheduled for cycle-end, not processed immediately
+- Handled separately from cross-cycle upgrades
+
+### Cancel-at-Cycle-End Capability by Provider
+
+| Provider | Cancel at Cycle-End | Implementation |
+|----------|--------------------|-|
+| **Razorpay** | ✓ Yes | Supported via `schedule_change_at: "cycle_end"` on subscription operations |
+| **Cashfree** | ✗ No | Only immediate operations; must use cycle-end scheduling server-side after operation completes |
+
+### Provider-Specific Implementation Details
+
+#### Cashfree Adapter Fixes
+
+1. **ScheduleAt Not Honored**: The Cashfree SDK `ScheduleAt` parameter is **not honored** by the provider; always applies immediately. Use cycle-end scheduling server-side (persist the scheduled action in the DB with a `scheduled_for_date` and execute at cycle-end via a job).
+
+2. **Unknown Statuses Default to ACTIVE**: When Cashfree returns a subscription status not in the expected enum, default it to `ACTIVE` instead of failing the entire response. This ensures robustness when the provider introduces new statuses.
+
+3. **Remarks Mandatory for Addons**: The `Remarks` field (Cashfree SDK `item.name` for addons) is mandatory and must not be empty. Guard all addon creation against nil/empty remarks.
+
+#### Razorpay Adapter Fixes
+
+1. **Remarks Mandatory**: Similar to Cashfree, the addon `item.name` (Remarks) must be set and non-empty; validate before sending to Razorpay.
+
 ### Webhook Events for Subscriptions
 
 Both adapters extend their `ParseEvent()` to handle subscription webhook events:

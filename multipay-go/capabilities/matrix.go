@@ -52,6 +52,7 @@ func NewSupportMatrix() *SupportMatrix {
 		CapSubscriptionManualCharge:     true,
 		CapSubscriptionUpgradeProration: true,
 		CapSubscriptionEligibility:      true,
+		CapSubscriptionCancelAtCycleEnd: false,
 		CapSubscriptionList:             false,
 		CapPlanList:                     false,
 
@@ -130,6 +131,7 @@ func NewSupportMatrix() *SupportMatrix {
 		CapSubscriptionManualCharge:     true,
 		CapSubscriptionUpgradeProration: true,
 		CapSubscriptionEligibility:      false,
+		CapSubscriptionCancelAtCycleEnd: true,
 
 		// Cashfree-only capabilities (not supported by Razorpay)
 		CapInstrumentCryptogram:  false,

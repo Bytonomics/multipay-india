@@ -120,13 +120,17 @@ func TestUpgradeSubscription_Cashfree_CreatesReauthSubscription(t *testing.T) {
 	}
 
 	// Assert prorated amount is correctly calculated
-	expectedProrated := domain.AmountMinor(currencyutils.ProrateUpgrade(
+	proratedAmount, prorateErr := currencyutils.ProrateUpgrade(
 		int64(req.OldAmountMinor),
 		int64(req.NewAmountMinor),
-		req.RemainingDays,
-		req.CycleDays,
+		int64(req.RemainingDays),
+		int64(req.CycleDays),
 		req.Currency.String(),
-	))
+	)
+	if prorateErr != nil {
+		t.Fatalf("proration failed: %v", prorateErr)
+	}
+	expectedProrated := domain.AmountMinor(proratedAmount)
 	if result.ProratedAmountMinor != expectedProrated {
 		t.Errorf("expected ProratedAmountMinor=%d, got %d", expectedProrated, result.ProratedAmountMinor)
 	}

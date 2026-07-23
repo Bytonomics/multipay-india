@@ -419,3 +419,184 @@ func TestSubscriptionService_CreateSubscription_Pipeline(t *testing.T) {
 		}
 	}
 }
+
+// TestPreviewPlanChange_SameCycle tests PreviewPlanChange for an upgrade within MONTHLY cycle.
+// Expects chargeNow to be prorated based on remainingDays, and RecurringEffective to be CYCLE_END.
+func TestPreviewPlanChange_SameCycle(t *testing.T) {
+	req := &domain.PlanChangePreviewRequest{
+		PlanKey:       "plan_monthly",
+		CurrentAmt:    50000, // ₹500 in minor units
+		NewAmt:        75000, // ₹750 in minor units (upgrade)
+		RemainingDays: 15,
+		CycleDays:     30,
+		CycleType:     "MONTHLY",
+	}
+
+	logger := ports.NewNoopLogger()
+	pipeline := hooks.NewPipeline(logger)
+	clock := ports.NewRealClock()
+	validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+	svc := NewSubscriptionService(domain.ProviderRazorpay, &fakeAdapter{}, validator, pipeline, logger, clock)
+
+	quote, err := svc.PreviewPlanChange(req)
+	if err != nil {
+		t.Fatalf("expected nil error for valid same-cycle request, got %v", err)
+	}
+	if quote == nil {
+		t.Fatalf("expected non-nil quote for same-cycle request")
+	}
+
+	if quote.RecurringEffective != "CYCLE_END" {
+		t.Errorf("expected RecurringEffective=CYCLE_END for same-cycle, got %s", quote.RecurringEffective)
+	}
+
+	if quote.ChargeNowMinor == 0 {
+		t.Errorf("expected non-zero chargeNow for same-cycle upgrade, got %d", quote.ChargeNowMinor)
+	}
+
+	if quote.Kind != domain.PlanChangeKindUpgrade {
+		t.Errorf("expected Kind=PlanChangeKindUpgrade, got %v", quote.Kind)
+	}
+}
+
+// TestPreviewPlanChange_CrossCycle tests PreviewPlanChange for an upgrade from MONTHLY to YEARLY.
+// Expects chargeNow = annual - unused-credit, and RecurringEffective to be IMMEDIATE.
+func TestPreviewPlanChange_CrossCycle(t *testing.T) {
+	req := &domain.PlanChangePreviewRequest{
+		PlanKey:       "plan_yearly",
+		CurrentAmt:    50000,  // ₹500/month in minor units
+		NewAmt:        600000, // ₹6000 annual in minor units
+		RemainingDays: 15,
+		CycleDays:     30,
+		CycleType:     "YEARLY", // upgrading from MONTHLY to YEARLY
+	}
+
+	logger := ports.NewNoopLogger()
+	pipeline := hooks.NewPipeline(logger)
+	clock := ports.NewRealClock()
+	validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+	svc := NewSubscriptionService(domain.ProviderRazorpay, &fakeAdapter{}, validator, pipeline, logger, clock)
+
+	quote, err := svc.PreviewPlanChange(req)
+	if err != nil {
+		t.Fatalf("expected nil error for valid cross-cycle request, got %v", err)
+	}
+	if quote == nil {
+		t.Fatalf("expected non-nil quote for cross-cycle request")
+	}
+
+	if quote.RecurringEffective != "IMMEDIATE" {
+		t.Errorf("expected RecurringEffective=IMMEDIATE for cross-cycle, got %s", quote.RecurringEffective)
+	}
+
+	if quote.ChargeNowMinor == 0 {
+		t.Errorf("expected non-zero chargeNow for cross-cycle upgrade, got %d", quote.ChargeNowMinor)
+	}
+
+	if quote.Kind != domain.PlanChangeKindUpgradeCross {
+		t.Errorf("expected Kind=PlanChangeKindUpgradeCross, got %v", quote.Kind)
+	}
+
+	if !quote.RequiresReauthorization {
+		t.Errorf("expected RequiresReauthorization=true for cross-cycle, got %v", quote.RequiresReauthorization)
+	}
+
+	// Verify exact chargeNow calculation: newAmt - prorateUnusedCredit(oldAmt, cycleDays, remainingDays)
+	// = 600000 - (50000 * 15 / 30) = 600000 - 25000 = 575000
+	expectedChargeNow := req.NewAmt - (req.CurrentAmt*req.RemainingDays)/req.CycleDays
+	if quote.ChargeNowMinor != expectedChargeNow {
+		t.Errorf("expected chargeNow=%d (600000 - 25000), got %d", expectedChargeNow, quote.ChargeNowMinor)
+	}
+
+	if quote.NewRecurringMinor != req.NewAmt {
+		t.Errorf("expected NewRecurringMinor=%d (req.NewAmt), got %d", req.NewAmt, quote.NewRecurringMinor)
+	}
+}
+
+// TestPreviewPlanChange_CrossCycleClampsNegativeCharge tests PreviewPlanChange for a downgrade
+// from YEARLY where unused credit exceeds the new annual price, ensuring chargeNow is clamped to 0.
+func TestPreviewPlanChange_CrossCycleClampsNegativeCharge(t *testing.T) {
+	req := &domain.PlanChangePreviewRequest{
+		PlanKey:       "plan_yearly_downgrade",
+		CurrentAmt:    600000, // ₹6000/year in minor units
+		NewAmt:        100000, // ₹1000/year in minor units (downgrade)
+		RemainingDays: 30,
+		CycleDays:     30,
+		CycleType:     "YEARLY", // downgrading within YEARLY
+	}
+
+	logger := ports.NewNoopLogger()
+	pipeline := hooks.NewPipeline(logger)
+	clock := ports.NewRealClock()
+	validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+	svc := NewSubscriptionService(domain.ProviderRazorpay, &fakeAdapter{}, validator, pipeline, logger, clock)
+
+	quote, err := svc.PreviewPlanChange(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if quote == nil {
+		t.Fatalf("expected non-nil quote")
+	}
+	if quote.ChargeNowMinor != 0 {
+		t.Errorf("expected ChargeNowMinor clamped to 0 when unused credit exceeds new annual, got %d", quote.ChargeNowMinor)
+	}
+}
+
+// TestUpgradeSubscription_CrossCycleIntegration verifies that UpgradeSubscription
+// calls PreviewPlanChange internally and returns the correct upgrade result.
+func TestUpgradeSubscription_CrossCycleIntegration(t *testing.T) {
+	changeReq := (*domain.ChangePlanRequest)(nil)
+	changeReqCaptured := false
+
+	adapter := &fakeAdapter{
+		changePlanFunc: func(ctx context.Context, req *domain.ChangePlanRequest) (*domain.Subscription, error) {
+			changeReqCaptured = true
+			changeReq = req
+			return &domain.Subscription{SubscriptionID: "sub_123"}, nil
+		},
+	}
+
+	logger := ports.NewNoopLogger()
+	pipeline := hooks.NewPipeline(logger)
+	clock := ports.NewRealClock()
+	validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+	svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, validator, pipeline, logger, clock)
+
+	req := &domain.UpgradeSubscriptionRequest{
+		SubscriptionID:    "sub_old",
+		NewSubscriptionID: "sub_new",
+		CurrentPlanID:     "plan_old",
+		NewPlanID:         "plan_new",
+		OldAmountMinor:    50000,
+		NewAmountMinor:    500000, // annual
+		RemainingDays:     15,
+		CycleDays:         30,
+		Currency:          domain.Currency("INR"),
+		CustomerEmail:     "test@example.com",
+		CustomerPhone:     "+919876543210",
+		CustomerName:      "Test User",
+		ReturnURL:         "https://example.com/return",
+		CrossCycle:        true,
+	}
+
+	result, err := svc.UpgradeSubscription(context.Background(), req)
+	if err != nil {
+		t.Fatalf("expected nil error for valid upgrade request, got %v", err)
+	}
+	if result == nil {
+		t.Fatalf("expected non-nil upgrade result")
+	}
+
+	if result.RecurringEffective != "IMMEDIATE" {
+		t.Errorf("expected RecurringEffective=IMMEDIATE for cross-cycle upgrade, got %s", result.RecurringEffective)
+	}
+
+	if !changeReqCaptured {
+		t.Errorf("expected ChangePlan to be called for Razorpay cross-cycle upgrade")
+	}
+
+	if changeReq != nil && changeReq.ScheduleAt != domain.ScheduleChangeNow {
+		t.Errorf("expected ChangePlan ScheduleAt=NOW, got %s", changeReq.ScheduleAt)
+	}
+}

@@ -124,3 +124,46 @@ func TestCreateSubscription_ForwardsCustomerNotify(t *testing.T) {
 		}
 	})
 }
+
+// TestChargeSubscription_EmptyRemarksGuard verifies that ChargeSubscription
+// returns an error before making the API call when Remarks is empty.
+func TestChargeSubscription_EmptyRemarksGuard(t *testing.T) {
+	apiCalled := false
+	mockHTTPClient := &http.Client{
+		Transport: rzRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+			apiCalled = true
+			resp := map[string]any{"error": "should not be called"}
+			jsonData, err := json.Marshal(resp)
+			if err != nil {
+				return nil, err
+			}
+			return &http.Response{StatusCode: 400, Body: io.NopCloser(strings.NewReader(string(jsonData)))}, err
+		}),
+	}
+	adapter, err := NewAdapter(&Config{
+		Key:         "rzp_mock_testonly",
+		Secret:      "test_secret",
+		Environment: domain.EnvironmentSandbox,
+		HTTPClient:  mockHTTPClient,
+	})
+	if err != nil {
+		t.Fatalf("failed to create adapter: %v", err)
+	}
+
+	req := &domain.ChargeSubscriptionRequest{
+		SubscriptionID: "sub_123",
+		PaymentRef:     "payment_456",
+		AmountMinor:    50000,
+		Currency:       "INR",
+		Remarks:        "", // Empty remarks — should be rejected
+	}
+
+	_, chargeErr := adapter.ChargeSubscription(context.Background(), req)
+	if chargeErr == nil {
+		t.Errorf("expected error for empty Remarks, got nil")
+	}
+
+	if apiCalled {
+		t.Errorf("API should NOT have been called when Remarks is empty")
+	}
+}

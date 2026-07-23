@@ -181,3 +181,27 @@ export interface ChargeSubscriptionRequest {
   /** Addon item description (Razorpay item.description). Razorpay-only. */
   description?: string;
 }
+
+/**
+ * Plan change kind represents the type of plan change operation
+ */
+export type PlanChangeKind =
+  | "CREATE"
+  | "UPGRADE"
+  | "UPGRADE_CROSS_CYCLE"
+  | "DOWNGRADE";
+
+/**
+ * Plan change quote represents the cost breakdown for a plan change
+ */
+export interface PlanChangeQuote {
+  kind: PlanChangeKind;
+  charge_now_minor: number;
+  new_recurring_minor: number;
+  new_recurring_interval: string;
+  recurring_effective: string;
+  days_remaining: number;
+  current_until_date: string;
+  requires_reauthorization: boolean;
+  requires_phone: boolean;
+}

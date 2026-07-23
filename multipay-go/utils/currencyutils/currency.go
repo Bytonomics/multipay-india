@@ -1,10 +1,14 @@
 package currencyutils
 
 import (
+	"errors"
 	"math"
 
 	"github.com/bojanz/currency"
 )
+
+// ErrProrationOverflow is returned when proration would overflow int64.
+var ErrProrationOverflow = errors.New("proration overflow: charge * remaining days exceeds int64 max")
 
 // AmountMinorToMajor converts minor units (paisa/cents/fils) to major units (rupees/dollars/dinars)
 // using the ISO 4217 minor unit exponent for the given currency.
@@ -48,14 +52,37 @@ func AmountMajorToMinor(majorAmount float64, currencyCode string) int64 {
 
 // ProrateUpgrade returns the one-time top-up to charge for an immediate plan upgrade:
 // (newAmountMinor - oldAmountMinor) * remainingDays / totalDays, rounded to the currency's
-// smallest unit. Returns 0 for downgrades (new <= old), or when totalDays <= 0, or
-// remainingDays <= 0. currencyCode is the ISO-4217 code (e.g. "INR").
-func ProrateUpgrade(oldAmountMinor, newAmountMinor int64, remainingDays, totalDays int, currencyCode string) int64 {
+// smallest unit. Returns (0, nil) for downgrades (new <= old), or when totalDays <= 0, or
+// remainingDays <= 0. Returns (0, ErrProrationOverflow) if charge * remainingDays would
+// overflow int64. currencyCode is the ISO-4217 code (e.g. "INR").
+func ProrateUpgrade(oldAmountMinor, newAmountMinor, remainingDays, totalDays int64, currencyCode string) (int64, error) {
 	if newAmountMinor <= oldAmountMinor || totalDays <= 0 || remainingDays <= 0 {
-		return 0
+		return 0, nil
 	}
 	diffMinor := newAmountMinor - oldAmountMinor
+
+	// Guard the FULL numerator (diffMinor*remainingDays + totalDays/2) against int64 overflow.
+	if diffMinor > (math.MaxInt64-totalDays/2)/remainingDays {
+		return 0, ErrProrationOverflow
+	}
+
 	// integer math in minor units, rounded to nearest minor unit
-	prorated := (diffMinor*int64(remainingDays) + int64(totalDays)/2) / int64(totalDays)
-	return prorated
+	prorated := (diffMinor*remainingDays + totalDays/2) / totalDays
+	return prorated, nil
+}
+
+// ProrateUnusedCredit returns the unused portion of an already-paid cycle when switching billing cycles:
+// (paidAmount * remainingDays) / cycleDays. remainingDays is the days left in the current paid cycle
+// (i.e. cycleDays - elapsedDays). Returns 0 when cycleDays <= 0. remainingDays is clamped to [0, cycleDays].
+func ProrateUnusedCredit(paidAmount, cycleDays, remainingDays int64) int64 {
+	if cycleDays <= 0 {
+		return 0
+	}
+	if remainingDays < 0 {
+		remainingDays = 0
+	}
+	if remainingDays > cycleDays {
+		remainingDays = cycleDays
+	}
+	return (paidAmount * remainingDays) / cycleDays
 }
