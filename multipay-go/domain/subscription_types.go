@@ -350,50 +350,49 @@ const (
 type PlanChangeKind string
 
 const (
-	PlanChangeKindCreate       PlanChangeKind = "CREATE"
-	PlanChangeKindUpgrade      PlanChangeKind = "UPGRADE"
-	PlanChangeKindUpgradeCross PlanChangeKind = "UPGRADE_CROSS_CYCLE"
-	PlanChangeKindDowngrade    PlanChangeKind = "DOWNGRADE"
+	PlanChangeKindCreate           PlanChangeKind = "CREATE"
+	PlanChangeKindUpgradeSameCycle PlanChangeKind = "UPGRADE_SAME_CYCLE"
+	PlanChangeKindUpgradeCross     PlanChangeKind = "UPGRADE_CROSS_CYCLE"
+	PlanChangeKindDowngrade        PlanChangeKind = "DOWNGRADE"
 )
 
-// PlanChangePreviewRequest represents a request to preview the cost of a plan change.
+// PlanChangePreviewRequest is the PURE, generic input to PreviewPlanChange. The CALLER (e.g. the
+// studio control plane) decides the Kind and passes already-resolved amounts in minor units. This
+// type carries NO plan keys, no cycle strings, no DB concepts — only the money-math primitives.
 type PlanChangePreviewRequest struct {
-	PlanKey       string `json:"plan_key" pedantigo:"required,minLength=1"`
-	CycleType     string `json:"cycle_type" pedantigo:"required,oneof=MONTHLY YEARLY"`
-	CurrentAmt    int64  `json:"current_amt" pedantigo:"required,gte=0"`
-	NewAmt        int64  `json:"new_amt" pedantigo:"required,gte=0"`
-	CycleDays     int64  `json:"cycle_days" pedantigo:"required,gt=0"`
-	RemainingDays int64  `json:"remaining_days" pedantigo:"required,gte=0"`
+	Kind               PlanChangeKind `json:"kind" pedantigo:"required,oneof=CREATE UPGRADE_SAME_CYCLE UPGRADE_CROSS_CYCLE DOWNGRADE"`
+	CurrentAmountMinor int64          `json:"current_amount_minor" pedantigo:"gte=0"`
+	NewAmountMinor     int64          `json:"new_amount_minor" pedantigo:"gte=0"`
+	RemainingDays      int64          `json:"remaining_days" pedantigo:"gte=0"`
+	CurrentCycleDays   int64          `json:"current_cycle_days" pedantigo:"gte=0"`
+	Currency           string         `json:"currency" pedantigo:"omitempty"`
 }
 
-// Validate enforces cross-field rules for plan change preview.
+// Validate enforces the money-math preconditions.
 func (r *PlanChangePreviewRequest) Validate() error {
-	if r.PlanKey == "" {
-		return errors.New("plan_key is required")
+	switch r.Kind {
+	case PlanChangeKindCreate, PlanChangeKindUpgradeSameCycle, PlanChangeKindUpgradeCross, PlanChangeKindDowngrade:
+	default:
+		return fmt.Errorf("invalid plan change kind %q", r.Kind)
 	}
-	if r.CycleType != "MONTHLY" && r.CycleType != "YEARLY" {
-		return fmt.Errorf("cycle_type must be MONTHLY or YEARLY, got %q", r.CycleType)
+	if r.RemainingDays < 0 {
+		return errors.New("remaining_days must be >= 0")
 	}
-	if r.CycleDays <= 0 {
-		return errors.New("cycle_days must be > 0")
-	}
-	if r.RemainingDays < 0 || r.RemainingDays > r.CycleDays {
-		return errors.New("remaining_days must be within [0, cycle_days]")
+	if r.CurrentCycleDays > 0 && r.RemainingDays > r.CurrentCycleDays {
+		return errors.New("remaining_days must be within [0, current_cycle_days]")
 	}
 	return nil
 }
 
-// PlanChangeQuote represents the cost breakdown for a plan change.
+// PlanChangeQuote is the PURE money breakdown returned by PreviewPlanChange. All amounts are minor
+// units (int64). RecurringEffective is "IMMEDIATE" (new price starts now) or "CYCLE_END" (new price
+// starts at the next renewal). No dates/names/phone — the caller derives those.
 type PlanChangeQuote struct {
-	Kind                    PlanChangeKind `json:"kind"`
-	ChargeNowMinor          int64          `json:"charge_now_minor"`
-	NewRecurringMinor       int64          `json:"new_recurring_minor"`
-	NewRecurringInterval    string         `json:"new_recurring_interval"`
-	RecurringEffective      string         `json:"recurring_effective"`
-	DaysRemaining           int64          `json:"days_remaining"`
-	CurrentUntilDate        string         `json:"current_until_date"`
-	RequiresReauthorization bool           `json:"requires_reauthorization"`
-	RequiresPhone           bool           `json:"requires_phone"`
+	Kind                PlanChangeKind `json:"kind"`
+	ChargeNowMinor      int64          `json:"charge_now_minor"`
+	ProratedCreditMinor int64          `json:"prorated_credit_minor"`
+	NewRecurringMinor   int64          `json:"new_recurring_minor"`
+	RecurringEffective  string         `json:"recurring_effective"`
 }
 
 // UpgradeSubscriptionRequest represents a request to upgrade an existing subscription to a new plan.

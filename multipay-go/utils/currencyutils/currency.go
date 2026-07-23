@@ -71,12 +71,13 @@ func ProrateUpgrade(oldAmountMinor, newAmountMinor, remainingDays, totalDays int
 	return prorated, nil
 }
 
-// ProrateUnusedCredit returns the unused portion of an already-paid cycle when switching billing cycles:
-// (paidAmount * remainingDays) / cycleDays. remainingDays is the days left in the current paid cycle
-// (i.e. cycleDays - elapsedDays). Returns 0 when cycleDays <= 0. remainingDays is clamped to [0, cycleDays].
-func ProrateUnusedCredit(paidAmount, cycleDays, remainingDays int64) int64 {
-	if cycleDays <= 0 {
-		return 0
+// ProrateUnusedCredit returns the unused (remaining) value of an already-paid cycle when switching
+// billing cycles: (paidAmount * remainingDays) / cycleDays, with remainingDays clamped to
+// [0, cycleDays]. Returns (0, nil) when cycleDays <= 0 or paidAmount <= 0. Returns
+// (0, ErrProrationOverflow) if paidAmount*remainingDays would overflow int64.
+func ProrateUnusedCredit(paidAmount, cycleDays, remainingDays int64) (int64, error) {
+	if cycleDays <= 0 || paidAmount <= 0 {
+		return 0, nil
 	}
 	if remainingDays < 0 {
 		remainingDays = 0
@@ -84,5 +85,11 @@ func ProrateUnusedCredit(paidAmount, cycleDays, remainingDays int64) int64 {
 	if remainingDays > cycleDays {
 		remainingDays = cycleDays
 	}
-	return (paidAmount * remainingDays) / cycleDays
+	if remainingDays == 0 {
+		return 0, nil
+	}
+	if paidAmount > math.MaxInt64/remainingDays {
+		return 0, ErrProrationOverflow
+	}
+	return (paidAmount * remainingDays) / cycleDays, nil
 }

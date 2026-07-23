@@ -280,91 +280,131 @@ The library provides utility functions for computing pro-rated amounts and previ
 
 ### ProrateUpgrade Function
 
-**Signature**: `func ProrateUpgrade(charge, days, cycleDays int64) (int64, error)`
+**Signature**: `func ProrateUpgrade(oldAmountMinor, newAmountMinor, remainingDays, totalDays int64, currencyCode string) (int64, error)`
 
-**Purpose**: Calculate the pro-rated charge amount for a partial billing cycle when upgrading to a higher plan.
+**Purpose**: Calculate the pro-rated charge amount when upgrading to a higher plan mid-cycle.
 
 **Inputs**:
-- `charge` — The additional charge amount (in minor units) for the upgrade, typically the difference between old and new plan amounts
-- `days` — The number of remaining days in the current billing cycle
-- `cycleDays` — The total number of days in the billing cycle
+- `oldAmountMinor` — The current plan's recurring amount (in minor units)
+- `newAmountMinor` — The new plan's recurring amount (in minor units)
+- `remainingDays` — The number of remaining days in the current billing cycle
+- `totalDays` — The total number of days in the billing cycle
+- `currencyCode` — ISO 4217 currency code (used for overflow detection)
 
-**Returns**: The pro-rated amount (in minor units) to be charged immediately, or `ErrProrationOverflow` if the calculation would overflow
+**Formula**: `(newAmountMinor − oldAmountMinor) * remainingDays / totalDays`, rounded to the nearest minor unit via the addend `+ totalDays/2`
 
-**Overflow Guard**: The function checks `charge > math.MaxInt64 / days` before multiplication to prevent integer overflow. If the check fails, it returns `ErrProrationOverflow`.
+**Returns**:
+- On success: the pro-rated charge amount (in minor units)
+- On downgrade (new ≤ old): `(0, nil)` — no charge needed
+- On zero remaining days: `(0, nil)` — no charge needed
+- On overflow: `(0, ErrProrationOverflow)` — when the full numerator `(newAmountMinor − oldAmountMinor) * remainingDays` would overflow `int64`
+
+**Overflow Guard**: Before multiplication, the function checks whether `(newAmountMinor − oldAmountMinor) > math.MaxInt64 / remainingDays`. If true, it returns `ErrProrationOverflow` without performing the calculation.
 
 **Example**:
 ```
-Scenario: Upgrade from ₹500/month to ₹1000/month mid-cycle
-- Old plan: ₹500/30 days = ₹16.67/day
-- New plan: ₹1000/30 days = ₹33.33/day
-- Charge delta: ₹500/month
-- Days remaining: 15 days out of 30
-- Pro-rated charge: 500 * 15 / 30 = ₹250 (in minor units: 25000)
+Scenario: Upgrade from ₹500/month to ₹1000/month, 15 days remaining out of 30
+- Charge delta: 1000 − 500 = ₹500 (₹50000 minor)
+- Pro-rated: 50000 * 15 / 30 = ₹250 (₹25000 minor)
 ```
 
 ### ProrateUnusedCredit Helper
 
-**Purpose**: Calculate the unused-credit refund amount when switching billing cycles (e.g., monthly to annual).
+**Signature**: `func ProrateUnusedCredit(paidAmount, cycleDays, remainingDays int64) (int64, error)`
 
-**Formula**: `(paidAmount * (paidCycleDays - elapsedDays)) / paidCycleDays`
+**Purpose**: Calculate the credit refund when switching between billing cycles (e.g., monthly to annual).
 
 **Inputs**:
 - `paidAmount` — The total amount already paid for the current cycle (in minor units)
-- `paidCycleDays` — The total days in the current billing cycle
-- `elapsedDays` — The number of days already elapsed in the current cycle
+- `cycleDays` — The total days in the current billing cycle
+- `remainingDays` — The number of remaining days in the current cycle (clamped to [0, cycleDays])
 
-**Returns**: The unused-credit amount to be refunded or applied as a credit against the new charge
+**Formula**: `(paidAmount * remainingDays) / cycleDays`
 
-**Usage context**: Cross-cycle upgrades (monthly→annual) use this to compute the credit offset against the annual charge:
+**Returns**:
+- On success: the unused-credit amount (in minor units) to be applied against the new plan charge
+- On non-positive inputs (paidAmount ≤ 0 or cycleDays ≤ 0): `(0, nil)` — no credit
+- On overflow: `(0, ErrProrationOverflow)` — when `paidAmount * remainingDays` would overflow `int64`
+
+**Clamping**: `remainingDays` is clamped to the range [0, cycleDays] before calculation, so overstated values are treated as the full cycle.
+
+**Example**:
 ```
-Example: Switch MONTHLY→YEARLY mid-cycle
+Scenario: Switch MONTHLY→ANNUAL mid-cycle
 - Paid ₹500 for 30-day month
-- Already used 10 days
-- Unused credit: 500 * (30 - 10) / 30 = ₹333.33
-- This credit offsets the annual charge
+- 15 days remaining
+- Unused credit: 500 * 15 / 30 = ₹250 (₹25000 minor)
+- This credit reduces the annual charge
 ```
 
 ### PreviewPlanChange Method
 
-**Signature**: `func PreviewPlanChange(planKey string, currentAmounts CurrentAmounts, cycleInfo CycleInfo) (*PlanChangeQuote, error)`
+**Signature**: `func (s *SubscriptionService) PreviewPlanChange(req *domain.PlanChangePreviewRequest) (*domain.PlanChangeQuote, error)`
 
-**Pure Function**: No provider calls, no state changes, deterministic output based on inputs.
+**Purpose**: Pure, side-effect-free calculator for plan change scenarios. No provider calls, no state changes, deterministic output based on inputs.
 
-**Inputs**:
-- `planKey` — The canonical plan key (e.g., "monthly_500", "annual_6000")
-- `currentAmounts` — Current plan charge, cycle days, prorated amounts
-- `cycleInfo` — Current cycle start/end dates, elapsed/remaining days
+**Inputs** (`PlanChangePreviewRequest`):
+- `Kind` — The type of change: `CREATE`, `UPGRADE_SAME_CYCLE`, `UPGRADE_CROSS_CYCLE`, `DOWNGRADE`
+- `CurrentAmountMinor` — The current plan's recurring amount (in minor units)
+- `NewAmountMinor` — The new plan's recurring amount (in minor units)
+- `RemainingDays` — Days left in the current billing cycle
+- `CurrentCycleDays` — Total days in the current billing cycle
+- `Currency` — ISO 4217 currency code
 
-**Returns**: `PlanChangeQuote` containing:
-- `FromPlan` — Current plan details
-- `ToPlan` — Target plan details
-- `ProratedChargeMinor` — Amount to charge immediately for the upgrade (computed via `ProrateUpgrade`)
-- `UnusedCreditMinor` — Credit applied if switching cycle types (computed via `ProrateUnusedCredit`)
-- `NetChargeMinor` — Final amount after credits: `ProratedChargeMinor - UnusedCreditMinor`
-- `RecurringEffectiveAt` — When the new recurring charge starts (e.g., `IMMEDIATE` for Razorpay, `CYCLE_END` for Cashfree)
+**Returns** (`PlanChangeQuote`):
+- `Kind` — Echoed from request
+- `ChargeNowMinor` — Amount to charge immediately (int64)
+- `ProratedCreditMinor` — Credit applied (only for `UPGRADE_CROSS_CYCLE`; zero otherwise)
+- `NewRecurringMinor` — The new plan's recurring amount
+- `RecurringEffective` — When the new recurring charge starts (`IMMEDIATE` or `CYCLE_END`)
 
-**Reuses**: Calls `ProrateUpgrade` for all amount calculations to maintain consistency.
+**Behavior by Kind**:
 
-### Cross-Cycle Upgrade Support (D6)
+| Kind | Charge Now | Prorated Credit | Recurring Effective | Description |
+|------|------------|-----------------|-------------------|-------------|
+| `CREATE` | `NewAmountMinor` | 0 | `IMMEDIATE` | New subscription, full plan amount charged now |
+| `IMMEDIATE` | `NewAmountMinor` | 0 | `IMMEDIATE` | Plan change with immediate effect, full amount charged |
+| `UPGRADE_SAME_CYCLE` | `ProrateUpgrade(current, new, remaining, cycleDays)` | 0 | `CYCLE_END` | Mid-cycle upgrade, pro-rated charge, recurring starts next cycle |
+| `UPGRADE_CROSS_CYCLE` | `max(0, NewAmountMinor − ProrateUnusedCredit(current, cycleDays, remaining))` | `ProrateUnusedCredit(current, cycleDays, remaining)` | `IMMEDIATE` | Cross-cycle upgrade (e.g., monthly→annual), unused-credit offset, recurring starts now |
+| `DOWNGRADE` | 0 | 0 | `CYCLE_END` | Downgrade (new ≤ current), no charge, effective next cycle |
 
-The library supports upgrading across different billing cycle types:
+**Example Calls**:
 
-**MONTHLY→YEARLY**:
-- Charge: `max(0, NewAmt - ProrateUnusedCredit(currentMonthly, cycleDays, remainingDays))` — the annual plan amount minus the unused-credit from the remaining monthly days, clamped to 0 if negative
-- Recurring: Effective immediately (next charge is annual amount on the anniversary date)
-- Provider: Cashfree (via `UpgradeSubscription` creating a new subscription with `FirstChargeTime`)
+Upgrade same-cycle (₹500 → ₹750, 15 days of 30):
+```
+PlanChangePreviewRequest{
+  Kind: "UPGRADE_SAME_CYCLE",
+  CurrentAmountMinor: 50000,
+  NewAmountMinor: 75000,
+  RemainingDays: 15,
+  CurrentCycleDays: 30,
+  Currency: "INR",
+}
+// Returns: ChargeNowMinor = 12500 (250 rupees), RecurringEffective = "CYCLE_END"
+```
 
-**YEARLY→MONTHLY**:
-- Treated as a downgrade: Scheduled for cycle-end, not processed immediately
-- Handled separately from cross-cycle upgrades
+Cross-cycle upgrade (monthly ₹500 → annual ₹5000, 15 days of 30):
+```
+PlanChangePreviewRequest{
+  Kind: "UPGRADE_CROSS_CYCLE",
+  CurrentAmountMinor: 50000,
+  NewAmountMinor: 500000,
+  RemainingDays: 15,
+  CurrentCycleDays: 30,
+  Currency: "INR",
+}
+// ProratedCredit = 25000 (₹250 from unused month)
+// ChargeNow = max(0, 500000 - 25000) = 475000
+// Returns: ChargeNowMinor = 475000, ProratedCreditMinor = 25000, RecurringEffective = "IMMEDIATE"
+```
 
-### Cancel-at-Cycle-End Capability by Provider
+### Provider-Specific Upgrade Behavior
 
-| Provider | Cancel at Cycle-End | Implementation |
-|----------|--------------------|-|
-| **Razorpay** | ✓ Yes | Supported via `schedule_change_at: "cycle_end"` on subscription operations |
-| **Cashfree** | ✗ No | Only immediate operations; must use cycle-end scheduling server-side after operation completes |
+**Razorpay**: Always uses `IMMEDIATE` scheduling. The library does NOT compute a separate pro-rated charge — the provider handles proration natively when `schedule_change_at="now"` is passed to the ChangePlan operation.
+
+**Cashfree (same-cycle)**: Charges `ProrateUpgrade(diff)` on the same mandate and schedules the new plan for the next cycle.
+
+**Cashfree (cross-cycle)**: Creates a new subscription for the new plan and charges `max(0, NewAmountMinor − ProrateUnusedCredit(current))` on the new mandate; sets `RecurringEffective="IMMEDIATE"`.
 
 ### Provider-Specific Implementation Details
 

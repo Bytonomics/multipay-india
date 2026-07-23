@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	cf "github.com/cashfree/cashfree-pg/v6"
+
+	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 )
 
 // TestMapSubscriptionPaymentEntity_CurrencyNotHardcoded verifies that amount is converted
@@ -89,22 +91,22 @@ func TestMapPlanEntityToCanonical_AmountConversion(t *testing.T) {
 // TestMapSubscriptionStatus_UnknownStatusDefault verifies that an unknown Cashfree
 // subscription status is mapped to a safe canonical status (not empty/panic).
 func TestMapSubscriptionStatus_UnknownStatusDefault(t *testing.T) {
-	// Call mapSubscriptionStatus with an unknown status pointer
 	unknownStatus := "UNKNOWN_CF_STATUS"
 	result := mapSubscriptionStatus(&unknownStatus)
 
-	// Should return a valid domain status, not empty
 	if result == "" {
 		t.Errorf("expected non-empty canonical status for unknown input, got empty string")
 	}
+	if result == domain.SubscriptionStatusActive {
+		t.Errorf("unknown status must NOT map to ACTIVE (would wrongly grant entitlement), got %q", result)
+	}
+	if result != domain.SubscriptionStatusPending {
+		t.Errorf("expected unknown status to map to PENDING (safe non-entitling default), got %q", result)
+	}
 
-	// Should be a known canonical status (one of the domain constants)
-	switch result {
-	case "INITIALIZED", "BANK_APPROVAL_PENDING", "AUTHENTICATED", "ACTIVE", "PENDING",
-		"ON_HOLD", "HALTED", "PAUSED", "CUSTOMER_PAUSED", "CANCELLED",
-		"CUSTOMER_CANCELLED", "COMPLETED", "EXPIRED":
-		// Valid status — OK
-	default:
-		t.Errorf("expected canonical status, got unknown value: %s", result)
+	// A known status still maps correctly.
+	active := "ACTIVE"
+	if got := mapSubscriptionStatus(&active); got != domain.SubscriptionStatusActive {
+		t.Errorf("known ACTIVE must map to SubscriptionStatusActive, got %q", got)
 	}
 }

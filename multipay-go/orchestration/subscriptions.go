@@ -374,59 +374,55 @@ func (s *SubscriptionService) PreviewPlanChange(req *domain.PlanChangePreviewReq
 	if req == nil {
 		return nil, fmt.Errorf("request cannot be nil: %w", domain.ErrInvalidRequest)
 	}
-
 	if err := planChangePreviewValidator.Validate(req); err != nil {
 		return nil, fmt.Errorf("request validation failed: %w", err)
 	}
 
-	// Determine plan change kind and calculate amounts based on cycle type change
-	var kind domain.PlanChangeKind
-	var chargeNow, newRecurring int64
-	var recurringEffective string
-
-	// For same-cycle upgrades (no cycle type change), use ProrateUpgrade
-	// For cross-cycle upgrades (e.g., MONTHLY->YEARLY), use ProrateUnusedCredit
-	switch req.CycleType {
-	case "MONTHLY":
-		// Current cycle is MONTHLY; could be upgrading within MONTHLY or crossing to YEARLY
-		kind = domain.PlanChangeKindUpgrade
-		// Same-cycle upgrade: charge = (new - old) * remainingDays / cycleDays
-		prorated, err := currencyutils.ProrateUpgrade(
-			req.CurrentAmt,
-			req.NewAmt,
-			req.RemainingDays,
-			req.CycleDays,
-			"INR", // currency from context
-		)
+	switch req.Kind {
+	case domain.PlanChangeKindCreate:
+		return &domain.PlanChangeQuote{
+			Kind:               domain.PlanChangeKindCreate,
+			ChargeNowMinor:     req.NewAmountMinor,
+			NewRecurringMinor:  req.NewAmountMinor,
+			RecurringEffective: "IMMEDIATE",
+		}, nil
+	case domain.PlanChangeKindUpgradeSameCycle:
+		charge, err := currencyutils.ProrateUpgrade(req.CurrentAmountMinor, req.NewAmountMinor, req.RemainingDays, req.CurrentCycleDays, req.Currency)
 		if err != nil {
-			return nil, fmt.Errorf("upgrade proration failed: %w", err)
+			return nil, fmt.Errorf("preview upgrade same-cycle: %w", err)
 		}
-		chargeNow = prorated
-		newRecurring = req.NewAmt // same recurring
-		recurringEffective = "CYCLE_END"
-	case "YEARLY":
-		// Cross-cycle upgrade: MONTHLY → YEARLY
-		kind = domain.PlanChangeKindUpgradeCross
-		unused := currencyutils.ProrateUnusedCredit(req.CurrentAmt, req.CycleDays, req.RemainingDays)
-		chargeNow = req.NewAmt - unused // new annual minus unused credit from current month
-		if chargeNow < 0 {
-			chargeNow = 0
+		return &domain.PlanChangeQuote{
+			Kind:               domain.PlanChangeKindUpgradeSameCycle,
+			ChargeNowMinor:     charge,
+			NewRecurringMinor:  req.NewAmountMinor,
+			RecurringEffective: "CYCLE_END",
+		}, nil
+	case domain.PlanChangeKindUpgradeCross:
+		credit, err := currencyutils.ProrateUnusedCredit(req.CurrentAmountMinor, req.CurrentCycleDays, req.RemainingDays)
+		if err != nil {
+			return nil, fmt.Errorf("preview upgrade cross-cycle: %w", err)
 		}
-		newRecurring = req.NewAmt // the new annual amount
-		recurringEffective = "IMMEDIATE"
+		charge := req.NewAmountMinor - credit
+		if charge < 0 {
+			charge = 0
+		}
+		return &domain.PlanChangeQuote{
+			Kind:                domain.PlanChangeKindUpgradeCross,
+			ChargeNowMinor:      charge,
+			ProratedCreditMinor: credit,
+			NewRecurringMinor:   req.NewAmountMinor,
+			RecurringEffective:  "IMMEDIATE",
+		}, nil
+	case domain.PlanChangeKindDowngrade:
+		return &domain.PlanChangeQuote{
+			Kind:               domain.PlanChangeKindDowngrade,
+			ChargeNowMinor:     0,
+			NewRecurringMinor:  req.NewAmountMinor,
+			RecurringEffective: "CYCLE_END",
+		}, nil
+	default:
+		return nil, fmt.Errorf("unknown plan change kind %q: %w", req.Kind, domain.ErrInvalidRequest)
 	}
-
-	return &domain.PlanChangeQuote{
-		Kind:                    kind,
-		ChargeNowMinor:          chargeNow,
-		NewRecurringMinor:       newRecurring,
-		NewRecurringInterval:    req.CycleType,
-		RecurringEffective:      recurringEffective,
-		DaysRemaining:           req.RemainingDays,
-		CurrentUntilDate:        fmt.Sprintf("%d days", req.RemainingDays),
-		RequiresReauthorization: kind == domain.PlanChangeKindUpgradeCross,
-		RequiresPhone:           false,
-	}, nil
 }
 
 // UpgradeSubscription immediately charges the pro-rata amount on an existing subscription's mandate.
@@ -450,15 +446,23 @@ func (s *SubscriptionService) UpgradeSubscription(ctx context.Context, req *doma
 		return nil, fmt.Errorf("capability check failed: %w", err)
 	}
 
-	proratedAmount, err := currencyutils.ProrateUpgrade(
-		int64(req.OldAmountMinor),
-		int64(req.NewAmountMinor),
-		int64(req.RemainingDays),
-		int64(req.CycleDays),
-		req.Currency.String(),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("upgrade proration failed: %w", err)
+	var proratedAmount int64
+	if req.CrossCycle {
+		credit, cerr := currencyutils.ProrateUnusedCredit(int64(req.OldAmountMinor), int64(req.CycleDays), int64(req.RemainingDays))
+		if cerr != nil {
+			return nil, fmt.Errorf("cross-cycle unused credit: %w", cerr)
+		}
+		charge := int64(req.NewAmountMinor) - credit
+		if charge < 0 {
+			charge = 0
+		}
+		proratedAmount = charge
+	} else {
+		p, perr := currencyutils.ProrateUpgrade(int64(req.OldAmountMinor), int64(req.NewAmountMinor), int64(req.RemainingDays), int64(req.CycleDays), req.Currency.String())
+		if perr != nil {
+			return nil, fmt.Errorf("upgrade proration failed: %w", perr)
+		}
+		proratedAmount = p
 	}
 	prorated := domain.AmountMinor(proratedAmount)
 

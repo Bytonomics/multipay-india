@@ -149,6 +149,7 @@ func TestProrateUnusedCredit(t *testing.T) {
 		cycleDays     int64
 		remainingDays int64
 		expected      int64
+		wantErr       error
 	}{
 		// Basic calculation: 10000 paid for 30 days, 15 days remain = 5000
 		{
@@ -157,6 +158,7 @@ func TestProrateUnusedCredit(t *testing.T) {
 			cycleDays:     30,
 			remainingDays: 15,
 			expected:      5000, // (10000 * 15) / 30 = 5000
+			wantErr:       nil,
 		},
 		// All days remain: 10000 paid for 30 days, all 30 days remain = 10000
 		{
@@ -165,6 +167,7 @@ func TestProrateUnusedCredit(t *testing.T) {
 			cycleDays:     30,
 			remainingDays: 30,
 			expected:      10000, // (10000 * 30) / 30 = 10000
+			wantErr:       nil,
 		},
 		// Zero days remain: 10000 paid for 30 days, 0 days remain = 0
 		{
@@ -173,6 +176,7 @@ func TestProrateUnusedCredit(t *testing.T) {
 			cycleDays:     30,
 			remainingDays: 0,
 			expected:      0, // (10000 * 0) / 30 = 0
+			wantErr:       nil,
 		},
 		// remainingDays exceeds cycleDays (clamped to cycleDays): 10000 paid for 30 days, 50 remain (clamp to 30) = 10000
 		{
@@ -181,6 +185,7 @@ func TestProrateUnusedCredit(t *testing.T) {
 			cycleDays:     30,
 			remainingDays: 50,
 			expected:      10000, // Clamped to 30: (10000 * 30) / 30 = 10000
+			wantErr:       nil,
 		},
 		// Negative remainingDays (clamped to 0): 10000 paid for 30 days, -5 remain (clamp to 0) = 0
 		{
@@ -189,6 +194,7 @@ func TestProrateUnusedCredit(t *testing.T) {
 			cycleDays:     30,
 			remainingDays: -5,
 			expected:      0, // Clamped to 0: (10000 * 0) / 30 = 0
+			wantErr:       nil,
 		},
 		// Zero paid amount: 0 paid for 30 days, 15 days remain = 0
 		{
@@ -197,6 +203,7 @@ func TestProrateUnusedCredit(t *testing.T) {
 			cycleDays:     30,
 			remainingDays: 15,
 			expected:      0, // (0 * 15) / 30 = 0
+			wantErr:       nil,
 		},
 		// Zero cycle days (returns 0): 10000 paid for 0 days, 15 days remain = 0
 		{
@@ -205,6 +212,7 @@ func TestProrateUnusedCredit(t *testing.T) {
 			cycleDays:     0,
 			remainingDays: 15,
 			expected:      0, // cycleDays <= 0: returns 0
+			wantErr:       nil,
 		},
 		// Negative cycle days (returns 0): 10000 paid for -30 days, 15 days remain = 0
 		{
@@ -213,6 +221,7 @@ func TestProrateUnusedCredit(t *testing.T) {
 			cycleDays:     -30,
 			remainingDays: 15,
 			expected:      0, // cycleDays <= 0: returns 0
+			wantErr:       nil,
 		},
 		// Large paidAmount with fractional days (rounding): 100000 paid for 30 days, 10 days remain = 33333
 		{
@@ -221,6 +230,7 @@ func TestProrateUnusedCredit(t *testing.T) {
 			cycleDays:     30,
 			remainingDays: 10,
 			expected:      33333, // (100000 * 10) / 30 = 33333.33... → 33333
+			wantErr:       nil,
 		},
 		// Large paidAmount whose product with remainingDays still fits in int64 (no overflow).
 		{
@@ -229,6 +239,7 @@ func TestProrateUnusedCredit(t *testing.T) {
 			cycleDays:     1000,
 			remainingDays: 999,
 			expected:      9_000_000_000_000_000 * 999 / 1000, // 8_991_000_000_000_000, no overflow
+			wantErr:       nil,
 		},
 		// Monthly to yearly cycle transition: 50000 paid for 30 days, 30 days remain (used to calculate full unused credit)
 		{
@@ -237,6 +248,7 @@ func TestProrateUnusedCredit(t *testing.T) {
 			cycleDays:     30,
 			remainingDays: 30,
 			expected:      50000, // Full credit: (50000 * 30) / 30 = 50000
+			wantErr:       nil,
 		},
 		// Monthly to yearly cycle transition: 50000 paid for 30 days, 20 days remain (partial unused)
 		{
@@ -245,15 +257,40 @@ func TestProrateUnusedCredit(t *testing.T) {
 			cycleDays:     30,
 			remainingDays: 20,
 			expected:      33333, // Partial credit: (50000 * 20) / 30 = 33333.33... → 33333
+			wantErr:       nil,
+		},
+		// Overflow case: paidAmount*remainingDays exceeds MaxInt64
+		{
+			name:          "overflow: paidAmount*remainingDays exceeds MaxInt64",
+			paidAmount:    math.MaxInt64,
+			cycleDays:     30,
+			remainingDays: 1_000_000,
+			expected:      0,
+			wantErr:       ErrProrationOverflow,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ProrateUnusedCredit(tt.paidAmount, tt.cycleDays, tt.remainingDays)
-			if result != tt.expected {
+			got, err := ProrateUnusedCredit(tt.paidAmount, tt.cycleDays, tt.remainingDays)
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Errorf("ProrateUnusedCredit(%d, %d, %d) error = %v, want %v",
+						tt.paidAmount, tt.cycleDays, tt.remainingDays, err, tt.wantErr)
+				}
+				if got != 0 {
+					t.Errorf("ProrateUnusedCredit(%d, %d, %d) result = %d, want 0 on error",
+						tt.paidAmount, tt.cycleDays, tt.remainingDays, got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("ProrateUnusedCredit(%d, %d, %d) unexpected error: %v",
+					tt.paidAmount, tt.cycleDays, tt.remainingDays, err)
+			}
+			if got != tt.expected {
 				t.Errorf("ProrateUnusedCredit(%d, %d, %d) = %d, want %d",
-					tt.paidAmount, tt.cycleDays, tt.remainingDays, result, tt.expected)
+					tt.paidAmount, tt.cycleDays, tt.remainingDays, got, tt.expected)
 			}
 		})
 	}

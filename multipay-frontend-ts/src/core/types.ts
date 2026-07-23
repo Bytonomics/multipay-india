@@ -142,6 +142,7 @@ export interface UpgradeSubscriptionRequest {
   customer_phone: string;
   customer_name?: string;
   return_url: string;
+  cross_cycle?: boolean;
 }
 
 /**
@@ -187,7 +188,7 @@ export interface ChargeSubscriptionRequest {
  */
 export type PlanChangeKind =
   | "CREATE"
-  | "UPGRADE"
+  | "UPGRADE_SAME_CYCLE"
   | "UPGRADE_CROSS_CYCLE"
   | "DOWNGRADE";
 
@@ -197,11 +198,7 @@ export type PlanChangeKind =
 export interface PlanChangeQuote {
   kind: PlanChangeKind;
   charge_now_minor: number;
+  prorated_credit_minor: number;
   new_recurring_minor: number;
-  new_recurring_interval: string;
   recurring_effective: string;
-  days_remaining: number;
-  current_until_date: string;
-  requires_reauthorization: boolean;
-  requires_phone: boolean;
 }

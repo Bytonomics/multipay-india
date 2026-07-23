@@ -37,7 +37,7 @@ const (
 	CapSubscriptionManualCharge     Capability = "subscription_manual_charge"
 	CapSubscriptionUpgradeProration Capability = "subscription_upgrade_proration"
 	CapSubscriptionEligibility      Capability = "subscription_eligibility"
-	CapSubscriptionCancelAtCycleEnd Capability = "cap_subscription_cancel_at_cycle_end"
+	CapSubscriptionCancelAtCycleEnd Capability = "subscription_cancel_at_cycle_end"
 )
 
 // Razorpay-specific Capabilities
