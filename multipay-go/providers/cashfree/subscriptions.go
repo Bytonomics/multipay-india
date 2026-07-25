@@ -121,6 +121,11 @@ func createSubscription(ctx context.Context, adapter *Adapter, req *domain.Creat
 		expiryStr := req.ExpiresAt.Format("2006-01-02T15:04:05-07:00")
 		cfReq.SubscriptionExpiryTime = &expiryStr
 	}
+	// FirstChargeWithMandate is mapped by the orchestration layer stamping req.FirstChargeTime = now,
+	// which we forward as subscription_first_charge_time so Cashfree charges the first period right after
+	// authorization and derives next_charge_time = first_charge_time + plan interval. RecurringInterval /
+	// RecurringIntervalType are intentionally ignored here (the Cashfree plan drives the schedule), and we
+	// never raise a manual charge (that would double-charge).
 	if req.FirstChargeTime != nil {
 		chargeStr := req.FirstChargeTime.Format("2006-01-02T15:04:05-07:00")
 		cfReq.SubscriptionFirstChargeTime = &chargeStr

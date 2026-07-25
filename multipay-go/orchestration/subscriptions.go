@@ -70,6 +70,13 @@ func (s *SubscriptionService) CreateSubscription(ctx context.Context, req *domai
 		return nil, fmt.Errorf("request validation failed: %w", err)
 	}
 
+	// When the caller opts into charging the first period at signup, stamp a concrete "now" here so
+	// each adapter maps it to its own first-charge mechanism. Adapters have no clock (library rule).
+	if req.FirstChargeWithMandate {
+		now := s.clock.Now()
+		req.FirstChargeTime = &now
+	}
+
 	provider := s.provider
 	adapter := s.adapter
 

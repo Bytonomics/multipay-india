@@ -97,7 +97,60 @@ func createSubscription(ctx context.Context, adapter *Adapter, req *domain.Creat
 	if req.ExpiresAt != nil {
 		subData.ExpireBy = req.ExpiresAt.Unix()
 	}
-	if req.FirstChargeTime != nil {
+	if req.FirstChargeWithMandate {
+		// Razorpay has no first-charge flag. Charge the first period as an addon during authorization and
+		// start the recurring cycle one interval later (no double charge). The addon's amount AND currency
+		// MUST equal the plan's, and the start offset MUST match the plan interval — otherwise the first
+		// charge and the recurring cycle would disagree. Source them from the plan itself:
+		//   - inline PlanDetails: straight from the plan being created.
+		//   - existing PlanID: from the recurring hints studio derives from the SAME resolved price that
+		//     selected this plan_id (guaranteed equal to the provider plan).
+		// This adapter is gated (not prod); if the values are missing/inconsistent, fail deterministically
+		// before any SDK call.
+		// FirstChargeTime is stamped by the orchestration layer whenever FirstChargeWithMandate is set; a
+		// nil here means the adapter was reached without that stamp (unsupported direct call). Guard it so
+		// the start-offset computation below cannot nil-panic — return a deterministic error instead.
+		if req.FirstChargeTime == nil {
+			return nil, fmt.Errorf("first_charge_with_mandate requires first_charge_time to be stamped by the orchestration layer: %w", domain.ErrInvalidRequest)
+		}
+		var addonAmount domain.AmountMinor
+		var addonCurrency domain.Currency
+		var offInterval int32
+		var offIntervalType domain.PlanIntervalType
+		switch {
+		case req.PlanDetails != nil:
+			if req.PlanDetails.PlanType != domain.PlanTypePeriodic {
+				return nil, fmt.Errorf("first_charge_with_mandate on razorpay requires a PERIODIC plan: %w", domain.ErrInvalidRequest)
+			}
+			addonAmount = req.PlanDetails.AmountMinor
+			addonCurrency = req.PlanDetails.Currency
+			offInterval = req.PlanDetails.Interval
+			offIntervalType = req.PlanDetails.IntervalType
+		default:
+			if req.RecurringAmountMinor <= 0 || req.RecurringInterval <= 0 || req.RecurringIntervalType == "" || req.RecurringCurrency == "" {
+				return nil, fmt.Errorf("first_charge_with_mandate on razorpay with an existing plan_id requires recurring_amount_minor>0, recurring_interval>0, recurring_interval_type and recurring_currency: %w", domain.ErrInvalidRequest)
+			}
+			addonAmount = req.RecurringAmountMinor
+			addonCurrency = req.RecurringCurrency
+			offInterval = req.RecurringInterval
+			offIntervalType = req.RecurringIntervalType
+		}
+		// First period charged upfront during authorization via an addon whose amount+currency equal the plan's.
+		subData.Addons = append(subData.Addons, razorpayAddon{
+			Item: razorpayItem{
+				Name:     "First billing period",
+				Amount:   int64(addonAmount),
+				Currency: string(addonCurrency),
+			},
+		})
+		// Recurring cycle starts one interval after now, so the first period is not double-charged.
+		start := req.FirstChargeTime.AddDate(
+			yearsFor(offIntervalType, offInterval),
+			monthsFor(offIntervalType, offInterval),
+			daysFor(offIntervalType, offInterval),
+		)
+		subData.StartAt = start.Unix()
+	} else if req.FirstChargeTime != nil {
 		subData.StartAt = req.FirstChargeTime.Unix()
 	}
 
@@ -476,4 +529,31 @@ func (a *Adapter) GetSubscriptionPayments(ctx context.Context, req *domain.GetSu
 // See subscriptions.go for implementation.
 func (a *Adapter) ChargeSubscription(ctx context.Context, req *domain.ChargeSubscriptionRequest) (*domain.SubscriptionPayment, error) {
 	return chargeSubscription(ctx, a, req)
+}
+
+func yearsFor(it domain.PlanIntervalType, n int32) int {
+	if it == domain.PlanIntervalYear {
+		return int(n)
+	}
+	return 0
+}
+
+func monthsFor(it domain.PlanIntervalType, n int32) int {
+	if it == domain.PlanIntervalMonth {
+		return int(n)
+	}
+	return 0
+}
+
+func daysFor(it domain.PlanIntervalType, n int32) int {
+	switch it {
+	case domain.PlanIntervalDay:
+		return int(n)
+	case domain.PlanIntervalWeek:
+		return int(n) * 7
+	case domain.PlanIntervalMonth, domain.PlanIntervalYear:
+		return 0
+	default:
+		return 0
+	}
 }

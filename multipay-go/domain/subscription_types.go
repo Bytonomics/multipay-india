@@ -191,13 +191,29 @@ type CreateSubscriptionRequest struct {
 	PlanDetails    *CreatePlanRequest `json:"plan_details,omitempty"`
 	// CustomerEmail is optional in the canonical contract but required by Cashfree provider adapter.
 	// The adapter enforces this requirement; validation is provider-specific, not checked here.
-	CustomerEmail   string            `json:"customer_email,omitempty" pedantigo:"omitempty,email"`
-	CustomerPhone   string            `json:"customer_phone" pedantigo:"required,minLength=5,maxLength=20"`
-	CustomerName    string            `json:"customer_name,omitempty" pedantigo:"omitempty,maxLength=200"`
-	ReturnURL       string            `json:"return_url" pedantigo:"required,url"`
-	ExpiresAt       *time.Time        `json:"expires_at,omitempty"`
-	FirstChargeTime *time.Time        `json:"first_charge_time,omitempty"`
-	Tags            map[string]string `json:"tags,omitempty" pedantigo:"omitempty,maxItems=10"`
+	CustomerEmail   string     `json:"customer_email,omitempty" pedantigo:"omitempty,email"`
+	CustomerPhone   string     `json:"customer_phone" pedantigo:"required,minLength=5,maxLength=20"`
+	CustomerName    string     `json:"customer_name,omitempty" pedantigo:"omitempty,maxLength=200"`
+	ReturnURL       string     `json:"return_url" pedantigo:"required,url"`
+	ExpiresAt       *time.Time `json:"expires_at,omitempty"`
+	FirstChargeTime *time.Time `json:"first_charge_time,omitempty"`
+	// FirstChargeWithMandate: collect the first billing period immediately at signup
+	// (right after mandate authorization). Provider-neutral; each adapter maps it to its own mechanism.
+	FirstChargeWithMandate bool `json:"first_charge_with_mandate,omitempty"`
+
+	// RecurringAmountMinor/RecurringInterval/RecurringIntervalType: recurring-schedule hint used by
+	// adapters that must compute the first-charge/start offset when FirstChargeWithMandate is true and an
+	// existing PlanID is used. Cashfree ignores these (its plan drives the schedule); Razorpay needs them
+	// (addon amount + start_at = now+interval).
+	RecurringAmountMinor  AmountMinor      `json:"recurring_amount_minor,omitempty"  pedantigo:"omitempty,gte=0"`
+	RecurringInterval     int32            `json:"recurring_interval,omitempty"      pedantigo:"omitempty,gte=1"`
+	RecurringIntervalType PlanIntervalType `json:"recurring_interval_type,omitempty" pedantigo:"omitempty,oneof=DAY WEEK MONTH YEAR"`
+	// RecurringCurrency is the ISO-4217 currency for the recurring charge and the first-period addon.
+	// It is threaded on EVERY create-subscription request (both Cashfree and Razorpay) to keep the two
+	// provider flows in sync. Cashfree ignores it (the provider plan drives currency); Razorpay uses it
+	// as the currency of the first-period addon when FirstChargeWithMandate is true.
+	RecurringCurrency Currency          `json:"recurring_currency,omitempty" pedantigo:"omitempty,iso4217"`
+	Tags              map[string]string `json:"tags,omitempty" pedantigo:"omitempty,maxItems=10"`
 
 	// TotalCount is the number of billing cycles the customer will be charged. Razorpay
 	// treats this as MANDATORY (unless end_at is supplied); the Razorpay adapter sends it
@@ -249,6 +265,9 @@ func (r *CreateSubscriptionRequest) Validate() error {
 	}
 	if r.ReturnURL == "" {
 		return errors.New("return_url is required and must not be empty")
+	}
+	if r.FirstChargeWithMandate && r.FirstChargeTime != nil {
+		return errors.New("first_charge_with_mandate and first_charge_time are mutually exclusive")
 	}
 	// Inline plan details are validated by the canonical CreatePlanRequest.Validate()
 	// (single source of truth) rather than re-implementing the rules here.

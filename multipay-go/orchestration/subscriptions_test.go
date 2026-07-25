@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/capabilities"
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
@@ -538,6 +539,204 @@ func TestPreviewPlanChange(t *testing.T) {
 				t.Errorf("RecurringEffective: expected %s, got %s", tt.expectRecurringEff, quote.RecurringEffective)
 			}
 		})
+	}
+}
+
+// TestCreateSubscription_RecurringFieldBounds tests pedantigo tag constraints on recurring-schedule fields.
+// The module-level validator (createSubscriptionValidator) enforces field bounds defined by pedantigo tags:
+// RecurringAmountMinor (gte=0), RecurringInterval (gte=1), RecurringIntervalType (oneof), RecurringCurrency (iso4217).
+// For wantErr=true cases, the test asserts that the adapter is NEVER invoked (validation short-circuits before dispatch).
+func TestCreateSubscription_RecurringFieldBounds(t *testing.T) {
+	tests := []struct {
+		name            string
+		recurring       domain.CreateSubscriptionRequest // base request with recurring fields set
+		wantErr         bool
+		adapterExpected bool // true if adapter should be called, false if validation should short-circuit
+	}{
+		{
+			name: "valid recurring fields succeed",
+			recurring: domain.CreateSubscriptionRequest{
+				PlanID:                 "plan_x",
+				ReturnURL:              "https://example.com/return",
+				CustomerPhone:          "9876543210",
+				CustomerEmail:          "test@example.com",
+				FirstChargeWithMandate: true,
+				RecurringAmountMinor:   49900,
+				RecurringInterval:      1,
+				RecurringIntervalType:  domain.PlanIntervalMonth,
+				RecurringCurrency:      domain.Currency("INR"),
+			},
+			wantErr:         false,
+			adapterExpected: true,
+		},
+		{
+			name: "zero recurring fields succeed (omitempty)",
+			recurring: domain.CreateSubscriptionRequest{
+				PlanID:                 "plan_x",
+				ReturnURL:              "https://example.com/return",
+				CustomerPhone:          "9876543210",
+				CustomerEmail:          "test@example.com",
+				FirstChargeWithMandate: true,
+				RecurringAmountMinor:   0,
+				RecurringInterval:      0,
+				RecurringIntervalType:  domain.PlanIntervalType(""),
+				RecurringCurrency:      domain.Currency(""),
+			},
+			wantErr:         false,
+			adapterExpected: true,
+		},
+		{
+			name: "recurring_interval negative is rejected",
+			recurring: domain.CreateSubscriptionRequest{
+				PlanID:                 "plan_x",
+				ReturnURL:              "https://example.com/return",
+				CustomerPhone:          "9876543210",
+				CustomerEmail:          "test@example.com",
+				FirstChargeWithMandate: true,
+				RecurringAmountMinor:   49900,
+				RecurringInterval:      -1,
+				RecurringIntervalType:  domain.PlanIntervalMonth,
+				RecurringCurrency:      domain.Currency("INR"),
+			},
+			wantErr:         true,
+			adapterExpected: false,
+		},
+		{
+			name: "recurring_interval_type invalid enum is rejected",
+			recurring: domain.CreateSubscriptionRequest{
+				PlanID:                 "plan_x",
+				ReturnURL:              "https://example.com/return",
+				CustomerPhone:          "9876543210",
+				CustomerEmail:          "test@example.com",
+				FirstChargeWithMandate: true,
+				RecurringAmountMinor:   49900,
+				RecurringInterval:      1,
+				RecurringIntervalType:  domain.PlanIntervalType("FORTNIGHT"),
+				RecurringCurrency:      domain.Currency("INR"),
+			},
+			wantErr:         true,
+			adapterExpected: false,
+		},
+		{
+			name: "recurring_amount_minor negative is rejected",
+			recurring: domain.CreateSubscriptionRequest{
+				PlanID:                 "plan_x",
+				ReturnURL:              "https://example.com/return",
+				CustomerPhone:          "9876543210",
+				CustomerEmail:          "test@example.com",
+				FirstChargeWithMandate: true,
+				RecurringAmountMinor:   domain.AmountMinor(-1),
+				RecurringInterval:      1,
+				RecurringIntervalType:  domain.PlanIntervalMonth,
+				RecurringCurrency:      domain.Currency("INR"),
+			},
+			wantErr:         true,
+			adapterExpected: false,
+		},
+		{
+			name: "recurring_currency invalid iso4217 is rejected",
+			recurring: domain.CreateSubscriptionRequest{
+				PlanID:                 "plan_x",
+				ReturnURL:              "https://example.com/return",
+				CustomerPhone:          "9876543210",
+				CustomerEmail:          "test@example.com",
+				FirstChargeWithMandate: true,
+				RecurringAmountMinor:   49900,
+				RecurringInterval:      1,
+				RecurringIntervalType:  domain.PlanIntervalMonth,
+				RecurringCurrency:      domain.Currency("XX"),
+			},
+			wantErr:         true,
+			adapterExpected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			adapterCalled := false
+			adapter := &fakeAdapter{
+				createSubscriptionFunc: func(ctx context.Context, req *domain.CreateSubscriptionRequest) (*domain.Subscription, error) {
+					adapterCalled = true
+					return &domain.Subscription{
+						SubscriptionID: req.SubscriptionID,
+						AuthLink:       "https://example.com/auth",
+						AuthSessionID:  "session_123",
+						Environment:    domain.EnvironmentSandbox,
+					}, nil
+				},
+			}
+			logger := ports.NewNoopLogger()
+			pipeline := hooks.NewPipeline(logger)
+			clock := ports.NewRealClock()
+			validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+			svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, validator, pipeline, logger, clock)
+
+			_, err := svc.CreateSubscription(context.Background(), &tt.recurring)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("expected nil error, got %v", err)
+				}
+			}
+
+			// Assert adapter call expectations: for validation failures, adapter must NOT be called
+			if tt.adapterExpected && !adapterCalled {
+				t.Fatalf("adapter should have been called")
+			}
+			if !tt.adapterExpected && adapterCalled {
+				t.Fatalf("adapter should NOT have been called (validation should short-circuit)")
+			}
+		})
+	}
+}
+
+// TestCreateSubscription_FirstChargeWithMandate_StampsClock verifies that when the caller opts into
+// first_charge_with_mandate (with first_charge_time nil, as the mutually-exclusive rule requires), the
+// orchestration layer stamps req.FirstChargeTime to the clock's Now() BEFORE dispatching to the adapter.
+// Adapters have no clock (library rule), so this stamp is the single source of the concrete "now".
+func TestCreateSubscription_FirstChargeWithMandate_StampsClock(t *testing.T) {
+	fixedTime := time.Date(2026, 7, 25, 10, 0, 0, 0, time.UTC)
+	clock := &fixedClock{fixedTime: fixedTime}
+
+	var capturedFirstChargeTime *time.Time
+	adapter := &fakeAdapter{
+		createSubscriptionFunc: func(ctx context.Context, req *domain.CreateSubscriptionRequest) (*domain.Subscription, error) {
+			capturedFirstChargeTime = req.FirstChargeTime
+			return &domain.Subscription{SubscriptionID: req.SubscriptionID}, nil
+		},
+	}
+
+	logger := ports.NewNoopLogger()
+	pipeline := hooks.NewPipeline(logger)
+	validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+	svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, validator, pipeline, logger, clock)
+
+	req := &domain.CreateSubscriptionRequest{
+		PlanID:                 "plan_x",
+		ReturnURL:              "https://example.com/return",
+		CustomerPhone:          "9876543210",
+		CustomerEmail:          "test@example.com",
+		FirstChargeWithMandate: true,
+		FirstChargeTime:        nil, // must be nil (mutually exclusive with the flag); orchestration stamps it
+		RecurringAmountMinor:   49900,
+		RecurringInterval:      1,
+		RecurringIntervalType:  domain.PlanIntervalMonth,
+		RecurringCurrency:      domain.Currency("INR"),
+	}
+
+	if _, err := svc.CreateSubscription(context.Background(), req); err != nil {
+		t.Fatalf("CreateSubscription returned error: %v", err)
+	}
+
+	if capturedFirstChargeTime == nil {
+		t.Fatal("expected orchestration to stamp req.FirstChargeTime, but the adapter received nil")
+	}
+	if !capturedFirstChargeTime.Equal(fixedTime) {
+		t.Errorf("expected stamped FirstChargeTime == %v, got %v", fixedTime, *capturedFirstChargeTime)
 	}
 }
 

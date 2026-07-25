@@ -60,6 +60,29 @@ adding or changing an operation.
 > Cashfree `subscription_session_id`), and `Environment` (`SANDBOX`/`PRODUCTION`). Canonical field names are
 > provider-neutral by design — no provider name appears in a canonical field name.
 
+### First charge with mandate (charge first period at signup)
+
+New canonical request fields on `CreateSubscriptionRequest` (all optional, provider-neutral; NO `Provider` field on the request):
+- `first_charge_with_mandate` (bool): opt-in to collect the first billing period immediately at signup, right after mandate authorization.
+- `recurring_amount_minor` (AmountMinor, minor units): recurring price hint; used to build the first-period addon amount (Razorpay). Cashfree ignores it.
+- `recurring_interval` (int32, ≥1) and `recurring_interval_type` (enum DAY|WEEK|MONTH|YEAR): recurring cadence hint; used to compute `start_at = now + interval` (Razorpay). Cashfree ignores them.
+- `recurring_currency` (Currency, `omitempty,iso4217`): ISO-4217 currency for the recurring charge and the first-period addon. Threaded on EVERY create-subscription request (both Cashfree and Razorpay) to keep the two flows in sync. Cashfree ignores it (its plan drives currency); Razorpay uses it as the first-period addon currency.
+
+Cross-field rule: `first_charge_with_mandate` and the low-level `first_charge_time` are MUTUALLY EXCLUSIVE (flag drives the timestamp; `first_charge_time` is a raw escape hatch). Enforced in `CreateSubscriptionRequest.Validate()`.
+
+Orchestration behavior: when `first_charge_with_mandate` is true, `orchestration.SubscriptionService.CreateSubscription` stamps `req.FirstChargeTime = clock.Now()` before dispatch (adapters have no clock — library rule).
+
+HARD INVARIANT: the Razorpay first-period addon amount AND currency MUST equal the plan's, and the start offset MUST match the plan interval. The adapter sources them from the plan itself (inline `PlanDetails`, or the recurring hints the caller derives from the SAME resolved price that selected the existing `plan_id`) — never recomputed/defaulted/hardcoded. For an existing `plan_id`, missing `recurring_amount_minor`/`recurring_interval`/`recurring_interval_type`/`recurring_currency` (or a non-PERIODIC inline plan) causes a deterministic `ErrInvalidRequest` BEFORE any SDK call.
+
+Provider mapping table:
+
+| Provider | Mapping of first_charge_with_mandate |
+|---|---|
+| Cashfree | forwards the stamped now as `subscription_first_charge_time`; Cashfree charges the first period after auth and derives `next_charge_time = first_charge_time + plan interval`. No manual/raise charge (would double-charge). Ignores all recurring_* hints (plan drives amount/currency/schedule). |
+| Razorpay (gated) | appends an addon `{item:{name:"First billing period", amount: <plan amount>, currency: <plan currency>}}` charged during auth, and sets `start_at = now + (interval × interval_type)`. amount+currency sourced from the plan (inline PlanDetails or recurring hints). Deterministic `ErrInvalidRequest` if required values missing. Not the prod provider — gated on fixture verification. |
+
+Note (Rule 12 / TS mirror): this is a create-time server→provider field set, NOT part of the checkout/authorization payload the `multipay-frontend-ts` client builds, so there is NO corresponding TypeScript client change required.
+
 ---
 
 ## Build, Test, and Lint Commands

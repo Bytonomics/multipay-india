@@ -464,3 +464,78 @@ func TestCreateSubscription_ForwardsCfOrderID(t *testing.T) {
 		}
 	})
 }
+
+// TestCreateSubscription_FirstChargeMandate_SetsFirstChargeTime verifies that the adapter
+// correctly forwards the canonical CreateSubscriptionRequest.FirstChargeTime to Cashfree's
+// subscription_first_charge_time in ISO8601 format, and makes exactly one HTTP request
+// (the create call, no additional raise-charge/CreatePayment calls).
+func TestCreateSubscription_FirstChargeMandate_SetsFirstChargeTime(t *testing.T) {
+	var capturedReq cf.CreateSubscriptionRequest
+	requestCount := 0
+
+	fixed := time.Date(2026, 7, 25, 10, 0, 0, 0, time.UTC)
+
+	mockHTTPClient := &http.Client{
+		Transport: cfRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+			requestCount++
+
+			body, err := io.ReadAll(req.Body)
+			if err != nil {
+				return nil, err
+			}
+			if unmarshalErr := json.Unmarshal(body, &capturedReq); unmarshalErr != nil {
+				t.Fatalf("failed to unmarshal request body: %v (body: %s)", unmarshalErr, string(body))
+			}
+
+			subID := "cf_sub_123"
+			status := "ACTIVE"
+			mockSub := &cf.SubscriptionEntity{
+				SubscriptionId:     &subID,
+				SubscriptionStatus: &status,
+			}
+			// Use jsonResp so the SDK can decode the response — a manually built http.Response with
+			// an empty content type yields the Cashfree SDK "undefined response type" error.
+			return jsonResp(200, mockSub)
+		}),
+	}
+
+	cfg := &Config{
+		ClientID:     "test_client_id",
+		ClientSecret: "test_client_secret",
+		Environment:  domain.EnvironmentSandbox,
+		AccountID:    "test_account",
+		Logger:       ports.NewNoopLogger(),
+		HTTPClient:   mockHTTPClient,
+	}
+
+	adapter, err := NewAdapter(cfg)
+	if err != nil {
+		t.Fatalf("failed to create adapter: %v", err)
+	}
+
+	req := &domain.CreateSubscriptionRequest{
+		PlanID:          "plan_x",
+		ReturnURL:       "https://example.com/return",
+		CustomerEmail:   "test@example.com",
+		CustomerPhone:   "9876543210",
+		FirstChargeTime: &fixed,
+	}
+
+	if _, err := createSubscription(context.Background(), adapter, req); err != nil {
+		t.Fatalf("createSubscription returned error: %v", err)
+	}
+
+	// Sub-assertion A: subscription_first_charge_time must equal the fixed time in ISO8601 format
+	expected := "2026-07-25T10:00:00+00:00"
+	if capturedReq.SubscriptionFirstChargeTime == nil {
+		t.Fatal("subscription_first_charge_time not set in captured request")
+	}
+	if *capturedReq.SubscriptionFirstChargeTime != expected {
+		t.Errorf("subscription_first_charge_time = %q, want %q", *capturedReq.SubscriptionFirstChargeTime, expected)
+	}
+
+	// Sub-assertion B: exactly one HTTP request must have been made (the create call, no raise-charge)
+	if requestCount != 1 {
+		t.Errorf("expected exactly 1 HTTP request, got %d", requestCount)
+	}
+}

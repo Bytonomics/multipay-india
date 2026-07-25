@@ -205,6 +205,53 @@ ignores these.
 `action_details.next_scheduled_time` for the `ACTIVATE` action (it rejects an ACTIVATE with no
 action_details); the adapter forwards it when set. Razorpay's Resume has no equivalent and ignores it.
 
+### First charge with mandate (charge first period at signup)
+
+The library supports opt-in immediate charging of the first billing period at subscription creation time,
+right after mandate authorization. This is a provider-neutral feature controlled by new canonical request fields
+on `CreateSubscriptionRequest` (all optional, no `Provider` field on the request):
+
+**New fields on `CreateSubscriptionRequest`**:
+
+- `first_charge_with_mandate` (bool): opt-in flag to collect the first billing period immediately at signup,
+  right after mandate authorization.
+- `recurring_amount_minor` (`AmountMinor`, minor units): recurring price hint; used by Razorpay to build the
+  first-period addon amount. Cashfree ignores it (plan drives amount).
+- `recurring_interval` (int32, ≥1): recurring billing cycle interval count. Used with `recurring_interval_type`
+  to compute subscription start offset for Razorpay (`start_at = now + (interval × interval_type)`).
+  Cashfree ignores it (plan drives schedule).
+- `recurring_interval_type` (enum `DAY` | `WEEK` | `MONTH` | `YEAR`): recurring billing cycle unit.
+  Cashfree ignores it; Razorpay uses it to compute `start_at` offset.
+- `recurring_currency` (`Currency`, `omitempty,iso4217`): ISO-4217 currency code for the recurring charge
+  and first-period addon. Threaded on EVERY create-subscription request (both Cashfree and Razorpay) to keep
+  the two flows in sync. Cashfree ignores it (its plan drives currency); Razorpay uses it as the first-period
+  addon currency.
+
+**Cross-field rule**: `first_charge_with_mandate` and the low-level `first_charge_time` are MUTUALLY EXCLUSIVE.
+The flag drives the timestamp; `first_charge_time` is a raw escape hatch. This is enforced in
+`CreateSubscriptionRequest.Validate()`.
+
+**Orchestration behavior**: When `first_charge_with_mandate` is true, `orchestration.SubscriptionService.CreateSubscription`
+stamps `req.FirstChargeTime = clock.Now()` before dispatch to providers. Adapters do not perform clock reads — the
+library enforces this discipline.
+
+**Hard invariant**: The Razorpay first-period addon amount AND currency MUST equal the plan's. The start offset
+MUST match the plan interval. The adapter sources them from the plan itself (inline `PlanDetails`, or the
+recurring hints the caller derives from the SAME resolved price that selected the existing `plan_id`) — never
+recomputed/defaulted/hardcoded. For an existing `plan_id`, if `recurring_amount_minor` or `recurring_interval` or
+`recurring_interval_type` or `recurring_currency` is missing, or if an inline plan is provided but is not PERIODIC,
+the orchestration layer returns a deterministic `ErrInvalidRequest` BEFORE any SDK call.
+
+**Provider mapping**:
+
+| Provider | Mapping of first_charge_with_mandate |
+|---|---|
+| **Cashfree** | forwards the stamped now as `subscription_first_charge_time`; Cashfree charges the first period after auth and derives `next_charge_time = first_charge_time + plan interval`. No manual/raise charge (would double-charge). Ignores all `recurring_*` hints (plan drives amount/currency/schedule). |
+| **Razorpay (gated)** | appends an addon `{item:{name:"First billing period", amount: <plan amount>, currency: <plan currency>}}` charged during auth, and sets `start_at = now + (interval × interval_type)`. amount+currency sourced from the plan (inline PlanDetails or recurring hints). Deterministic `ErrInvalidRequest` if required values missing. Not the prod provider — gated on fixture verification. |
+
+**Note (Rule 12 / TS mirror)**: This is a create-time server→provider field set, NOT part of the checkout/authorization
+payload the `multipay-frontend-ts` client builds, so there is NO corresponding TypeScript client change required.
+
 ### Subscription Upgrade Orchestration
 
 **UpgradeSubscription(ctx, *UpgradeSubscriptionRequest) (*UpgradeResult, error)**

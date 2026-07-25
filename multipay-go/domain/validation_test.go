@@ -1,7 +1,9 @@
 package domain
 
 import (
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestCreateOrderRequest_Validate(t *testing.T) {
@@ -161,6 +163,49 @@ func TestCreateSubscriptionRequest_Validate(t *testing.T) {
 			wantErr: true,
 			errMsg:  "plan_details.amount_minor is required and must be greater than 0 for PERIODIC plans",
 		},
+		{
+			name: "first_charge_with_mandate alone is valid",
+			req: &CreateSubscriptionRequest{
+				SubscriptionID:         "sub123",
+				PlanID:                 "plan_x",
+				ReturnURL:              "https://example.com/return",
+				CustomerPhone:          "9876543210",
+				FirstChargeWithMandate: true,
+				FirstChargeTime:        nil,
+			},
+			wantErr: false,
+		},
+		{
+			name: "first_charge_with_mandate + first_charge_time is rejected",
+			req: func() *CreateSubscriptionRequest {
+				t0 := time.Now()
+				return &CreateSubscriptionRequest{
+					SubscriptionID:         "sub123",
+					PlanID:                 "plan_x",
+					ReturnURL:              "https://example.com/return",
+					CustomerPhone:          "9876543210",
+					FirstChargeWithMandate: true,
+					FirstChargeTime:        &t0,
+				}
+			}(),
+			wantErr: true,
+			errMsg:  "first_charge_with_mandate and first_charge_time are mutually exclusive",
+		},
+		{
+			name: "first_charge_time alone (no flag) is valid",
+			req: func() *CreateSubscriptionRequest {
+				t0 := time.Now()
+				return &CreateSubscriptionRequest{
+					SubscriptionID:         "sub123",
+					PlanID:                 "plan_x",
+					ReturnURL:              "https://example.com/return",
+					CustomerPhone:          "9876543210",
+					FirstChargeWithMandate: false,
+					FirstChargeTime:        &t0,
+				}
+			}(),
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -169,8 +214,18 @@ func TestCreateSubscriptionRequest_Validate(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if tt.wantErr && err.Error() != tt.errMsg {
-				t.Errorf("Validate() error = %v, want %v", err.Error(), tt.errMsg)
+			if tt.wantErr {
+				if strings.Contains(tt.errMsg, "mutually exclusive") {
+					// For mutual-exclusion assertions, check that error message contains the substring
+					if !strings.Contains(err.Error(), "mutually exclusive") {
+						t.Errorf("Validate() error = %v, want to contain %v", err.Error(), tt.errMsg)
+					}
+				} else {
+					// For other assertions, require exact match
+					if err.Error() != tt.errMsg {
+						t.Errorf("Validate() error = %v, want %v", err.Error(), tt.errMsg)
+					}
+				}
 			}
 		})
 	}
