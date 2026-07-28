@@ -246,8 +246,10 @@ the orchestration layer returns a deterministic `ErrInvalidRequest` BEFORE any S
 
 | Provider | Mapping of first_charge_with_mandate |
 |---|---|
-| **Cashfree** | forwards the stamped now as `subscription_first_charge_time`; Cashfree charges the first period after auth and derives `next_charge_time = first_charge_time + plan interval`. No manual/raise charge (would double-charge). Ignores all `recurring_*` hints (plan drives amount/currency/schedule). |
-| **Razorpay (gated)** | appends an addon `{item:{name:"First billing period", amount: <plan amount>, currency: <plan currency>}}` charged during auth, and sets `start_at = now + (interval × interval_type)`. amount+currency sourced from the plan (inline PlanDetails or recurring hints). Deterministic `ErrInvalidRequest` if required values missing. Not the prod provider — gated on fixture verification. |
+| **Cashfree** | The library does NOT charge the first period for Cashfree. When `first_charge_with_mandate` is set, the Cashfree adapter sets `subscription_first_charge_time = now + one recurring interval` (the NEXT cycle), computed in **IST** (a fixed +05:30 zone via `time.FixedZone`, NOT `time.LoadLocation`), using `recurring_interval` / `recurring_interval_type`. This pushes Cashfree's own first auto-charge to period 2; the CALLER charges period 1 out-of-band via a post-authorization raise-charge (Create Payment / `PaymentType:"CHARGE"`). The adapter never raises a charge and never sets a same-day first-charge time (Cashfree rejects same-day: `subscription_first_charge_time` must be ≥ the next day, IST). |
+| **Razorpay (gated)** | appends an addon `{item:{name:"First billing period", amount: <plan amount>, currency: <plan currency>}}` charged during authorization, and sets `start_at = now + one interval` so the recurring cycle begins at period 2. amount+currency sourced from the plan (inline PlanDetails or recurring hints). Deterministic `ErrInvalidRequest` if required values missing. Not the prod provider — gated on fixture verification. |
+
+**Asymmetry**: Razorpay charges period 1 during authorization (addon); Cashfree's period-1 charge is issued by the caller after authorization, and the library only schedules Cashfree's recurring start at the next cycle.
 
 **Note (Rule 12 / TS mirror)**: This is a create-time server→provider field set, NOT part of the checkout/authorization
 payload the `multipay-frontend-ts` client builds, so there is NO corresponding TypeScript client change required.

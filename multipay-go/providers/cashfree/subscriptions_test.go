@@ -514,19 +514,27 @@ func TestCreateSubscription_FirstChargeMandate_SetsFirstChargeTime(t *testing.T)
 	}
 
 	req := &domain.CreateSubscriptionRequest{
-		PlanID:          "plan_x",
-		ReturnURL:       "https://example.com/return",
-		CustomerEmail:   "test@example.com",
-		CustomerPhone:   "9876543210",
-		FirstChargeTime: &fixed,
+		PlanID:                 "plan_x",
+		ReturnURL:              "https://example.com/return",
+		CustomerEmail:          "test@example.com",
+		CustomerPhone:          "9876543210",
+		FirstChargeWithMandate: true,
+		FirstChargeTime:        &fixed,
+		RecurringAmountMinor:   49900,
+		RecurringInterval:      1,
+		RecurringIntervalType:  domain.PlanIntervalMonth,
+		RecurringCurrency:      domain.Currency("INR"),
 	}
 
 	if _, err := createSubscription(context.Background(), adapter, req); err != nil {
 		t.Fatalf("createSubscription returned error: %v", err)
 	}
 
-	// Sub-assertion A: subscription_first_charge_time must equal the fixed time in ISO8601 format
-	expected := "2026-07-25T10:00:00+00:00"
+	// Sub-assertion A: subscription_first_charge_time must equal (fixed, in IST) + 1 month, because the
+	// flag path pushes Cashfree's own first auto-charge to the next cycle (the caller charges period 1
+	// out-of-band). Compute the expectation identically to the adapter (FixedZone IST +05:30).
+	ist := time.FixedZone("IST", 5*3600+1800)
+	expected := fixed.In(ist).AddDate(0, 1, 0).Format("2006-01-02T15:04:05-07:00")
 	if capturedReq.SubscriptionFirstChargeTime == nil {
 		t.Fatal("subscription_first_charge_time not set in captured request")
 	}

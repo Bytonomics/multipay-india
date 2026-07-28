@@ -144,11 +144,8 @@ func createSubscription(ctx context.Context, adapter *Adapter, req *domain.Creat
 			},
 		})
 		// Recurring cycle starts one interval after now, so the first period is not double-charged.
-		start := req.FirstChargeTime.AddDate(
-			yearsFor(offIntervalType, offInterval),
-			monthsFor(offIntervalType, offInterval),
-			daysFor(offIntervalType, offInterval),
-		)
+		oy, om, od := domain.IntervalOffset(offIntervalType, offInterval)
+		start := req.FirstChargeTime.AddDate(oy, om, od)
 		subData.StartAt = start.Unix()
 	} else if req.FirstChargeTime != nil {
 		subData.StartAt = req.FirstChargeTime.Unix()
@@ -529,31 +526,4 @@ func (a *Adapter) GetSubscriptionPayments(ctx context.Context, req *domain.GetSu
 // See subscriptions.go for implementation.
 func (a *Adapter) ChargeSubscription(ctx context.Context, req *domain.ChargeSubscriptionRequest) (*domain.SubscriptionPayment, error) {
 	return chargeSubscription(ctx, a, req)
-}
-
-func yearsFor(it domain.PlanIntervalType, n int32) int {
-	if it == domain.PlanIntervalYear {
-		return int(n)
-	}
-	return 0
-}
-
-func monthsFor(it domain.PlanIntervalType, n int32) int {
-	if it == domain.PlanIntervalMonth {
-		return int(n)
-	}
-	return 0
-}
-
-func daysFor(it domain.PlanIntervalType, n int32) int {
-	switch it {
-	case domain.PlanIntervalDay:
-		return int(n)
-	case domain.PlanIntervalWeek:
-		return int(n) * 7
-	case domain.PlanIntervalMonth, domain.PlanIntervalYear:
-		return 0
-	default:
-		return 0
-	}
 }

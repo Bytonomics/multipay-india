@@ -3,6 +3,7 @@ package cashfree
 import (
 	"context"
 	"fmt"
+	"time"
 
 	cf "github.com/cashfree/cashfree-pg/v6"
 
@@ -116,17 +117,33 @@ func createSubscription(ctx context.Context, adapter *Adapter, req *domain.Creat
 		cfReq.PlanDetails = buildInlinePlanDetails(req.PlanDetails)
 	}
 
-	// Optional: set expiry and first charge times (as ISO 8601 strings)
+	// Optional: set subscription expiry (ISO 8601 string).
 	if req.ExpiresAt != nil {
 		expiryStr := req.ExpiresAt.Format("2006-01-02T15:04:05-07:00")
 		cfReq.SubscriptionExpiryTime = &expiryStr
 	}
-	// FirstChargeWithMandate is mapped by the orchestration layer stamping req.FirstChargeTime = now,
-	// which we forward as subscription_first_charge_time so Cashfree charges the first period right after
-	// authorization and derives next_charge_time = first_charge_time + plan interval. RecurringInterval /
-	// RecurringIntervalType are intentionally ignored here (the Cashfree plan drives the schedule), and we
-	// never raise a manual charge (that would double-charge).
-	if req.FirstChargeTime != nil {
+	// First charge handling.
+	// When FirstChargeWithMandate is set, the CALLER charges the first period out-of-band via a
+	// post-authorization raise-charge. Cashfree cannot charge same-day (subscription_first_charge_time
+	// must be >= the next day, in IST), so here we push Cashfree's OWN first auto-charge to the NEXT
+	// cycle (now + one recurring interval, in IST) so it does not double-charge the period the caller
+	// charges. This adapter never raises a charge itself.
+	if req.FirstChargeWithMandate {
+		if req.FirstChargeTime == nil {
+			return nil, fmt.Errorf("first_charge_with_mandate requires first_charge_time stamped by the orchestration layer: %w", domain.ErrInvalidRequest)
+		}
+		// Guard the recurring hints: without a positive interval the offset below is (0,0,0), which would
+		// set subscription_first_charge_time = today and re-trigger Cashfree's "first charge date cannot be
+		// before <tomorrow>" rejection. Fail deterministically before the SDK call instead (mirrors Razorpay).
+		if req.RecurringInterval <= 0 || req.RecurringIntervalType == "" {
+			return nil, fmt.Errorf("first_charge_with_mandate on cashfree requires recurring_interval>0 and recurring_interval_type: %w", domain.ErrInvalidRequest)
+		}
+		y, m, d := domain.IntervalOffset(req.RecurringIntervalType, req.RecurringInterval)
+		next := req.FirstChargeTime.In(istLocation()).AddDate(y, m, d)
+		chargeStr := next.Format("2006-01-02T15:04:05-07:00")
+		cfReq.SubscriptionFirstChargeTime = &chargeStr
+	} else if req.FirstChargeTime != nil {
+		// Low-level escape hatch (unchanged): forward the caller-supplied time verbatim.
 		chargeStr := req.FirstChargeTime.Format("2006-01-02T15:04:05-07:00")
 		cfReq.SubscriptionFirstChargeTime = &chargeStr
 	}
@@ -696,4 +713,10 @@ func (a *Adapter) GetSubscriptionPayments(ctx context.Context, req *domain.GetSu
 // See subscriptions.go for implementation.
 func (a *Adapter) ChargeSubscription(ctx context.Context, req *domain.ChargeSubscriptionRequest) (*domain.SubscriptionPayment, error) {
 	return chargeSubscription(ctx, a, req)
+}
+
+// istLocation returns the fixed IST (+05:30) zone. We use a FixedZone rather than time.LoadLocation
+// because tzdata may be absent in minimal deploy containers.
+func istLocation() *time.Location {
+	return time.FixedZone("IST", 5*3600+1800)
 }

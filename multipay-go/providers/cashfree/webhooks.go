@@ -222,23 +222,30 @@ func parseEvent(ctx context.Context, body []byte, headers map[string]string) (*d
 	case "SUBSCRIPTION_STATUS_CHANGED":
 		handleSubscriptionStatusChanged(event, envelope.Data)
 
-	case "ORDER.PAID":
+	// Payment events: support both the old wire names (ORDER.PAID, PAYMENT.*, REFUND.*) and the
+	// current 2025-01-01 webhook-version names (PAYMENT_SUCCESS_WEBHOOK, etc.) so the parser handles
+	// whichever format Cashfree sends. See https://www.cashfree.com/docs/api-reference/payments/latest/payments/webhooks
+	case "ORDER.PAID", "PAYMENT_SUCCESS_WEBHOOK":
 		event.EventType = domain.EventPaymentCaptured
+		populateOrderAndPaymentFromEventData(event, envelope.Data)
 
 	case "ORDER.EXPIRED":
-		event.EventType = domain.EventOrderExpired // D16 fix
+		event.EventType = domain.EventOrderExpired
 
 	case "PAYMENT.AUTHORIZED":
 		event.EventType = domain.EventPaymentAuthorized
 
-	case "PAYMENT.FAILED":
+	case "PAYMENT.FAILED", "PAYMENT_FAILED_WEBHOOK":
+		event.EventType = domain.EventPaymentFailed
+
+	case "PAYMENT_USER_DROPPED_WEBHOOK":
 		event.EventType = domain.EventPaymentFailed
 
 	case "REFUND.PROCESSED":
 		event.EventType = domain.EventRefundProcessed
 
 	case "REFUND.FAILED":
-		event.EventType = domain.EventRefundFailed // D16 fix
+		event.EventType = domain.EventRefundFailed
 
 	default:
 		// Unknown event type → EventUnknown, not an error
@@ -275,6 +282,32 @@ func populateSubscriptionFromCardExpiryData(event *domain.WebhookEvent, rawData 
 			SubscriptionID:         data.SubscriptionStatusWebhook.SubscriptionDetails.SubscriptionID,
 			ProviderSubscriptionID: data.SubscriptionStatusWebhook.SubscriptionDetails.SubscriptionID,
 		}
+	}
+}
+
+// populateOrderAndPaymentFromEventData extracts the order_id from the Cashfree payment webhook payload
+// (PAYMENT_SUCCESS_WEBHOOK / PAYMENT_FAILED_WEBHOOK) and populates event.Order and event.Payment so the
+// studio EventPaymentCaptured handler can find the order. The 2025-01-01 webhook payload has:
+// { "data": { "order": { "order_id": "..." }, "payment": { "cf_payment_id": ..., ... } }, "type": "..." }
+func populateOrderAndPaymentFromEventData(event *domain.WebhookEvent, rawData json.RawMessage) {
+	var data struct {
+		Order struct {
+			OrderID string `json:"order_id"`
+		} `json:"order"`
+		Payment struct {
+			CfPaymentID int64  `json:"cf_payment_id"`
+			OrderID     string `json:"order_id"`
+		} `json:"payment"`
+	}
+	if err := json.Unmarshal(rawData, &data); err != nil {
+		return
+	}
+	orderID := data.Order.OrderID
+	if orderID == "" {
+		orderID = data.Payment.OrderID
+	}
+	if orderID != "" {
+		event.Order = &domain.Order{OrderID: orderID}
 	}
 }
 
