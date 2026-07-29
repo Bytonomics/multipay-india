@@ -430,6 +430,12 @@ type UpgradeSubscriptionRequest struct {
 	CustomerName      string      `json:"customer_name" pedantigo:"omitempty,maxLength=200"`
 	ReturnURL         string      `json:"return_url" pedantigo:"required,url"`
 	CrossCycle        bool        `json:"cross_cycle"`
+	// NewRecurringInterval and NewRecurringIntervalType describe the NEW plan's recurring cadence.
+	// They are REQUIRED when CrossCycle is true: a cross-cycle upgrade charges a full new-cycle amount
+	// up front, so the new mandate's first auto-charge must be one NEW interval out, not the remainder
+	// of the old cycle. Ignored when CrossCycle is false.
+	NewRecurringInterval     int32            `json:"new_recurring_interval" pedantigo:"omitempty,gte=1"`
+	NewRecurringIntervalType PlanIntervalType `json:"new_recurring_interval_type" pedantigo:"omitempty,oneof=DAY WEEK MONTH YEAR"`
 }
 
 // Validate enforces presence of mandatory fields and cross-field constraints.
@@ -452,6 +458,14 @@ func (r *UpgradeSubscriptionRequest) Validate() error {
 	if r.ReturnURL == "" {
 		return errors.New("return_url is required")
 	}
+	if r.CrossCycle {
+		if r.NewRecurringInterval < 1 {
+			return errors.New("new_recurring_interval is required and must be >= 1 when cross_cycle is true")
+		}
+		if r.NewRecurringIntervalType == "" {
+			return errors.New("new_recurring_interval_type is required when cross_cycle is true")
+		}
+	}
 	return nil
 }
 
@@ -469,20 +483,39 @@ type UpgradeResult struct {
 
 // FinalizeUpgradeRequest represents a request to finalize an upgrade operation.
 type FinalizeUpgradeRequest struct {
-	NewSubscriptionID   string      `json:"new_subscription_id" pedantigo:"required,minLength=1"`
-	OldSubscriptionID   string      `json:"old_subscription_id" pedantigo:"required,minLength=1"`
-	PaymentRef          string      `json:"payment_ref" pedantigo:"required,minLength=1"`
-	ProratedAmountMinor AmountMinor `json:"prorated_amount_minor" pedantigo:"required,gt=0"`
-	Currency            Currency    `json:"currency" pedantigo:"required,iso4217"`
+	NewSubscriptionID string `json:"new_subscription_id" pedantigo:"required,minLength=1"`
+	OldSubscriptionID string `json:"old_subscription_id" pedantigo:"required,minLength=1"`
+	// PaymentRef, ProratedAmountMinor and Currency are required ONLY when the library must raise the
+	// proration charge itself, i.e. when ProrationCollectedExternally is false. The tags are omitempty
+	// because the requirement is conditional; presence is enforced in Validate().
+	PaymentRef          string      `json:"payment_ref" pedantigo:"omitempty,minLength=1"`
+	ProratedAmountMinor AmountMinor `json:"prorated_amount_minor" pedantigo:"omitempty,gte=0"`
+	Currency            Currency    `json:"currency" pedantigo:"omitempty,iso4217"`
+	// ProrationCollectedExternally declares that the caller already collected the prorated delta
+	// out-of-band (for example a one-time Order settled through Orders().CreateOrder). When true the
+	// library performs ONLY the provider transition — it does NOT raise a charge on the new mandate.
+	// The default (false) preserves the historical charge-then-cancel behaviour.
+	ProrationCollectedExternally bool `json:"proration_collected_externally"`
 }
 
-// Validate enforces presence of mandatory fields.
+// Validate enforces presence of mandatory fields and the conditional proration fields.
 func (r *FinalizeUpgradeRequest) Validate() error {
 	if r.NewSubscriptionID == "" {
 		return errors.New("new_subscription_id is required")
 	}
-	if r.PaymentRef == "" {
-		return errors.New("payment_ref is required")
+	if r.OldSubscriptionID == "" {
+		return errors.New("old_subscription_id is required")
+	}
+	if !r.ProrationCollectedExternally {
+		if r.PaymentRef == "" {
+			return errors.New("payment_ref is required when proration is not collected externally")
+		}
+		if r.ProratedAmountMinor <= 0 {
+			return errors.New("prorated_amount_minor must be > 0 when proration is not collected externally")
+		}
+		if r.Currency == "" {
+			return errors.New("currency is required when proration is not collected externally")
+		}
 	}
 	return nil
 }

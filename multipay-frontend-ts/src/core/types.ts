@@ -126,6 +126,16 @@ export enum RecurringEffective {
 }
 
 /**
+ * Interval unit for periodic plans. Wire values must match the Go port exactly.
+ */
+export enum PlanIntervalType {
+  DAY = "DAY",
+  WEEK = "WEEK",
+  MONTH = "MONTH",
+  YEAR = "YEAR",
+}
+
+/**
  * Request to upgrade an existing subscription to a new plan
  */
 export interface UpgradeSubscriptionRequest {
@@ -143,6 +153,13 @@ export interface UpgradeSubscriptionRequest {
   customer_name?: string;
   return_url: string;
   cross_cycle?: boolean;
+  /**
+   * The NEW plan's recurring cadence. REQUIRED when cross_cycle is true: a cross-cycle upgrade charges a
+   * full new-cycle amount up front, so the new mandate's first auto-charge must be one NEW interval out
+   * rather than at the end of the old cycle. Ignored when cross_cycle is false.
+   */
+  new_recurring_interval?: number;
+  new_recurring_interval_type?: PlanIntervalType;
 }
 
 /**
@@ -163,9 +180,20 @@ export interface UpgradeResult {
 export interface FinalizeUpgradeRequest {
   new_subscription_id: string;
   old_subscription_id: string;
-  payment_ref: string;
-  prorated_amount_minor: number;
-  currency: string;
+  /**
+   * payment_ref, prorated_amount_minor and currency are required ONLY when the library must raise the
+   * proration charge itself, i.e. when proration_collected_externally is false or omitted.
+   */
+  payment_ref?: string;
+  prorated_amount_minor?: number;
+  currency?: string;
+  /**
+   * Declares that the caller already collected the prorated delta out-of-band (for example a one-time
+   * Order settled through the orders API). When true the library performs ONLY the provider transition —
+   * it does NOT raise a charge on the new mandate. Omitting it preserves the historical
+   * charge-then-cancel behaviour.
+   */
+  proration_collected_externally?: boolean;
 }
 
 /**

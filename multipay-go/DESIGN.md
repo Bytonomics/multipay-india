@@ -261,7 +261,9 @@ payload the `multipay-frontend-ts` client builds, so there is NO corresponding T
 - Capability-gated: requires `CapSubscriptionUpgradeProration` (both Cashfree and Razorpay support)
 
 **Cashfree (strategy `REAUTH_PRORATED`)**:
-- Creates a NEW subscription/mandate via `adapter.CreateSubscription(SubscriptionID=req.NewSubscriptionID, PlanID=req.NewPlanID, FirstChargeTime=clock.Now()+remainingDays)`
+- Creates a NEW subscription/mandate via `adapter.CreateSubscription(SubscriptionID=req.NewSubscriptionID, PlanID=req.NewPlanID, ...)`. `FirstChargeTime` depends on the upgrade kind:
+  - same-cycle (`CrossCycle=false`): `clock.Now() + RemainingDays` — the delta covers the remainder of the current cycle at the new tier, so the new mandate's first auto-charge belongs at the current cycle end.
+  - cross-cycle (`CrossCycle=true`): one NEW recurring interval out, computed as `clock.Now().AddDate(domain.IntervalOffset(req.NewRecurringIntervalType, req.NewRecurringInterval))`. The customer has just paid a FULL new-cycle amount (less unused credit), so scheduling the first auto-charge at the end of the OLD, shorter cycle would debit another full cycle within weeks. `NewRecurringInterval` and `NewRecurringIntervalType` are therefore REQUIRED when `CrossCycle` is true, enforced by `UpgradeSubscriptionRequest.Validate()`. The offset is computed in the orchestration layer because adapters have no clock.
 - Returns: `RequiresReauthorization=true`, `AuthLink` (mandate authorization session from new subscription), `ProratedAmountMinor` (computed via `currencyutils.ProrateUpgrade(...)`), `RecurringEffective="CYCLE_END"`
 - The old mandate is NOT charged; old subscription remains active until `FinalizeUpgrade` cancels it
 
@@ -277,13 +279,13 @@ payload the `multipay-frontend-ts` client builds, so there is NO corresponding T
 - Return type: `(*SubscriptionPayment, error)` (NOT bare `error`)
 - Capability-gated: requires `CapSubscriptionUpgradeProration`
 
-**Cashfree**:
-- Charges the prorated delta on the NEW mandate: `adapter.ChargeSubscription(SubscriptionID=req.NewSubscriptionID, PaymentRef=req.PaymentRef, AmountMinor=req.ProratedAmountMinor)`
-- Cancels the old subscription: `adapter.CancelSubscription(req.OldSubscriptionID)`
-- Returns the charge payment result
+**Cashfree** — two funding modes, selected by `req.ProrationCollectedExternally`:
+- `false` (default, unchanged): charges the prorated delta on the NEW mandate via `adapter.ChargeSubscription(SubscriptionID=req.NewSubscriptionID, PaymentRef=req.PaymentRef, AmountMinor=req.ProratedAmountMinor)`, then cancels the old subscription via `adapter.CancelSubscription(req.OldSubscriptionID)`, and returns the charge payment result.
+- `true`: the CALLER already collected the delta out-of-band (for example a one-time Order settled through `Orders().CreateOrder`). The library then performs ONLY the provider transition — it cancels the old subscription and does NOT raise any charge — returning a non-nil empty `*SubscriptionPayment`. Raising a charge in this mode would debit the customer a SECOND time.
 - **Replay-safe (no double debit).** `FinalizeUpgrade` is not atomic across the charge→cancel→consumer-DB-write sequence, so a webhook replay can re-enter it. Two adapter-level guards make re-entry safe:
   1. `chargeSubscription` passes `req.PaymentRef` as Cashfree's native `x-idempotency-key` header on `SubsCreatePayment`, so a replayed charge returns the ORIGINAL payment result instead of debiting the customer a second time.
   2. `cancelSubscription` treats an already-cancelled subscription as success — on a provider error it fetches the subscription and, if its canonical status is `CANCELLED`, returns that subscription with `nil` error, so a replayed cancel does not loop or fail.
+  3. When `ProrationCollectedExternally` is true no charge is issued at all, so the only replayable provider call is the cancel, which guard 2 already makes idempotent.
 
 **Razorpay**:
 - No-op success (no charge step needed; plan change is already effective)
@@ -303,11 +305,17 @@ payload the `multipay-frontend-ts` client builds, so there is NO corresponding T
    - Razorpay: schedules plan change immediately, returns `RequiresReauthorization=false, ProratedAmountMinor=0`
    - Executes before/after hooks
 3. If Cashfree: caller directs user to reauthorize via AuthLink before next step
-4. Call `FinalizeUpgrade(oldSubscriptionID, newSubscriptionID, proratedAmountMinor, paymentRef, ...)`
-   - Cashfree: charges prorated on new mandate, cancels old subscription, returns charge payment
-   - Razorpay: no-op, returns empty payment
+4. Call `FinalizeUpgrade(...)`
+   - Cashfree, `ProrationCollectedExternally=false`: charges prorated on the new mandate, cancels the old subscription, returns the charge payment.
+   - Cashfree, `ProrationCollectedExternally=true`: cancels the old subscription only; the caller collected the delta itself. This is the mode the smritea-cloud control plane uses — it creates a one-time Order for the delta before the mandate is authorized.
+   - Razorpay: no-op, returns an empty payment.
    - Executes before/after hooks
 5. Return finalized upgrade state to caller
+
+**`FinalizeUpgradeRequest` validation contract**: `PaymentRef`, `ProratedAmountMinor` and `Currency` are
+CONDITIONALLY required — mandatory only when `ProrationCollectedExternally` is false, since only then does the
+library raise the charge itself. `OldSubscriptionID` is now actually enforced in `Validate()`: it carried a
+`required` tag but was never checked, so an empty value used to reach the provider cancel call.
 
 #### Subscription Upgrade Capabilities
 

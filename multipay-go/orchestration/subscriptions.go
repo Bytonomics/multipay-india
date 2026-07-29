@@ -491,6 +491,18 @@ func (s *SubscriptionService) UpgradeSubscription(ctx context.Context, req *doma
 
 	switch provider {
 	case domain.ProviderCashfree:
+		// First-charge scheduling differs by upgrade kind:
+		//   same-cycle  -> the delta covers the REMAINDER of the current cycle at the new tier, so the
+		//                  new mandate's first auto-charge belongs at the current cycle end.
+		//   cross-cycle -> the customer just paid a FULL new-cycle amount (less unused credit), so the
+		//                  first auto-charge must be one NEW interval out. Scheduling it at the old
+		//                  cycle end would debit another full cycle within weeks.
+		firstChargeYears, firstChargeMonths, firstChargeDays := 0, 0, req.RemainingDays
+		if req.CrossCycle {
+			firstChargeYears, firstChargeMonths, firstChargeDays = domain.IntervalOffset(
+				req.NewRecurringIntervalType, req.NewRecurringInterval)
+		}
+
 		createReq := &domain.CreateSubscriptionRequest{
 			SubscriptionID:  req.NewSubscriptionID,
 			PlanID:          req.NewPlanID,
@@ -498,7 +510,7 @@ func (s *SubscriptionService) UpgradeSubscription(ctx context.Context, req *doma
 			CustomerPhone:   req.CustomerPhone,
 			CustomerName:    req.CustomerName,
 			ReturnURL:       req.ReturnURL,
-			FirstChargeTime: ptrTime(s.clock.Now().AddDate(0, 0, req.RemainingDays)),
+			FirstChargeTime: ptrTime(s.clock.Now().AddDate(firstChargeYears, firstChargeMonths, firstChargeDays)),
 		}
 		newSub, err := adapter.CreateSubscription(ctx, createReq)
 		if err != nil {
@@ -601,29 +613,41 @@ func (s *SubscriptionService) FinalizeUpgrade(ctx context.Context, req *domain.F
 
 	switch provider {
 	case domain.ProviderCashfree:
-		pay, err := adapter.ChargeSubscription(ctx, &domain.ChargeSubscriptionRequest{
-			SubscriptionID: req.NewSubscriptionID,
-			PaymentRef:     req.PaymentRef,
-			AmountMinor:    req.ProratedAmountMinor,
-			Currency:       req.Currency,
-			Remarks:        "plan upgrade proration",
-		})
-		if err != nil {
-			hookCtx.Error = err
-			if hookErr := s.pipeline.ExecuteOnError(ctx, hookCtx, err); hookErr != nil {
-				s.logger.Error(ctx, "error in OnError hook for FinalizeUpgrade", "error", hookErr.Error())
+		// When the caller already collected the prorated delta out-of-band (e.g. a one-time Order
+		// settled via Orders().CreateOrder), raising a charge here would debit the customer a SECOND
+		// time. In that mode we perform ONLY the provider transition: cancel the old mandate.
+		var pay *domain.SubscriptionPayment
+		if !req.ProrationCollectedExternally {
+			charged, cerr := adapter.ChargeSubscription(ctx, &domain.ChargeSubscriptionRequest{
+				SubscriptionID: req.NewSubscriptionID,
+				PaymentRef:     req.PaymentRef,
+				AmountMinor:    req.ProratedAmountMinor,
+				Currency:       req.Currency,
+				Remarks:        "plan upgrade proration",
+			})
+			if cerr != nil {
+				hookCtx.Error = cerr
+				if hookErr := s.pipeline.ExecuteOnError(ctx, hookCtx, cerr); hookErr != nil {
+					s.logger.Error(ctx, "error in OnError hook for FinalizeUpgrade", "error", hookErr.Error())
+				}
+				return nil, fmt.Errorf("failed to charge upgrade proration: %w", cerr)
 			}
-			return nil, fmt.Errorf("failed to charge upgrade proration: %w", err)
+			pay = charged
 		}
 
-		if _, cerr := adapter.CancelSubscription(ctx, &domain.CancelSubscriptionRequest{
+		if _, cancelErr := adapter.CancelSubscription(ctx, &domain.CancelSubscriptionRequest{
 			SubscriptionID: req.OldSubscriptionID,
-		}); cerr != nil {
-			hookCtx.Error = cerr
-			if hookErr := s.pipeline.ExecuteOnError(ctx, hookCtx, cerr); hookErr != nil {
+		}); cancelErr != nil {
+			hookCtx.Error = cancelErr
+			if hookErr := s.pipeline.ExecuteOnError(ctx, hookCtx, cancelErr); hookErr != nil {
 				s.logger.Error(ctx, "error in OnError hook for FinalizeUpgrade (cancel)", "error", hookErr.Error())
 			}
-			return nil, fmt.Errorf("failed to cancel old subscription after upgrade: %w", cerr)
+			return nil, fmt.Errorf("failed to cancel old subscription after upgrade: %w", cancelErr)
+		}
+
+		if pay == nil {
+			// Never return (nil, nil) for a pointer + error pair. Mirrors the Razorpay arm.
+			pay = &domain.SubscriptionPayment{}
 		}
 		result = pay
 	case domain.ProviderRazorpay:

@@ -85,6 +85,17 @@ Asymmetry: Razorpay charges period 1 during authorization (addon); Cashfree's pe
 
 Note (Rule 12 / TS mirror): this is a create-time server→provider field set, NOT part of the checkout/authorization payload the `multipay-frontend-ts` client builds, so there is NO corresponding TypeScript client change required.
 
+### Order-funded upgrade proration (`proration_collected_externally`)
+
+New canonical field on `FinalizeUpgradeRequest`:
+- `proration_collected_externally` (bool, JSON key `proration_collected_externally`): default `false` preserves the historical charge-then-cancel behaviour — the library raises the prorated delta on the NEW mandate, then cancels the old subscription. When `true`, the CALLER already collected the delta out-of-band (e.g. a one-time Order settled through `Orders().CreateOrder`), so the library must ONLY cancel the old mandate and must NEVER raise a charge; charging here would debit the customer a second time.
+- Consequence for validation: `payment_ref`, `prorated_amount_minor` and `currency` are mandatory ONLY when `proration_collected_externally` is false. `old_subscription_id` is now explicitly enforced in `FinalizeUpgradeRequest.Validate()` (its `required` tag alone never ran).
+
+New canonical fields on `UpgradeSubscriptionRequest`:
+- `new_recurring_interval` (int32, ≥1) and `new_recurring_interval_type` (enum DAY|WEEK|MONTH|YEAR): the NEW plan's recurring cadence. REQUIRED when `cross_cycle` is true (enforced in `UpgradeSubscriptionRequest.Validate()`), because a cross-cycle upgrade charges a full new-cycle amount up front — the new mandate's first auto-charge must therefore be scheduled one NEW interval out, not at the end of the old, shorter cycle. Ignored when `cross_cycle` is false (the first charge lands at the current cycle end, `now + remaining_days`). The offset is computed in the orchestration layer via `domain.IntervalOffset` because adapters have no clock.
+
+Note (Rule 12 / TS mirror): unlike the first-charge field set above, ALL of these are mirrored in `multipay-frontend-ts/src/core/types.ts` in the same change, with snake_case field names matching the Go JSON tags.
+
 ---
 
 ## Build, Test, and Lint Commands

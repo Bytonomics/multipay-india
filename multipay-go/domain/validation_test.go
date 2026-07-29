@@ -363,3 +363,215 @@ func TestListRefundsRequest_Validate(t *testing.T) {
 		})
 	}
 }
+
+func TestFinalizeUpgradeRequest_Validate(t *testing.T) {
+	tests := []struct {
+		name    string
+		req     *FinalizeUpgradeRequest
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:    "valid - library charges the proration",
+			req:     &FinalizeUpgradeRequest{NewSubscriptionID: "sub_new", OldSubscriptionID: "sub_old", PaymentRef: "paya_1", ProratedAmountMinor: AmountMinor(154900), Currency: "INR"},
+			wantErr: false,
+		},
+		{
+			name:    "valid - proration collected externally, all optional fields empty",
+			req:     &FinalizeUpgradeRequest{NewSubscriptionID: "sub_new", OldSubscriptionID: "sub_old", ProrationCollectedExternally: true},
+			wantErr: false,
+		},
+		{
+			name:    "missing new_subscription_id",
+			req:     &FinalizeUpgradeRequest{NewSubscriptionID: "", OldSubscriptionID: "sub_old", PaymentRef: "paya_1", ProratedAmountMinor: AmountMinor(154900), Currency: "INR"},
+			wantErr: true,
+			errMsg:  "new_subscription_id is required",
+		},
+		{
+			name:    "missing old_subscription_id",
+			req:     &FinalizeUpgradeRequest{NewSubscriptionID: "sub_new", OldSubscriptionID: "", PaymentRef: "paya_1", ProratedAmountMinor: AmountMinor(154900), Currency: "INR"},
+			wantErr: true,
+			errMsg:  "old_subscription_id is required",
+		},
+		{
+			name:    "missing payment_ref when library must charge",
+			req:     &FinalizeUpgradeRequest{NewSubscriptionID: "sub_new", OldSubscriptionID: "sub_old", PaymentRef: "", ProratedAmountMinor: AmountMinor(154900), Currency: "INR"},
+			wantErr: true,
+			errMsg:  "payment_ref is required when proration is not collected externally",
+		},
+		{
+			name:    "zero prorated amount when library must charge",
+			req:     &FinalizeUpgradeRequest{NewSubscriptionID: "sub_new", OldSubscriptionID: "sub_old", PaymentRef: "paya_1", ProratedAmountMinor: AmountMinor(0), Currency: "INR"},
+			wantErr: true,
+			errMsg:  "prorated_amount_minor must be > 0 when proration is not collected externally",
+		},
+		{
+			name:    "missing currency when library must charge",
+			req:     &FinalizeUpgradeRequest{NewSubscriptionID: "sub_new", OldSubscriptionID: "sub_old", PaymentRef: "paya_1", ProratedAmountMinor: AmountMinor(154900), Currency: ""},
+			wantErr: true,
+			errMsg:  "currency is required when proration is not collected externally",
+		},
+		{
+			name:    "external proration still requires old_subscription_id",
+			req:     &FinalizeUpgradeRequest{NewSubscriptionID: "sub_new", ProrationCollectedExternally: true},
+			wantErr: true,
+			errMsg:  "old_subscription_id is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.req.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr {
+				if err.Error() != tt.errMsg {
+					t.Errorf("Validate() error = %v, want %v", err.Error(), tt.errMsg)
+				}
+			}
+		})
+	}
+}
+
+func TestUpgradeSubscriptionRequest_Validate(t *testing.T) {
+	tests := []struct {
+		name    string
+		req     *UpgradeSubscriptionRequest
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "valid same-cycle without recurring hints",
+			req: &UpgradeSubscriptionRequest{
+				SubscriptionID:    "sub_old",
+				NewSubscriptionID: "sub_new",
+				CurrentPlanID:     "plan_old",
+				NewPlanID:         "plan_new",
+				OldAmountMinor:    AmountMinor(74900),
+				NewAmountMinor:    AmountMinor(179900),
+				Currency:          "INR",
+				RemainingDays:     30,
+				CycleDays:         30,
+				CustomerEmail:     "user@example.com",
+				CustomerPhone:     "9876543210",
+				ReturnURL:         "https://example.com/return",
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid cross-cycle with recurring hints",
+			req: &UpgradeSubscriptionRequest{
+				SubscriptionID:           "sub_old",
+				NewSubscriptionID:        "sub_new",
+				CurrentPlanID:            "plan_old",
+				NewPlanID:                "plan_new",
+				OldAmountMinor:           AmountMinor(74900),
+				NewAmountMinor:           AmountMinor(179900),
+				Currency:                 "INR",
+				RemainingDays:            30,
+				CycleDays:                30,
+				CustomerEmail:            "user@example.com",
+				CustomerPhone:            "9876543210",
+				ReturnURL:                "https://example.com/return",
+				CrossCycle:               true,
+				NewRecurringInterval:     1,
+				NewRecurringIntervalType: PlanIntervalYear,
+			},
+			wantErr: false,
+		},
+		{
+			name: "cross-cycle missing interval",
+			req: &UpgradeSubscriptionRequest{
+				SubscriptionID:           "sub_old",
+				NewSubscriptionID:        "sub_new",
+				CurrentPlanID:            "plan_old",
+				NewPlanID:                "plan_new",
+				OldAmountMinor:           AmountMinor(74900),
+				NewAmountMinor:           AmountMinor(179900),
+				Currency:                 "INR",
+				RemainingDays:            30,
+				CycleDays:                30,
+				CustomerEmail:            "user@example.com",
+				CustomerPhone:            "9876543210",
+				ReturnURL:                "https://example.com/return",
+				CrossCycle:               true,
+				NewRecurringIntervalType: PlanIntervalYear,
+			},
+			wantErr: true,
+			errMsg:  "new_recurring_interval is required and must be >= 1 when cross_cycle is true",
+		},
+		{
+			name: "cross-cycle missing interval type",
+			req: &UpgradeSubscriptionRequest{
+				SubscriptionID:       "sub_old",
+				NewSubscriptionID:    "sub_new",
+				CurrentPlanID:        "plan_old",
+				NewPlanID:            "plan_new",
+				OldAmountMinor:       AmountMinor(74900),
+				NewAmountMinor:       AmountMinor(179900),
+				Currency:             "INR",
+				RemainingDays:        30,
+				CycleDays:            30,
+				CustomerEmail:        "user@example.com",
+				CustomerPhone:        "9876543210",
+				ReturnURL:            "https://example.com/return",
+				CrossCycle:           true,
+				NewRecurringInterval: 1,
+			},
+			wantErr: true,
+			errMsg:  "new_recurring_interval_type is required when cross_cycle is true",
+		},
+		{
+			name: "remaining_days greater than cycle_days",
+			req: &UpgradeSubscriptionRequest{
+				SubscriptionID:    "sub_old",
+				NewSubscriptionID: "sub_new",
+				CurrentPlanID:     "plan_old",
+				NewPlanID:         "plan_new",
+				OldAmountMinor:    AmountMinor(74900),
+				NewAmountMinor:    AmountMinor(179900),
+				Currency:          "INR",
+				RemainingDays:     45,
+				CycleDays:         30,
+				CustomerEmail:     "user@example.com",
+				CustomerPhone:     "9876543210",
+				ReturnURL:         "https://example.com/return",
+			},
+			wantErr: true,
+			errMsg:  "remaining_days must be within [0, cycle_days]",
+		},
+		{
+			name: "missing return_url",
+			req: &UpgradeSubscriptionRequest{
+				SubscriptionID:    "sub_old",
+				NewSubscriptionID: "sub_new",
+				CurrentPlanID:     "plan_old",
+				NewPlanID:         "plan_new",
+				OldAmountMinor:    AmountMinor(74900),
+				NewAmountMinor:    AmountMinor(179900),
+				Currency:          "INR",
+				RemainingDays:     30,
+				CycleDays:         30,
+				CustomerEmail:     "user@example.com",
+				CustomerPhone:     "9876543210",
+			},
+			wantErr: true,
+			errMsg:  "return_url is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.req.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr {
+				if err.Error() != tt.errMsg {
+					t.Errorf("Validate() error = %v, want %v", err.Error(), tt.errMsg)
+				}
+			}
+		})
+	}
+}

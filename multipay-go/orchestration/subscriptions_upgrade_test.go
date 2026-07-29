@@ -88,6 +88,7 @@ func TestUpgradeSubscription_Cashfree_CreatesReauthSubscription(t *testing.T) {
 		t.Errorf("expected PlanID=%s, got %s", req.NewPlanID, capturedCreateReq.PlanID)
 	}
 
+	// CrossCycle is false here, so the same-cycle offset (now + RemainingDays) must be preserved.
 	// Assert FirstChargeTime is correctly set to clock.Now() + RemainingDays
 	expectedFirstChargeTime := clock.Now().AddDate(0, 0, req.RemainingDays)
 	if capturedCreateReq.FirstChargeTime == nil {
@@ -418,5 +419,239 @@ func TestFinalizeUpgrade_Cashfree_ChargeError(t *testing.T) {
 	// Assert CancelSubscription was NOT called when charge fails
 	if cancelCalled {
 		t.Fatalf("expected adapter.CancelSubscription NOT to be called when charge fails")
+	}
+}
+
+// TestFinalizeUpgrade_Cashfree_ExternalProration_SkipsCharge tests that when
+// ProrationCollectedExternally is true, ChargeSubscription is skipped entirely
+// and only CancelSubscription is called for the old subscription.
+func TestFinalizeUpgrade_Cashfree_ExternalProration_SkipsCharge(t *testing.T) {
+	fixedTime := time.Date(2026, 6, 25, 10, 0, 0, 0, time.UTC)
+	clock := &fixedClock{fixedTime: fixedTime}
+
+	cancelCalled := false
+	var capturedCancelID string
+
+	adapter := &fakeAdapter{
+		chargeSubscriptionFunc: func(ctx context.Context, req *domain.ChargeSubscriptionRequest) (*domain.SubscriptionPayment, error) {
+			t.Fatalf("ChargeSubscription must NOT be called when ProrationCollectedExternally is true — this is the double-charge guard")
+			return &domain.SubscriptionPayment{}, errors.New("chargeSubscriptionFunc should not be called")
+		},
+		cancelSubscriptionFunc: func(ctx context.Context, req *domain.CancelSubscriptionRequest) (*domain.Subscription, error) {
+			cancelCalled = true
+			capturedCancelID = req.SubscriptionID
+			return &domain.Subscription{
+				SubscriptionID: req.SubscriptionID,
+				Status:         domain.SubscriptionStatusCancelled,
+			}, nil
+		},
+	}
+
+	logger := ports.NewNoopLogger()
+	pipeline := hooks.NewPipeline(logger)
+	validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+	svc := NewSubscriptionService(domain.ProviderCashfree, adapter, validator, pipeline, logger, clock)
+
+	res, err := svc.FinalizeUpgrade(context.Background(), &domain.FinalizeUpgradeRequest{
+		NewSubscriptionID:            "sub_new",
+		OldSubscriptionID:            "sub_old",
+		ProrationCollectedExternally: true,
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+
+	if !cancelCalled {
+		t.Fatalf("expected CancelSubscription to be called")
+	}
+	if capturedCancelID != "sub_old" {
+		t.Errorf("expected capturedCancelID=%s, got %s", "sub_old", capturedCancelID)
+	}
+	if res == nil {
+		t.Fatalf("FinalizeUpgrade must never return nil, nil")
+	}
+}
+
+// TestFinalizeUpgrade_Cashfree_DefaultStillCharges tests that the zero value of
+// ProrationCollectedExternally (false) preserves the original behavior: charge
+// then cancel.
+func TestFinalizeUpgrade_Cashfree_DefaultStillCharges(t *testing.T) {
+	fixedTime := time.Date(2026, 6, 25, 10, 0, 0, 0, time.UTC)
+	clock := &fixedClock{fixedTime: fixedTime}
+
+	chargeCalled := false
+	cancelCalled := false
+	var capturedCharge *domain.ChargeSubscriptionRequest
+
+	adapter := &fakeAdapter{
+		chargeSubscriptionFunc: func(ctx context.Context, req *domain.ChargeSubscriptionRequest) (*domain.SubscriptionPayment, error) {
+			chargeCalled = true
+			capturedCharge = req
+			return &domain.SubscriptionPayment{PaymentID: "pay_1"}, nil
+		},
+		cancelSubscriptionFunc: func(ctx context.Context, req *domain.CancelSubscriptionRequest) (*domain.Subscription, error) {
+			cancelCalled = true
+			return &domain.Subscription{
+				SubscriptionID: req.SubscriptionID,
+				Status:         domain.SubscriptionStatusCancelled,
+			}, nil
+		},
+	}
+
+	logger := ports.NewNoopLogger()
+	pipeline := hooks.NewPipeline(logger)
+	validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+	svc := NewSubscriptionService(domain.ProviderCashfree, adapter, validator, pipeline, logger, clock)
+
+	res, err := svc.FinalizeUpgrade(context.Background(), &domain.FinalizeUpgradeRequest{
+		NewSubscriptionID:   "sub_new",
+		OldSubscriptionID:   "sub_old",
+		PaymentRef:          "paya_1",
+		ProratedAmountMinor: domain.AmountMinor(154900),
+		Currency:            "INR",
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+
+	if !chargeCalled {
+		t.Fatalf("expected ChargeSubscription to be called when ProrationCollectedExternally is false")
+	}
+	if capturedCharge == nil {
+		t.Fatalf("capturedCharge is nil")
+	}
+	if capturedCharge.SubscriptionID != "sub_new" {
+		t.Errorf("expected ChargeSubscriptionRequest SubscriptionID=%s, got %s", "sub_new", capturedCharge.SubscriptionID)
+	}
+	if capturedCharge.AmountMinor != domain.AmountMinor(154900) {
+		t.Errorf("expected AmountMinor=%d, got %d", domain.AmountMinor(154900), capturedCharge.AmountMinor)
+	}
+	if capturedCharge.PaymentRef != "paya_1" {
+		t.Errorf("expected PaymentRef=%s, got %s", "paya_1", capturedCharge.PaymentRef)
+	}
+
+	if !cancelCalled {
+		t.Fatalf("expected CancelSubscription to be called")
+	}
+
+	if res == nil {
+		t.Fatalf("expected non-nil response")
+	}
+	if res.PaymentID != "pay_1" {
+		t.Errorf("expected PaymentID=%s, got %s", "pay_1", res.PaymentID)
+	}
+}
+
+// TestFinalizeUpgrade_Razorpay_ExternalProration_NoOp tests that Razorpay with
+// ProrationCollectedExternally true returns an empty non-nil payment without
+// calling any adapter methods.
+func TestFinalizeUpgrade_Razorpay_ExternalProration_NoOp(t *testing.T) {
+	fixedTime := time.Date(2026, 6, 25, 10, 0, 0, 0, time.UTC)
+	clock := &fixedClock{fixedTime: fixedTime}
+
+	adapter := &fakeAdapter{
+		chargeSubscriptionFunc: func(ctx context.Context, req *domain.ChargeSubscriptionRequest) (*domain.SubscriptionPayment, error) {
+			t.Fatalf("ChargeSubscription must NOT be called for Razorpay")
+			return &domain.SubscriptionPayment{}, errors.New("chargeSubscriptionFunc should not be called")
+		},
+	}
+
+	logger := ports.NewNoopLogger()
+	pipeline := hooks.NewPipeline(logger)
+	validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+	svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, validator, pipeline, logger, clock)
+
+	res, err := svc.FinalizeUpgrade(context.Background(), &domain.FinalizeUpgradeRequest{
+		NewSubscriptionID:            "sub_new",
+		OldSubscriptionID:            "sub_old",
+		ProrationCollectedExternally: true,
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+
+	if res == nil {
+		t.Fatalf("expected non-nil response")
+	}
+}
+
+// TestUpgradeSubscription_CrossCycle_FirstChargeAtNewInterval tests that when
+// CrossCycle is true, FirstChargeTime is scheduled at one NEW recurring interval
+// out, not at the end of the old cycle (RemainingDays).
+func TestUpgradeSubscription_CrossCycle_FirstChargeAtNewInterval(t *testing.T) {
+	fixedTime := time.Date(2026, 6, 25, 10, 0, 0, 0, time.UTC)
+	clock := &fixedClock{fixedTime: fixedTime}
+
+	var capturedCreateReq *domain.CreateSubscriptionRequest
+
+	adapter := &fakeAdapter{
+		createSubscriptionFunc: func(ctx context.Context, req *domain.CreateSubscriptionRequest) (*domain.Subscription, error) {
+			capturedCreateReq = req
+			return &domain.Subscription{
+				SubscriptionID: req.SubscriptionID,
+				AuthLink:       "https://auth.cashfree.com/x",
+				AuthSessionID:  "sess_x",
+				Environment:    domain.EnvironmentSandbox,
+			}, nil
+		},
+	}
+
+	logger := ports.NewNoopLogger()
+	pipeline := hooks.NewPipeline(logger)
+	validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+	svc := NewSubscriptionService(domain.ProviderCashfree, adapter, validator, pipeline, logger, clock)
+
+	req := &domain.UpgradeSubscriptionRequest{
+		SubscriptionID:           "sub_old",
+		NewSubscriptionID:        "sub_new",
+		CurrentPlanID:            "plan_old",
+		NewPlanID:                "plan_new",
+		OldAmountMinor:           domain.AmountMinor(74900),
+		NewAmountMinor:           domain.AmountMinor(1799000),
+		Currency:                 "INR",
+		RemainingDays:            10,
+		CycleDays:                30,
+		CustomerEmail:            "user@example.com",
+		CustomerPhone:            "9876543210",
+		ReturnURL:                "https://example.com/return",
+		CrossCycle:               true,
+		NewRecurringInterval:     1,
+		NewRecurringIntervalType: domain.PlanIntervalYear,
+	}
+
+	result, err := svc.UpgradeSubscription(context.Background(), req)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+
+	if capturedCreateReq == nil {
+		t.Fatalf("expected CreateSubscriptionRequest to be called")
+	}
+	if capturedCreateReq.FirstChargeTime == nil {
+		t.Fatalf("expected non-nil FirstChargeTime")
+	}
+
+	// Assert FirstChargeTime is one year out (2027-06-25)
+	expectedTime := fixedTime.AddDate(1, 0, 0)
+	if capturedCreateReq.FirstChargeTime.Year() != expectedTime.Year() {
+		t.Errorf("expected Year=%d, got %d", expectedTime.Year(), capturedCreateReq.FirstChargeTime.Year())
+	}
+	if capturedCreateReq.FirstChargeTime.Month() != expectedTime.Month() {
+		t.Errorf("expected Month=%v, got %v", expectedTime.Month(), capturedCreateReq.FirstChargeTime.Month())
+	}
+	if capturedCreateReq.FirstChargeTime.Day() != expectedTime.Day() {
+		t.Errorf("expected Day=%d, got %d", expectedTime.Day(), capturedCreateReq.FirstChargeTime.Day())
+	}
+
+	// Explicitly assert it is NOT equal to end-of-old-cycle (2026-07-05)
+	oldCycleEnd := fixedTime.AddDate(0, 0, 10)
+	if capturedCreateReq.FirstChargeTime.Year() == oldCycleEnd.Year() &&
+		capturedCreateReq.FirstChargeTime.Month() == oldCycleEnd.Month() &&
+		capturedCreateReq.FirstChargeTime.Day() == oldCycleEnd.Day() {
+		t.Fatalf("cross-cycle upgrade must schedule the new mandate one NEW interval out, not at the end of the old cycle")
+	}
+
+	if result.RecurringEffective != "IMMEDIATE" {
+		t.Errorf("expected RecurringEffective=IMMEDIATE, got %s", result.RecurringEffective)
 	}
 }

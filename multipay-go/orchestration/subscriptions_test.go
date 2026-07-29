@@ -744,34 +744,40 @@ func TestCreateSubscription_FirstChargeWithMandate_StampsClock(t *testing.T) {
 // calls PreviewPlanChange internally and returns the correct upgrade result with cross-cycle charges.
 func TestUpgradeSubscription_CrossCycleIntegration(t *testing.T) {
 	tests := []struct {
-		name                 string
-		crossCycle           bool
-		oldAmountMinor       domain.AmountMinor
-		newAmountMinor       domain.AmountMinor
-		remainingDays        int
-		cycleDays            int
-		expectRecurringEff   string
-		expectProratedAmount domain.AmountMinor
+		name                     string
+		crossCycle               bool
+		oldAmountMinor           domain.AmountMinor
+		newAmountMinor           domain.AmountMinor
+		remainingDays            int
+		cycleDays                int
+		newRecurringInterval     int32
+		newRecurringIntervalType domain.PlanIntervalType
+		expectRecurringEff       string
+		expectProratedAmount     domain.AmountMinor
 	}{
 		{
-			name:                 "cross-cycle upgrade",
-			crossCycle:           true,
-			oldAmountMinor:       160000,
-			newAmountMinor:       1600000,
-			remainingDays:        10,
-			cycleDays:            30,
-			expectRecurringEff:   "IMMEDIATE",
-			expectProratedAmount: 1546667, // 1600000 - (160000*10/30) = 1600000 - 53333 = 1546667
+			name:                     "cross-cycle upgrade",
+			crossCycle:               true,
+			oldAmountMinor:           160000,
+			newAmountMinor:           1600000,
+			remainingDays:            10,
+			cycleDays:                30,
+			newRecurringInterval:     1,
+			newRecurringIntervalType: domain.PlanIntervalYear,
+			expectRecurringEff:       "IMMEDIATE",
+			expectProratedAmount:     1546667, // 1600000 - (160000*10/30) = 1600000 - 53333 = 1546667
 		},
 		{
-			name:                 "same-cycle upgrade",
-			crossCycle:           false,
-			oldAmountMinor:       100000,
-			newAmountMinor:       160000,
-			remainingDays:        12,
-			cycleDays:            30,
-			expectRecurringEff:   "CYCLE_END",
-			expectProratedAmount: 24000, // (160000-100000)*12/30 = 60000*12/30 = 24000
+			name:                     "same-cycle upgrade",
+			crossCycle:               false,
+			oldAmountMinor:           100000,
+			newAmountMinor:           160000,
+			remainingDays:            12,
+			cycleDays:                30,
+			newRecurringInterval:     0,
+			newRecurringIntervalType: "",
+			expectRecurringEff:       "CYCLE_END",
+			expectProratedAmount:     24000, // (160000-100000)*12/30 = 60000*12/30 = 24000
 		},
 	}
 
@@ -795,20 +801,22 @@ func TestUpgradeSubscription_CrossCycleIntegration(t *testing.T) {
 			svc := NewSubscriptionService(domain.ProviderCashfree, adapter, validator, pipeline, logger, clock)
 
 			req := &domain.UpgradeSubscriptionRequest{
-				SubscriptionID:    "sub_old",
-				NewSubscriptionID: "sub_new",
-				CurrentPlanID:     "plan_old",
-				NewPlanID:         "plan_new",
-				OldAmountMinor:    tt.oldAmountMinor,
-				NewAmountMinor:    tt.newAmountMinor,
-				RemainingDays:     tt.remainingDays,
-				CycleDays:         tt.cycleDays,
-				Currency:          domain.Currency("INR"),
-				CustomerEmail:     "test@example.com",
-				CustomerPhone:     "+919876543210",
-				CustomerName:      "Test User",
-				ReturnURL:         "https://example.com/return",
-				CrossCycle:        tt.crossCycle,
+				SubscriptionID:           "sub_old",
+				NewSubscriptionID:        "sub_new",
+				CurrentPlanID:            "plan_old",
+				NewPlanID:                "plan_new",
+				OldAmountMinor:           tt.oldAmountMinor,
+				NewAmountMinor:           tt.newAmountMinor,
+				RemainingDays:            tt.remainingDays,
+				CycleDays:                tt.cycleDays,
+				Currency:                 domain.Currency("INR"),
+				CustomerEmail:            "test@example.com",
+				CustomerPhone:            "+919876543210",
+				CustomerName:             "Test User",
+				ReturnURL:                "https://example.com/return",
+				CrossCycle:               tt.crossCycle,
+				NewRecurringInterval:     tt.newRecurringInterval,
+				NewRecurringIntervalType: tt.newRecurringIntervalType,
 			}
 
 			result, err := svc.UpgradeSubscription(context.Background(), req)

@@ -5,6 +5,7 @@ export {
   Environment,
   UpgradeStrategy,
   RecurringEffective,
+  PlanIntervalType,
 } from "./types";
 export type {
   CheckoutPayload,
