@@ -384,18 +384,25 @@ func resumeSubscription(ctx context.Context, adapter *Adapter, req *domain.Resum
 		return nil, fmt.Errorf("request is required: %w", domain.ErrInvalidRequest)
 	}
 
+	// Cashfree-specific mandatory field (multipay Rule V2: vendor-specific requirements are enforced in
+	// the vendor's adapter, not in the shared Validate, so Razorpay is not wrongly rejected). Cashfree's
+	// Manage Subscription reference marks action_details.next_scheduled_time "Required for ACTIVATE
+	// action". Sending ACTIVATE without it is a request we already know is invalid, so fail here with a
+	// deterministic error instead of paying a round-trip for an opaque provider rejection.
+	if req.NextScheduledTime == nil {
+		return nil, fmt.Errorf("next_scheduled_time is required by cashfree for ACTIVATE: %w", domain.ErrInvalidRequest)
+	}
+
 	// Cashfree REQUIRES action_details.next_scheduled_time for the ACTIVATE action — it is the
-	// date the resumed subscription's next charge is scheduled. Send it when the caller provides
-	// NextScheduledTime; Cashfree rejects an ACTIVATE with no action_details.
+	// date the resumed subscription's next charge is scheduled. Always sent since the guard above
+	// has proven the pointer is non-nil; Cashfree rejects an ACTIVATE with no action_details.
+	nextStr := req.NextScheduledTime.Format("2006-01-02T15:04:05-07:00")
 	cfReq := &cf.ManageSubscriptionRequest{
 		SubscriptionId: req.SubscriptionID,
 		Action:         "ACTIVATE",
-	}
-	if req.NextScheduledTime != nil {
-		nextStr := req.NextScheduledTime.Format("2006-01-02T15:04:05-07:00")
-		cfReq.ActionDetails = &cf.ManageSubscriptionRequestActionDetails{
+		ActionDetails: &cf.ManageSubscriptionRequestActionDetails{
 			NextScheduledTime: &nextStr,
-		}
+		},
 	}
 
 	// Call Cashfree SDK
