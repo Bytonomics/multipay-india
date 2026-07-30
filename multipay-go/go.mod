@@ -31,6 +31,6 @@ require (
 require (
 	github.com/cockroachdb/apd/v3 v3.2.1 // indirect; transitive dep of bojanz/currency (decimal arithmetic, NOT a database)
 	github.com/getsentry/sentry-go v0.29.1 // indirect
-	golang.org/x/sys v0.42.0 // indirect
-	golang.org/x/text v0.34.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 )

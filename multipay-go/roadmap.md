@@ -1,3 +1,10 @@
+---
+type: Overview
+title: MultiPay Adapter — Roadmap
+status: draft
+tags: []
+---
+
 # MultiPay Adapter — Roadmap
 
 Tasks and planned features for the multipay-india/multipay-go library.

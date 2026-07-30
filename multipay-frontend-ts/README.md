@@ -1,3 +1,11 @@
+---
+type: Overview
+title: multipay-frontend-ts
+status: stable
+tags:
+- readme
+---
+
 # multipay-frontend-ts
 
 The frontend TypeScript/React library for the **multipay-india** payment-aggregator monorepo — providing headless checkout redirects and a React `<PaymentPicker>` component for selecting payment aggregators (Cashfree, Razorpay).

@@ -1,3 +1,10 @@
+---
+type: Overview
+title: Payment Flows
+status: draft
+tags: []
+---
+
 # Payment Flows
 
 Sequence diagrams for every workflow `multipay-india` supports. These are **provider-neutral** — the same

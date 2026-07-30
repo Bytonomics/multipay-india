@@ -1,3 +1,10 @@
+---
+type: Overview
+title: MultiPay Adapter — Design Document
+status: draft
+tags: []
+---
+
 # MultiPay Adapter — Design Document
 
 This document describes the architecture, design decisions, and core concepts of the MultiPay Adapter library.

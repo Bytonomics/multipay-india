@@ -1,3 +1,11 @@
+---
+type: Overview
+title: MultiPay Adapter
+status: stable
+tags:
+- readme
+---
+
 # MultiPay Adapter
 
 A unified Go library for integrating payment providers (Cashfree, Razorpay) with a single, consistent API. Each client is bound to one provider. Process orders, payments, refunds, and webhooks without provider-specific code.

@@ -1,3 +1,11 @@
+---
+type: Overview
+title: contract
+status: stable
+tags:
+- readme
+---
+
 # contract
 
 Shared canonical contract for every multipay-* port: request/response types, enum string values,

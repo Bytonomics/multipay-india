@@ -1,3 +1,11 @@
+---
+type: Overview
+title: multipay-india
+status: stable
+tags:
+- readme
+---
+
 # multipay-india
 
 `multipay-india` is a payment-gateway **aggregator** for Indian providers (Cashfree and Razorpay today,

@@ -77,10 +77,10 @@ repos:
     hooks:
       - id: frontend-ts-install
         name: TypeScript frontend install (sync lockfile)
-        description: Runs make -C multipay-frontend-ts install (npm install) FIRST so package.json/package-lock.json drift is reconciled and node_modules (incl. @types/react) is present before typecheck/lint/test. If npm install rewrites package-lock.json, pre-commit aborts so the synced lockfile must be committed.
+        description: Runs make -C multipay-frontend-ts install (npm install) so node_modules (incl. @types/react) is present before typecheck/lint/test. Runs on ANY multipay-frontend-ts file change (not just .ts/.tsx) so non-TS changes (e.g. .md) that trigger a submodule commit still get a working node_modules.
         entry: make -C multipay-frontend-ts install
         language: system
-        files: ^multipay-frontend-ts/(src/.*\.(ts|tsx)|tests/.*\.(ts|tsx)|package\.json|package-lock\.json)$
+        files: ^multipay-frontend-ts/
         pass_filenames: false
 
       - id: frontend-ts-check
@@ -88,5 +88,5 @@ repos:
         description: Runs make -C multipay-frontend-ts check (typecheck + lint + test)
         entry: make -C multipay-frontend-ts check
         language: system
-        types_or: [ts, tsx]
+        files: ^multipay-frontend-ts/
         pass_filenames: false

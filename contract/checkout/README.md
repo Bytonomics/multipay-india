@@ -1,3 +1,11 @@
+---
+type: Overview
+title: Checkout Slice
+status: stable
+tags:
+- readme
+---
+
 # Checkout Slice
 
 Frontend-bound, provider-agnostic checkout payload that enables JavaScript clients to drive vendor-hosted checkout redirects. Discriminated by `Provider`; only fields for the configured provider are populated.
