@@ -18,9 +18,10 @@ your frontend all speak the exact same shapes.
 
 | Provider | Implementation Status | Status |
 |----------|------------|--------|
-| CashFree | Implemented for Golang and Frontend | Testing WIP |
+| CashFree | Implemented for Golang and Frontend | Tested with a sandbox account |
 | RazorPay | Implemented for Golang and Frontend | Not Tested |
 | PayU | TODO | TODO |
+| Dodo Payments | TODO | FIGURING OUT |
 
 ## How it works
 
