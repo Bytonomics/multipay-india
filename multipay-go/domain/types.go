@@ -11,24 +11,24 @@ import (
 type RawProviderResponse json.RawMessage
 
 type CustomerInfo struct {
-	CustomerID string `json:"customer_id" pedantigo:"required,minLength=1,maxLength=250"`
-	Name       string `json:"name,omitempty" pedantigo:"omitempty,maxLength=200"`
-	Email      string `json:"email,omitempty" pedantigo:"omitempty,email"`
-	Phone      string `json:"phone" pedantigo:"required,minLength=5,maxLength=20"`
+	CustomerID string `json:"customer_id" validate:"required,minLength=1,maxLength=250"`
+	Name       string `json:"name,omitempty" validate:"omitempty,maxLength=200"`
+	Email      string `json:"email,omitempty" validate:"omitempty,email"`
+	Phone      string `json:"phone" validate:"required,minLength=5,maxLength=20"`
 
 	// --- Cashfree TPV (Third-Party Validation) bank fields (Cashfree-only; ignored by Razorpay) ---
 	// BankAccountNumber → cf CustomerDetails.customer_bank_account_number / link customer_bank_account_number.
-	BankAccountNumber string `json:"bank_account_number,omitempty" pedantigo:"omitempty,maxLength=50"`
+	BankAccountNumber string `json:"bank_account_number,omitempty" validate:"omitempty,maxLength=50"`
 	// BankIFSC → cf customer_bank_ifsc.
-	BankIFSC string `json:"bank_ifsc,omitempty" pedantigo:"omitempty,maxLength=20"`
+	BankIFSC string `json:"bank_ifsc,omitempty" validate:"omitempty,maxLength=20"`
 	// BankCode → cf customer_bank_code (net-banking code). Cashfree wire type is numeric.
-	BankCode int32 `json:"bank_code,omitempty" pedantigo:"omitempty"`
+	BankCode int32 `json:"bank_code,omitempty" validate:"omitempty"`
 	// BankAccountHolderName → cf link customer_bank_acoount_holder_name (note the vendor's
 	// misspelling on the wire) and subscription customer_bank_account_holder_name. Cashfree-only;
 	// ignored by Razorpay.
-	BankAccountHolderName string `json:"bank_account_holder_name,omitempty" pedantigo:"omitempty,maxLength=250"`
+	BankAccountHolderName string `json:"bank_account_holder_name,omitempty" validate:"omitempty,maxLength=250"`
 	// UID → cf customer_uid (Cashfree customer identifier). Order-only.
-	UID string `json:"uid,omitempty" pedantigo:"omitempty,maxLength=250"`
+	UID string `json:"uid,omitempty" validate:"omitempty,maxLength=250"`
 }
 
 type Metadata map[string]string
@@ -36,14 +36,14 @@ type Metadata map[string]string
 // --- Order types ---
 
 type CreateOrderRequest struct {
-	OrderID     string        `json:"order_id,omitempty" pedantigo:"omitempty,maxLength=250"`
-	AmountMinor AmountMinor   `json:"amount_minor" pedantigo:"required,gt=0"`
-	Currency    Currency      `json:"currency" pedantigo:"required,iso4217"`
-	Customer    *CustomerInfo `json:"customer" pedantigo:"required"`
-	ReturnURL   string        `json:"return_url" pedantigo:"required,url"`
-	NotifyURL   string        `json:"notify_url,omitempty" pedantigo:"omitempty,url"`
+	OrderID     string        `json:"order_id,omitempty" validate:"omitempty,maxLength=250"`
+	AmountMinor AmountMinor   `json:"amount_minor" validate:"required,gt=0"`
+	Currency    Currency      `json:"currency" validate:"required,iso4217"`
+	Customer    *CustomerInfo `json:"customer" validate:"required"`
+	ReturnURL   string        `json:"return_url" validate:"required,url"`
+	NotifyURL   string        `json:"notify_url,omitempty" validate:"omitempty,url"`
 	ExpiryTime  *time.Time    `json:"expiry_time,omitempty"`
-	Note        string        `json:"note,omitempty" pedantigo:"omitempty,maxLength=500"`
+	Note        string        `json:"note,omitempty" validate:"omitempty,maxLength=500"`
 	Metadata    Metadata      `json:"metadata,omitempty"`
 
 	// --- Cashfree-only optional fields (ignored by the Razorpay adapter) ---
@@ -56,7 +56,7 @@ type CreateOrderRequest struct {
 	// Products → cf CreateOrderRequest.products (One-Click-Checkout / Verify-and-Pay toggles).
 	Products *OrderProducts `json:"products,omitempty"`
 	// PaymentMethods → cf order_meta.payment_methods (comma-separated allowed modes, e.g. "cc,dc,upi").
-	PaymentMethods string `json:"payment_methods,omitempty" pedantigo:"omitempty,maxLength=500"`
+	PaymentMethods string `json:"payment_methods,omitempty" validate:"omitempty,maxLength=500"`
 	// PaymentMethodsFilters → cf order_meta.payment_methods_filters (card bin/scheme/bank/suffix filters).
 	PaymentMethodsFilters *OrderPaymentMethodsFilters `json:"payment_methods_filters,omitempty"`
 	// OfferFilters → cf order_meta.offer_filters (allow/deny offer ids).
@@ -69,7 +69,7 @@ type CreateOrderRequest struct {
 	PartialPayment *bool `json:"partial_payment,omitempty"`
 	// FirstPaymentMinAmount is the minimum first installment when partial payment is on.
 	// Minor units (rzp first_payment_min_amount). Only meaningful with PartialPayment=true.
-	FirstPaymentMinAmount AmountMinor `json:"first_payment_min_amount_minor,omitempty" pedantigo:"omitempty,gte=0"`
+	FirstPaymentMinAmount AmountMinor `json:"first_payment_min_amount_minor,omitempty" validate:"omitempty,gte=0"`
 }
 
 // Validate enforces presence and non-empty constraints on CreateOrderRequest fields.
@@ -120,11 +120,11 @@ type CheckoutPayload struct {
 }
 
 type GetOrderRequest struct {
-	OrderID string `json:"order_id" pedantigo:"required,minLength=1"`
+	OrderID string `json:"order_id" validate:"required,minLength=1"`
 }
 
 type ListOrderPaymentsRequest struct {
-	OrderID string `json:"order_id" pedantigo:"required,minLength=1"`
+	OrderID string `json:"order_id" validate:"required,minLength=1"`
 }
 
 // --- Payment types ---
@@ -150,29 +150,29 @@ type Payment struct {
 type GetPaymentRequest struct {
 	// OrderID is optional in the canonical contract, but required by Cashfree (enforced in adapter).
 	// Razorpay fetches payments by PaymentID alone.
-	OrderID   string `json:"order_id,omitempty" pedantigo:"omitempty,minLength=1"`
-	PaymentID string `json:"payment_id" pedantigo:"required,minLength=1"`
+	OrderID   string `json:"order_id,omitempty" validate:"omitempty,minLength=1"`
+	PaymentID string `json:"payment_id" validate:"required,minLength=1"`
 }
 
 type ListPaymentsRequest struct {
-	OrderID string `json:"order_id" pedantigo:"required,minLength=1"`
+	OrderID string `json:"order_id" validate:"required,minLength=1"`
 }
 
 type CapturePaymentRequest struct {
-	PaymentID   string      `json:"payment_id" pedantigo:"required,minLength=1"`
-	AmountMinor AmountMinor `json:"amount_minor" pedantigo:"required,gt=0"`
-	Currency    Currency    `json:"currency" pedantigo:"required,iso4217"`
+	PaymentID   string      `json:"payment_id" validate:"required,minLength=1"`
+	AmountMinor AmountMinor `json:"amount_minor" validate:"required,gt=0"`
+	Currency    Currency    `json:"currency" validate:"required,iso4217"`
 }
 
 // --- Refund types ---
 
 type CreateRefundRequest struct {
-	OrderID     string      `json:"order_id,omitempty" pedantigo:"omitempty,minLength=1"`
-	PaymentID   string      `json:"payment_id,omitempty" pedantigo:"omitempty,minLength=1"`
-	RefundID    string      `json:"refund_id,omitempty" pedantigo:"omitempty,maxLength=250"`
-	AmountMinor AmountMinor `json:"amount_minor" pedantigo:"required,gt=0"`
-	Currency    Currency    `json:"currency" pedantigo:"required,iso4217"`
-	Reason      string      `json:"reason,omitempty" pedantigo:"omitempty,maxLength=500"`
+	OrderID     string      `json:"order_id,omitempty" validate:"omitempty,minLength=1"`
+	PaymentID   string      `json:"payment_id,omitempty" validate:"omitempty,minLength=1"`
+	RefundID    string      `json:"refund_id,omitempty" validate:"omitempty,maxLength=250"`
+	AmountMinor AmountMinor `json:"amount_minor" validate:"required,gt=0"`
+	Currency    Currency    `json:"currency" validate:"required,iso4217"`
+	Reason      string      `json:"reason,omitempty" validate:"omitempty,maxLength=500"`
 	Metadata    Metadata    `json:"metadata,omitempty"`
 
 	// RefundSpeed selects how fast the provider settles the refund. The two vendors
@@ -182,7 +182,7 @@ type CreateRefundRequest struct {
 	//   Razorpay speed:        normal   | optimum
 	// Empty means "provider default" (STANDARD / normal). The Cashfree adapter forwards
 	// STANDARD/INSTANT verbatim; the Razorpay adapter maps STANDARD→normal, INSTANT→optimum.
-	RefundSpeed RefundSpeed `json:"refund_speed,omitempty" pedantigo:"omitempty,oneof=STANDARD INSTANT"`
+	RefundSpeed RefundSpeed `json:"refund_speed,omitempty" validate:"omitempty,oneof=STANDARD INSTANT"`
 
 	// RefundSplits reverses an Easy-Split order proportionally across vendors.
 	// Cashfree-only (cf refund_splits); ignored by the Razorpay adapter.
@@ -192,8 +192,8 @@ type CreateRefundRequest struct {
 // RefundSplit mirrors cf OrderCreateRefundRequestRefundSplitsInner. VendorID is
 // mandatory on the vendor struct; Amount is minor units.
 type RefundSplit struct {
-	VendorID string            `json:"vendor_id" pedantigo:"required,maxLength=250"`
-	Amount   AmountMinor       `json:"amount_minor,omitempty" pedantigo:"omitempty,gte=0"`
+	VendorID string            `json:"vendor_id" validate:"required,maxLength=250"`
+	Amount   AmountMinor       `json:"amount_minor,omitempty" validate:"omitempty,gte=0"`
 	Tags     map[string]string `json:"tags,omitempty"`
 }
 
@@ -223,8 +223,8 @@ type Refund struct {
 }
 
 type GetRefundRequest struct {
-	OrderID  string `json:"order_id,omitempty" pedantigo:"omitempty,minLength=1"`
-	RefundID string `json:"refund_id" pedantigo:"required,minLength=1"`
+	OrderID  string `json:"order_id,omitempty" validate:"omitempty,minLength=1"`
+	RefundID string `json:"refund_id" validate:"required,minLength=1"`
 }
 
 // ListRefundsRequest asks a provider for every refund issued against ONE transaction.
@@ -235,11 +235,11 @@ type ListRefundsRequest struct {
 	// OrderID — CASHFREE only. Cashfree lists refunds under the ORDER:
 	//   GET /pg/orders/{order_id}/refunds  (SDK: PGOrderFetchRefunds).
 	// Set this for Cashfree. It is ignored by the Razorpay adapter.
-	OrderID string `json:"order_id,omitempty" pedantigo:"omitempty,minLength=1"`
+	OrderID string `json:"order_id,omitempty" validate:"omitempty,minLength=1"`
 	// PaymentID — RAZORPAY only. Razorpay lists refunds under the captured PAYMENT:
 	//   GET /v1/payments/{payment_id}/refunds  (SDK: Payment.FetchMultipleRefund).
 	// Set this for Razorpay. It is ignored by the Cashfree adapter.
-	PaymentID string `json:"payment_id,omitempty" pedantigo:"omitempty,minLength=1"`
+	PaymentID string `json:"payment_id,omitempty" validate:"omitempty,minLength=1"`
 }
 
 // Validate enforces that at least one provider identifier is present. pedantigo's Validate()
@@ -265,17 +265,17 @@ type Instrument struct {
 }
 
 type GetInstrumentRequest struct {
-	CustomerID   string `json:"customer_id" pedantigo:"required,minLength=1"`
-	InstrumentID string `json:"instrument_id" pedantigo:"required,minLength=1"`
+	CustomerID   string `json:"customer_id" validate:"required,minLength=1"`
+	InstrumentID string `json:"instrument_id" validate:"required,minLength=1"`
 }
 
 type ListInstrumentsRequest struct {
-	CustomerID string `json:"customer_id" pedantigo:"required,minLength=1"`
+	CustomerID string `json:"customer_id" validate:"required,minLength=1"`
 }
 
 type DeleteInstrumentRequest struct {
-	CustomerID   string `json:"customer_id" pedantigo:"required,minLength=1"`
-	InstrumentID string `json:"instrument_id" pedantigo:"required,minLength=1"`
+	CustomerID   string `json:"customer_id" validate:"required,minLength=1"`
+	InstrumentID string `json:"instrument_id" validate:"required,minLength=1"`
 }
 
 // --- Webhook types ---

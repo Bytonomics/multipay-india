@@ -5,7 +5,7 @@ go 1.26
 toolchain go1.26.0
 
 require (
-	github.com/SmrutAI/pedantigo v1.1.4
+	github.com/SmrutAI/pedantigo/v2 v2.0.0
 	github.com/bojanz/currency v1.3.0
 	github.com/cashfree/cashfree-pg/v6 v6.0.5
 	github.com/razorpay/razorpay-go v1.4.1

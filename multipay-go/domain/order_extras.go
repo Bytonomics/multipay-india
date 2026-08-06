@@ -8,35 +8,35 @@ package domain
 
 // CartAddress mirrors cf CartAddress (shipping / billing address on a cart).
 type CartAddress struct {
-	FullName string `json:"full_name,omitempty" pedantigo:"omitempty,maxLength=200"`
-	Country  string `json:"country,omitempty" pedantigo:"omitempty,maxLength=100"`
-	City     string `json:"city,omitempty" pedantigo:"omitempty,maxLength=100"`
-	State    string `json:"state,omitempty" pedantigo:"omitempty,maxLength=100"`
-	Pincode  string `json:"pincode,omitempty" pedantigo:"omitempty,maxLength=20"`
-	Address1 string `json:"address_1,omitempty" pedantigo:"omitempty,maxLength=500"`
-	Address2 string `json:"address_2,omitempty" pedantigo:"omitempty,maxLength=500"`
+	FullName string `json:"full_name,omitempty" validate:"omitempty,maxLength=200"`
+	Country  string `json:"country,omitempty" validate:"omitempty,maxLength=100"`
+	City     string `json:"city,omitempty" validate:"omitempty,maxLength=100"`
+	State    string `json:"state,omitempty" validate:"omitempty,maxLength=100"`
+	Pincode  string `json:"pincode,omitempty" validate:"omitempty,maxLength=20"`
+	Address1 string `json:"address_1,omitempty" validate:"omitempty,maxLength=500"`
+	Address2 string `json:"address_2,omitempty" validate:"omitempty,maxLength=500"`
 }
 
 // CartItem mirrors cf CartItem. Prices are minor units.
 type CartItem struct {
-	ItemID              string      `json:"item_id,omitempty" pedantigo:"omitempty,maxLength=250"`
-	ItemName            string      `json:"item_name,omitempty" pedantigo:"omitempty,maxLength=250"`
-	ItemDescription     string      `json:"item_description,omitempty" pedantigo:"omitempty,maxLength=1000"`
+	ItemID              string      `json:"item_id,omitempty" validate:"omitempty,maxLength=250"`
+	ItemName            string      `json:"item_name,omitempty" validate:"omitempty,maxLength=250"`
+	ItemDescription     string      `json:"item_description,omitempty" validate:"omitempty,maxLength=1000"`
 	ItemTags            []string    `json:"item_tags,omitempty"`
-	ItemDetailsURL      string      `json:"item_details_url,omitempty" pedantigo:"omitempty,url"`
-	ItemImageURL        string      `json:"item_image_url,omitempty" pedantigo:"omitempty,url"`
-	OriginalUnitPrice   AmountMinor `json:"original_unit_price_minor,omitempty" pedantigo:"omitempty,gte=0"`
-	DiscountedUnitPrice AmountMinor `json:"discounted_unit_price_minor,omitempty" pedantigo:"omitempty,gte=0"`
-	ItemCurrency        Currency    `json:"item_currency,omitempty" pedantigo:"omitempty,iso4217"`
-	ItemQuantity        int64       `json:"item_quantity,omitempty" pedantigo:"omitempty,gte=0"`
-	ItemVariantID       string      `json:"item_variant_id,omitempty" pedantigo:"omitempty,maxLength=250"`
+	ItemDetailsURL      string      `json:"item_details_url,omitempty" validate:"omitempty,url"`
+	ItemImageURL        string      `json:"item_image_url,omitempty" validate:"omitempty,url"`
+	OriginalUnitPrice   AmountMinor `json:"original_unit_price_minor,omitempty" validate:"omitempty,gte=0"`
+	DiscountedUnitPrice AmountMinor `json:"discounted_unit_price_minor,omitempty" validate:"omitempty,gte=0"`
+	ItemCurrency        Currency    `json:"item_currency,omitempty" validate:"omitempty,iso4217"`
+	ItemQuantity        int64       `json:"item_quantity,omitempty" validate:"omitempty,gte=0"`
+	ItemVariantID       string      `json:"item_variant_id,omitempty" validate:"omitempty,maxLength=250"`
 }
 
 // CartDetails mirrors cf CartDetails. ShippingCharge is minor units.
 type CartDetails struct {
-	CustomerNote    string       `json:"customer_note,omitempty" pedantigo:"omitempty,maxLength=1000"`
-	ShippingCharge  AmountMinor  `json:"shipping_charge_minor,omitempty" pedantigo:"omitempty,gte=0"`
-	CartName        string       `json:"cart_name,omitempty" pedantigo:"omitempty,maxLength=250"`
+	CustomerNote    string       `json:"customer_note,omitempty" validate:"omitempty,maxLength=1000"`
+	ShippingCharge  AmountMinor  `json:"shipping_charge_minor,omitempty" validate:"omitempty,gte=0"`
+	CartName        string       `json:"cart_name,omitempty" validate:"omitempty,maxLength=250"`
 	ShippingAddress *CartAddress `json:"shipping_address,omitempty"`
 	BillingAddress  *CartAddress `json:"billing_address,omitempty"`
 	CartItems       []CartItem   `json:"cart_items,omitempty"`
@@ -45,21 +45,21 @@ type CartDetails struct {
 // TerminalDetails mirrors cf TerminalDetails (softPOS terminal binding).
 // TerminalType is the only mandatory field on the vendor struct.
 type TerminalDetails struct {
-	TerminalID      string `json:"terminal_id,omitempty" pedantigo:"omitempty,maxLength=250"`
-	TerminalType    string `json:"terminal_type,omitempty" pedantigo:"omitempty,maxLength=50"`
-	TerminalPhoneNo string `json:"terminal_phone_no,omitempty" pedantigo:"omitempty,maxLength=20"`
-	TerminalName    string `json:"terminal_name,omitempty" pedantigo:"omitempty,maxLength=250"`
-	CfTerminalID    int64  `json:"cf_terminal_id,omitempty" pedantigo:"omitempty,gte=0"`
-	TerminalAddress string `json:"terminal_address,omitempty" pedantigo:"omitempty,maxLength=500"`
-	TerminalNote    string `json:"terminal_note,omitempty" pedantigo:"omitempty,maxLength=500"`
+	TerminalID      string `json:"terminal_id,omitempty" validate:"omitempty,maxLength=250"`
+	TerminalType    string `json:"terminal_type,omitempty" validate:"omitempty,maxLength=50"`
+	TerminalPhoneNo string `json:"terminal_phone_no,omitempty" validate:"omitempty,maxLength=20"`
+	TerminalName    string `json:"terminal_name,omitempty" validate:"omitempty,maxLength=250"`
+	CfTerminalID    int64  `json:"cf_terminal_id,omitempty" validate:"omitempty,gte=0"`
+	TerminalAddress string `json:"terminal_address,omitempty" validate:"omitempty,maxLength=500"`
+	TerminalNote    string `json:"terminal_note,omitempty" validate:"omitempty,maxLength=500"`
 }
 
 // VendorSplit mirrors cf VendorSplit (Easy Split). Amount is minor units.
 // A split names EITHER a flat amount OR a percentage (per Cashfree).
 type VendorSplit struct {
-	VendorID   string            `json:"vendor_id,omitempty" pedantigo:"omitempty,maxLength=250"`
-	Amount     AmountMinor       `json:"amount_minor,omitempty" pedantigo:"omitempty,gte=0"`
-	Percentage float64           `json:"percentage,omitempty" pedantigo:"omitempty,gte=0,lte=100"`
+	VendorID   string            `json:"vendor_id,omitempty" validate:"omitempty,maxLength=250"`
+	Amount     AmountMinor       `json:"amount_minor,omitempty" validate:"omitempty,gte=0"`
+	Percentage float64           `json:"percentage,omitempty" validate:"omitempty,gte=0,lte=100"`
 	Tags       map[string]string `json:"tags,omitempty"`
 }
 
@@ -77,7 +77,7 @@ type OrderProductDetail struct {
 // CardFilter mirrors the ALLOW/values card filter shape cf uses for bins,
 // schemes, suffixes and issuing banks under payment_methods_filters.filters.
 type CardFilter struct {
-	Action string   `json:"action,omitempty" pedantigo:"omitempty,maxLength=20"`
+	Action string   `json:"action,omitempty" validate:"omitempty,maxLength=20"`
 	Values []string `json:"values,omitempty"`
 }
 
@@ -99,6 +99,6 @@ type CardBinFilters struct {
 
 // OfferFilters mirrors cf OrderMetaOfferFilters (allow/deny offer ids).
 type OfferFilters struct {
-	Action string   `json:"action,omitempty" pedantigo:"omitempty,maxLength=20"`
+	Action string   `json:"action,omitempty" validate:"omitempty,maxLength=20"`
 	Values []string `json:"values,omitempty"`
 }

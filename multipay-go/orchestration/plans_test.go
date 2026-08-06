@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SmrutAI/pedantigo"
+	"github.com/SmrutAI/pedantigo/v2"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 	"github.com/Bytonomics/multipay-india/multipay-go/hooks"

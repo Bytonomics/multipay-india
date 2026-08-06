@@ -6,33 +6,33 @@ import (
 )
 
 type CreatePaymentLinkRequest struct {
-	LinkID         string        `json:"link_id,omitempty" pedantigo:"omitempty,maxLength=250"`
-	AmountMinor    AmountMinor   `json:"amount_minor" pedantigo:"required,gt=0"`
-	Currency       Currency      `json:"currency" pedantigo:"required,iso4217"`
-	Purpose        string        `json:"purpose" pedantigo:"required,minLength=1,maxLength=500"`
-	Customer       *CustomerInfo `json:"customer" pedantigo:"required"`
+	LinkID         string        `json:"link_id,omitempty" validate:"omitempty,maxLength=250"`
+	AmountMinor    AmountMinor   `json:"amount_minor" validate:"required,gt=0"`
+	Currency       Currency      `json:"currency" validate:"required,iso4217"`
+	Purpose        string        `json:"purpose" validate:"required,minLength=1,maxLength=500"`
+	Customer       *CustomerInfo `json:"customer" validate:"required"`
 	PartialPayment *bool         `json:"partial_payment,omitempty"`
 	ExpiryTime     *time.Time    `json:"expiry_time,omitempty"`
 	NotifySMS      *bool         `json:"notify_sms,omitempty"`
 	NotifyEmail    *bool         `json:"notify_email,omitempty"`
-	ReturnURL      string        `json:"return_url,omitempty" pedantigo:"omitempty,url"`
+	ReturnURL      string        `json:"return_url,omitempty" validate:"omitempty,url"`
 	Metadata       Metadata      `json:"metadata,omitempty"`
 
 	// MinPartialAmount is the minimum first installment when partial payments are
 	// enabled. Minor units. Cashfree link_minimum_partial_amount / Razorpay first_min_partial_amount.
-	MinPartialAmount AmountMinor `json:"min_partial_amount_minor,omitempty" pedantigo:"omitempty,gte=0"`
+	MinPartialAmount AmountMinor `json:"min_partial_amount_minor,omitempty" validate:"omitempty,gte=0"`
 	// AutoReminders enables provider-driven payment reminders.
 	// Cashfree link_auto_reminders / Razorpay reminder_enable.
 	AutoReminders *bool `json:"auto_reminders,omitempty"`
 	// NotifyURL is the server-to-server notification (webhook) URL for the link.
 	// Cashfree link_meta.notify_url only (Razorpay reconciles the link via account webhooks).
-	NotifyURL string `json:"notify_url,omitempty" pedantigo:"omitempty,url"`
+	NotifyURL string `json:"notify_url,omitempty" validate:"omitempty,url"`
 	// UpiIntent, when set (Cashfree accepts "true"), makes the link open the UPI-intent
 	// flow on mobile. Cashfree link_meta.upi_intent only.
-	UpiIntent string `json:"upi_intent,omitempty" pedantigo:"omitempty,maxLength=20"`
+	UpiIntent string `json:"upi_intent,omitempty" validate:"omitempty,maxLength=20"`
 	// PaymentMethods restricts allowed modes on the link (comma-separated, e.g. "upi,cc").
 	// Cashfree link_meta.payment_methods only.
-	PaymentMethods string `json:"payment_methods,omitempty" pedantigo:"omitempty,maxLength=500"`
+	PaymentMethods string `json:"payment_methods,omitempty" validate:"omitempty,maxLength=500"`
 	// OrderSplits splits the collected amount across Easy-Split vendors.
 	// Cashfree order_splits only; ignored by the Razorpay adapter.
 	OrderSplits []VendorSplit `json:"order_splits,omitempty"`
@@ -53,10 +53,10 @@ type CreatePaymentLinkRequest struct {
 // (same field set as Cashfree's link plan) rather than defining a duplicate plan type.
 type LinkSubscription struct {
 	// SubscriptionID → cf subscription.subscription_id.
-	SubscriptionID string `json:"subscription_id,omitempty" pedantigo:"omitempty,maxLength=250"`
+	SubscriptionID string `json:"subscription_id,omitempty" validate:"omitempty,maxLength=250"`
 	// AuthorizationAmountMinor → cf subscription.authorization_amount (minor units; the adapter
 	// converts to major via the link currency).
-	AuthorizationAmountMinor AmountMinor `json:"authorization_amount_minor,omitempty" pedantigo:"omitempty,gte=0"`
+	AuthorizationAmountMinor AmountMinor `json:"authorization_amount_minor,omitempty" validate:"omitempty,gte=0"`
 	// AuthorizationAmountRefund → cf subscription.authorization_amount_refund.
 	AuthorizationAmountRefund *bool `json:"authorization_amount_refund,omitempty"`
 	// ExpiryTime → cf subscription.subscription_expiry_time (ISO 8601).
@@ -99,9 +99,9 @@ type PaymentLink struct {
 }
 
 type GetPaymentLinkRequest struct {
-	LinkID string `json:"link_id" pedantigo:"required,minLength=1"`
+	LinkID string `json:"link_id" validate:"required,minLength=1"`
 }
 
 type CancelPaymentLinkRequest struct {
-	LinkID string `json:"link_id" pedantigo:"required,minLength=1"`
+	LinkID string `json:"link_id" validate:"required,minLength=1"`
 }

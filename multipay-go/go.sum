@@ -1,5 +1,5 @@
-github.com/SmrutAI/pedantigo v1.1.4 h1:OlVFBZiOtJGGT0ImOQU7kEV3a65/K684QVbMTWhjEgU=
-github.com/SmrutAI/pedantigo v1.1.4/go.mod h1:UcI+waNPtfGDUn+SPSchZSbMqzwU4mMRfb1Do/JSrJM=
+github.com/SmrutAI/pedantigo/v2 v2.0.0 h1:bi1abf0tz1J+7gOdYAJKAiES6TqSmu0Sf2QdJ1buuOk=
+github.com/SmrutAI/pedantigo/v2 v2.0.0/go.mod h1:tVZdyf7xiDV0s9/AMOXy226MSZvKwk9KhHgfNyxY1c0=
 github.com/bahlo/generic-list-go v0.2.0 h1:5sz/EEAK+ls5wF+NeqDpk5+iNdMDXrh3z3nPnH1Wvgk=
 github.com/bahlo/generic-list-go v0.2.0/go.mod h1:2KvAjgMlE5NNynlg/5iLrrCCZ2+5xWbdbCW3pNTGyYg=
 github.com/bojanz/currency v1.3.0 h1:HlgIxAaD7xMCk1RtjR5b7UKG3d5BBTPZORSPAWefhro=

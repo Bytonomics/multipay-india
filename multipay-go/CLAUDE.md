@@ -376,7 +376,7 @@ only compliant structures ever leave for Cashfree / Razorpay. Every existing ser
 new service method or request type MUST too. Adapters (`providers/*/`) are internal and are reached only via the
 orchestration services — do not treat a direct adapter call as a supported entry point.
 
-`pedantigo.New[T]().Validate(req)` runs the `pedantigo:""` field constraints **and** invokes the request type's
+`pedantigo.New[T]().Validate(req)` runs the `validate:""` field constraints **and** invokes the request type's
 custom `Validate() error` method. Note: `Validate()` does NOT enforce the `required` tag (pedantigo only enforces
 `required` during `Unmarshal()`), so mandatory presence is checked explicitly inside the custom `Validate()`.
 
@@ -384,7 +384,7 @@ custom `Validate() error` method. Note: `Validate()` does NOT enforce the `requi
 
 | Rule kind | Where it goes |
 |---|---|
-| **Field format** (`url`, `iso4217`, `email`, `oneof`, `gt`, `minLength`, …) | `pedantigo:""` struct tag |
+| **Field format** (`url`, `iso4217`, `email`, `oneof`, `gt`, `minLength`, …) | `validate:""` struct tag |
 | **Mandatory presence + cross-field** (non-empty, non-nil pointer, exactly-one-of, at-least-one) | a custom `func (r *XxxRequest) Validate() error` method — checked explicitly (`if r.X == "" { return errors.New("x is required") }`, `if r.Ptr == nil { … }`), because `.Validate()` does not honor `required` |
 | **Provider-specific mandatory** (required by ONE vendor only — e.g. Cashfree `customer_email`, Razorpay refund `payment_id`) | enforced inside that provider's **adapter**, NOT the shared `Validate()`, so the other provider is not wrongly rejected. Document it on the field with a comment naming the vendor. |
 | **Optional payload** fields | mapped with conditional `if non-empty { … }` guards inside the adapters |

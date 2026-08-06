@@ -129,19 +129,19 @@ type SubscriptionPayment struct {
 
 // CreatePlanRequest represents a request to create a new plan.
 type CreatePlanRequest struct {
-	PlanID         string           `json:"plan_id" pedantigo:"required,minLength=1,maxLength=250"`
-	PlanName       string           `json:"plan_name" pedantigo:"required,minLength=1,maxLength=250"`
-	PlanType       PlanType         `json:"plan_type" pedantigo:"required,oneof=PERIODIC ON_DEMAND"`
-	MaxAmountMinor AmountMinor      `json:"max_amount_minor" pedantigo:"required,gt=0"`
-	Currency       Currency         `json:"currency" pedantigo:"required,iso4217"`
-	AmountMinor    AmountMinor      `json:"amount_minor,omitempty" pedantigo:"skip_unless=PlanType PERIODIC,required,gt=0"`
-	Interval       int32            `json:"interval,omitempty" pedantigo:"skip_unless=PlanType PERIODIC,required,gte=1"`
-	IntervalType   PlanIntervalType `json:"interval_type,omitempty" pedantigo:"skip_unless=PlanType PERIODIC,required,oneof=DAY WEEK MONTH YEAR"`
-	MaxCycles      int32            `json:"max_cycles,omitempty" pedantigo:"omitempty,gte=0"`
-	Note           string           `json:"note,omitempty" pedantigo:"omitempty,maxLength=500"`
+	PlanID         string           `json:"plan_id" validate:"required,minLength=1,maxLength=250"`
+	PlanName       string           `json:"plan_name" validate:"required,minLength=1,maxLength=250"`
+	PlanType       PlanType         `json:"plan_type" validate:"required,oneof=PERIODIC ON_DEMAND"`
+	MaxAmountMinor AmountMinor      `json:"max_amount_minor" validate:"required,gt=0"`
+	Currency       Currency         `json:"currency" validate:"required,iso4217"`
+	AmountMinor    AmountMinor      `json:"amount_minor,omitempty" validate:"skip_unless=PlanType PERIODIC,required,gt=0"`
+	Interval       int32            `json:"interval,omitempty" validate:"skip_unless=PlanType PERIODIC,required,gte=1"`
+	IntervalType   PlanIntervalType `json:"interval_type,omitempty" validate:"skip_unless=PlanType PERIODIC,required,oneof=DAY WEEK MONTH YEAR"`
+	MaxCycles      int32            `json:"max_cycles,omitempty" validate:"omitempty,gte=0"`
+	Note           string           `json:"note,omitempty" validate:"omitempty,maxLength=500"`
 	// Description populates the Razorpay plan item description (item.description). Cashfree has
 	// no per-plan description field (it uses PlanNote, mapped from Note). Optional.
-	Description string `json:"description,omitempty" pedantigo:"omitempty,maxLength=500"`
+	Description string `json:"description,omitempty" validate:"omitempty,maxLength=500"`
 }
 
 // Validate enforces presence of the mandatory plan fields (pedantigo's Validate() does not
@@ -181,20 +181,20 @@ func (r *CreatePlanRequest) Validate() error {
 
 // GetPlanRequest represents a request to get a plan.
 type GetPlanRequest struct {
-	PlanID string `json:"plan_id" pedantigo:"required,minLength=1"`
+	PlanID string `json:"plan_id" validate:"required,minLength=1"`
 }
 
 // CreateSubscriptionRequest represents a request to create a new subscription.
 type CreateSubscriptionRequest struct {
-	SubscriptionID string             `json:"subscription_id" pedantigo:"required,minLength=1,maxLength=250"`
-	PlanID         string             `json:"plan_id,omitempty" pedantigo:"omitempty,minLength=1"`
+	SubscriptionID string             `json:"subscription_id" validate:"required,minLength=1,maxLength=250"`
+	PlanID         string             `json:"plan_id,omitempty" validate:"omitempty,minLength=1"`
 	PlanDetails    *CreatePlanRequest `json:"plan_details,omitempty"`
 	// CustomerEmail is optional in the canonical contract but required by Cashfree provider adapter.
 	// The adapter enforces this requirement; validation is provider-specific, not checked here.
-	CustomerEmail   string     `json:"customer_email,omitempty" pedantigo:"omitempty,email"`
-	CustomerPhone   string     `json:"customer_phone" pedantigo:"required,minLength=5,maxLength=20"`
-	CustomerName    string     `json:"customer_name,omitempty" pedantigo:"omitempty,maxLength=200"`
-	ReturnURL       string     `json:"return_url" pedantigo:"required,url"`
+	CustomerEmail   string     `json:"customer_email,omitempty" validate:"omitempty,email"`
+	CustomerPhone   string     `json:"customer_phone" validate:"required,minLength=5,maxLength=20"`
+	CustomerName    string     `json:"customer_name,omitempty" validate:"omitempty,maxLength=200"`
+	ReturnURL       string     `json:"return_url" validate:"required,url"`
 	ExpiresAt       *time.Time `json:"expires_at,omitempty"`
 	FirstChargeTime *time.Time `json:"first_charge_time,omitempty"`
 	// FirstChargeWithMandate: collect the first billing period immediately at signup
@@ -205,26 +205,26 @@ type CreateSubscriptionRequest struct {
 	// adapters that must compute the first-charge/start offset when FirstChargeWithMandate is true and an
 	// existing PlanID is used. Cashfree ignores these (its plan drives the schedule); Razorpay needs them
 	// (addon amount + start_at = now+interval).
-	RecurringAmountMinor  AmountMinor      `json:"recurring_amount_minor,omitempty"  pedantigo:"omitempty,gte=0"`
-	RecurringInterval     int32            `json:"recurring_interval,omitempty"      pedantigo:"omitempty,gte=1"`
-	RecurringIntervalType PlanIntervalType `json:"recurring_interval_type,omitempty" pedantigo:"omitempty,oneof=DAY WEEK MONTH YEAR"`
+	RecurringAmountMinor  AmountMinor      `json:"recurring_amount_minor,omitempty"  validate:"omitempty,gte=0"`
+	RecurringInterval     int32            `json:"recurring_interval,omitempty"      validate:"omitempty,gte=1"`
+	RecurringIntervalType PlanIntervalType `json:"recurring_interval_type,omitempty" validate:"omitempty,oneof=DAY WEEK MONTH YEAR"`
 	// RecurringCurrency is the ISO-4217 currency for the recurring charge and the first-period addon.
 	// It is threaded on EVERY create-subscription request (both Cashfree and Razorpay) to keep the two
 	// provider flows in sync. Cashfree ignores it (the provider plan drives currency); Razorpay uses it
 	// as the currency of the first-period addon when FirstChargeWithMandate is true.
-	RecurringCurrency Currency          `json:"recurring_currency,omitempty" pedantigo:"omitempty,iso4217"`
-	Tags              map[string]string `json:"tags,omitempty" pedantigo:"omitempty,maxItems=10"`
+	RecurringCurrency Currency          `json:"recurring_currency,omitempty" validate:"omitempty,iso4217"`
+	Tags              map[string]string `json:"tags,omitempty" validate:"omitempty,maxItems=10"`
 
 	// TotalCount is the number of billing cycles the customer will be charged. Razorpay
 	// treats this as MANDATORY (unless end_at is supplied); the Razorpay adapter sends it
 	// UNCONDITIONALLY, preferring this field and falling back to PlanDetails.MaxCycles. When
 	// zero and no inline plan bounds cycles, the mapper omits it. Cashfree ignores it (the
 	// plan's own max_cycles governs cycle count). Optional in the canonical contract.
-	TotalCount int32 `json:"total_count,omitempty" pedantigo:"omitempty,gte=0"`
+	TotalCount int32 `json:"total_count,omitempty" validate:"omitempty,gte=0"`
 	// Quantity multiplies the plan amount per invoice (Razorpay-only, defaults to 1).
-	Quantity int32 `json:"quantity,omitempty" pedantigo:"omitempty,gte=1"`
+	Quantity int32 `json:"quantity,omitempty" validate:"omitempty,gte=1"`
 	// OfferID links a Razorpay offer to the subscription (Razorpay-only).
-	OfferID string `json:"offer_id,omitempty" pedantigo:"omitempty,maxLength=250"`
+	OfferID string `json:"offer_id,omitempty" validate:"omitempty,maxLength=250"`
 	// Addons are items collected upfront during authorization (Razorpay-only).
 	Addons []SubscriptionAddon `json:"addons,omitempty"`
 
@@ -245,7 +245,7 @@ type CreateSubscriptionRequest struct {
 	// CfOrderID forwards Cashfree's cf_order_id on the create-subscription request (present on the
 	// vendored Cashfree SDK struct; attaches the subscription to a pre-created Cashfree order).
 	// Cashfree-only; ignored by Razorpay. Empty ⇒ not sent.
-	CfOrderID string `json:"cf_order_id,omitempty" pedantigo:"omitempty,maxLength=250"`
+	CfOrderID string `json:"cf_order_id,omitempty" validate:"omitempty,maxLength=250"`
 }
 
 // Validate enforces cross-field rules:
@@ -281,12 +281,12 @@ func (r *CreateSubscriptionRequest) Validate() error {
 
 // GetSubscriptionRequest represents a request to get a subscription.
 type GetSubscriptionRequest struct {
-	SubscriptionID string `json:"subscription_id" pedantigo:"required,minLength=1"`
+	SubscriptionID string `json:"subscription_id" validate:"required,minLength=1"`
 }
 
 // CancelSubscriptionRequest represents a request to cancel a subscription.
 type CancelSubscriptionRequest struct {
-	SubscriptionID string `json:"subscription_id" pedantigo:"required,minLength=1"`
+	SubscriptionID string `json:"subscription_id" validate:"required,minLength=1"`
 	// CancelAtCycleEnd is Razorpay's cancel_at_cycle_end (Boolean per Razorpay docs):
 	// nil/false = cancel immediately, true = cancel at the end of the current billing cycle.
 	// Razorpay-only — Cashfree's Manage Subscription CANCEL is immediate-only and ignores it.
@@ -295,10 +295,10 @@ type CancelSubscriptionRequest struct {
 
 // PauseSubscriptionRequest represents a request to pause a subscription.
 type PauseSubscriptionRequest struct {
-	SubscriptionID string `json:"subscription_id" pedantigo:"required,minLength=1"`
+	SubscriptionID string `json:"subscription_id" validate:"required,minLength=1"`
 	// PauseAt is Razorpay's pause_at. The ONLY value Razorpay accepts is "now" (pause immediately);
 	// Validate() rejects anything else. Razorpay-only — Cashfree pause is action-based and ignores it.
-	PauseAt string `json:"pause_at,omitempty" pedantigo:"omitempty"`
+	PauseAt string `json:"pause_at,omitempty" validate:"omitempty"`
 }
 
 // Validate rejects any pause_at value other than "now" (the only value the vendor accepts).
@@ -311,7 +311,7 @@ func (r *PauseSubscriptionRequest) Validate() error {
 
 // ResumeSubscriptionRequest represents a request to resume a subscription.
 type ResumeSubscriptionRequest struct {
-	SubscriptionID string `json:"subscription_id" pedantigo:"required,minLength=1"`
+	SubscriptionID string `json:"subscription_id" validate:"required,minLength=1"`
 	// NextScheduledTime is REQUIRED by Cashfree's Manage Subscription ACTIVATE action
 	// (action_details.next_scheduled_time) — it is the date the resumed subscription's next
 	// charge is scheduled. Cashfree rejects an ACTIVATE with no action_details. Razorpay's
@@ -321,7 +321,7 @@ type ResumeSubscriptionRequest struct {
 	NextScheduledTime *time.Time `json:"next_scheduled_time,omitempty"`
 	// ResumeAt is Razorpay's resume_at. The ONLY value Razorpay accepts is "now" (resume immediately);
 	// Validate() rejects anything else. Razorpay-only — Cashfree resume is action-based and ignores it.
-	ResumeAt string `json:"resume_at,omitempty" pedantigo:"omitempty"`
+	ResumeAt string `json:"resume_at,omitempty" validate:"omitempty"`
 }
 
 // Validate rejects any resume_at value other than "now" (the only value the vendor accepts).
@@ -334,17 +334,17 @@ func (r *ResumeSubscriptionRequest) Validate() error {
 
 // ChangePlanRequest represents a request to change the plan of a subscription.
 type ChangePlanRequest struct {
-	SubscriptionID string           `json:"subscription_id" pedantigo:"required,minLength=1"`
-	NewPlanID      string           `json:"new_plan_id" pedantigo:"required,minLength=1"`
-	ScheduleAt     ScheduleChangeAt `json:"schedule_at,omitempty" pedantigo:"omitempty,oneof=NOW CYCLE_END"`
+	SubscriptionID string           `json:"subscription_id" validate:"required,minLength=1"`
+	NewPlanID      string           `json:"new_plan_id" validate:"required,minLength=1"`
+	ScheduleAt     ScheduleChangeAt `json:"schedule_at,omitempty" validate:"omitempty,oneof=NOW CYCLE_END"`
 	// The fields below are Razorpay Update-Subscription optional params. Cashfree's Manage
 	// Subscription CHANGE_PLAN action supports only plan_id, so the Cashfree adapter ignores them.
 	// OfferID links a Razorpay offer to the subscription.
-	OfferID string `json:"offer_id,omitempty" pedantigo:"omitempty,maxLength=250"`
+	OfferID string `json:"offer_id,omitempty" validate:"omitempty,maxLength=250"`
 	// Quantity multiplies the plan charge per invoice (Razorpay, defaults to 1).
-	Quantity int32 `json:"quantity,omitempty" pedantigo:"omitempty,gte=1"`
+	Quantity int32 `json:"quantity,omitempty" validate:"omitempty,gte=1"`
 	// RemainingCount updates the subscription's total_count (Razorpay).
-	RemainingCount int32 `json:"remaining_count,omitempty" pedantigo:"omitempty,gte=0"`
+	RemainingCount int32 `json:"remaining_count,omitempty" validate:"omitempty,gte=0"`
 	// StartAt is the new start date for the subscription (Razorpay, Unix seconds).
 	StartAt *time.Time `json:"start_at,omitempty"`
 	// CustomerNotify controls whether Razorpay notifies the customer (nil = use Razorpay default).
@@ -353,7 +353,7 @@ type ChangePlanRequest struct {
 
 // GetSubscriptionPaymentsRequest represents a request to get payments for a subscription.
 type GetSubscriptionPaymentsRequest struct {
-	SubscriptionID string `json:"subscription_id" pedantigo:"required,minLength=1"`
+	SubscriptionID string `json:"subscription_id" validate:"required,minLength=1"`
 }
 
 // UpgradeStrategy represents the strategy used for upgrading a subscription.
@@ -379,12 +379,12 @@ const (
 // studio control plane) decides the Kind and passes already-resolved amounts in minor units. This
 // type carries NO plan keys, no cycle strings, no DB concepts — only the money-math primitives.
 type PlanChangePreviewRequest struct {
-	Kind               PlanChangeKind `json:"kind" pedantigo:"required,oneof=CREATE UPGRADE_SAME_CYCLE UPGRADE_CROSS_CYCLE DOWNGRADE"`
-	CurrentAmountMinor int64          `json:"current_amount_minor" pedantigo:"gte=0"`
-	NewAmountMinor     int64          `json:"new_amount_minor" pedantigo:"gte=0"`
-	RemainingDays      int64          `json:"remaining_days" pedantigo:"gte=0"`
-	CurrentCycleDays   int64          `json:"current_cycle_days" pedantigo:"gte=0"`
-	Currency           string         `json:"currency" pedantigo:"omitempty"`
+	Kind               PlanChangeKind `json:"kind" validate:"required,oneof=CREATE UPGRADE_SAME_CYCLE UPGRADE_CROSS_CYCLE DOWNGRADE"`
+	CurrentAmountMinor int64          `json:"current_amount_minor" validate:"gte=0"`
+	NewAmountMinor     int64          `json:"new_amount_minor" validate:"gte=0"`
+	RemainingDays      int64          `json:"remaining_days" validate:"gte=0"`
+	CurrentCycleDays   int64          `json:"current_cycle_days" validate:"gte=0"`
+	Currency           string         `json:"currency" validate:"omitempty"`
 }
 
 // Validate enforces the money-math preconditions.
@@ -416,26 +416,26 @@ type PlanChangeQuote struct {
 
 // UpgradeSubscriptionRequest represents a request to upgrade an existing subscription to a new plan.
 type UpgradeSubscriptionRequest struct {
-	SubscriptionID    string      `json:"subscription_id" pedantigo:"required,minLength=1"`
-	NewSubscriptionID string      `json:"new_subscription_id" pedantigo:"required,minLength=1"`
-	CurrentPlanID     string      `json:"current_plan_id" pedantigo:"required,minLength=1"`
-	NewPlanID         string      `json:"new_plan_id" pedantigo:"required,minLength=1"`
-	OldAmountMinor    AmountMinor `json:"old_amount_minor" pedantigo:"required,gt=0"`
-	NewAmountMinor    AmountMinor `json:"new_amount_minor" pedantigo:"required,gt=0"`
-	Currency          Currency    `json:"currency" pedantigo:"required,iso4217"`
-	RemainingDays     int         `json:"remaining_days" pedantigo:"required,gte=0"`
-	CycleDays         int         `json:"cycle_days" pedantigo:"required,gt=0"`
-	CustomerEmail     string      `json:"customer_email" pedantigo:"required,email"`
-	CustomerPhone     string      `json:"customer_phone" pedantigo:"required,minLength=5,maxLength=20"`
-	CustomerName      string      `json:"customer_name" pedantigo:"omitempty,maxLength=200"`
-	ReturnURL         string      `json:"return_url" pedantigo:"required,url"`
+	SubscriptionID    string      `json:"subscription_id" validate:"required,minLength=1"`
+	NewSubscriptionID string      `json:"new_subscription_id" validate:"required,minLength=1"`
+	CurrentPlanID     string      `json:"current_plan_id" validate:"required,minLength=1"`
+	NewPlanID         string      `json:"new_plan_id" validate:"required,minLength=1"`
+	OldAmountMinor    AmountMinor `json:"old_amount_minor" validate:"required,gt=0"`
+	NewAmountMinor    AmountMinor `json:"new_amount_minor" validate:"required,gt=0"`
+	Currency          Currency    `json:"currency" validate:"required,iso4217"`
+	RemainingDays     int         `json:"remaining_days" validate:"required,gte=0"`
+	CycleDays         int         `json:"cycle_days" validate:"required,gt=0"`
+	CustomerEmail     string      `json:"customer_email" validate:"required,email"`
+	CustomerPhone     string      `json:"customer_phone" validate:"required,minLength=5,maxLength=20"`
+	CustomerName      string      `json:"customer_name" validate:"omitempty,maxLength=200"`
+	ReturnURL         string      `json:"return_url" validate:"required,url"`
 	CrossCycle        bool        `json:"cross_cycle"`
 	// NewRecurringInterval and NewRecurringIntervalType describe the NEW plan's recurring cadence.
 	// They are REQUIRED when CrossCycle is true: a cross-cycle upgrade charges a full new-cycle amount
 	// up front, so the new mandate's first auto-charge must be one NEW interval out, not the remainder
 	// of the old cycle. Ignored when CrossCycle is false.
-	NewRecurringInterval     int32            `json:"new_recurring_interval" pedantigo:"omitempty,gte=1"`
-	NewRecurringIntervalType PlanIntervalType `json:"new_recurring_interval_type" pedantigo:"omitempty,oneof=DAY WEEK MONTH YEAR"`
+	NewRecurringInterval     int32            `json:"new_recurring_interval" validate:"omitempty,gte=1"`
+	NewRecurringIntervalType PlanIntervalType `json:"new_recurring_interval_type" validate:"omitempty,oneof=DAY WEEK MONTH YEAR"`
 }
 
 // Validate enforces presence of mandatory fields and cross-field constraints.
@@ -483,14 +483,14 @@ type UpgradeResult struct {
 
 // FinalizeUpgradeRequest represents a request to finalize an upgrade operation.
 type FinalizeUpgradeRequest struct {
-	NewSubscriptionID string `json:"new_subscription_id" pedantigo:"required,minLength=1"`
-	OldSubscriptionID string `json:"old_subscription_id" pedantigo:"required,minLength=1"`
+	NewSubscriptionID string `json:"new_subscription_id" validate:"required,minLength=1"`
+	OldSubscriptionID string `json:"old_subscription_id" validate:"required,minLength=1"`
 	// PaymentRef, ProratedAmountMinor and Currency are required ONLY when the library must raise the
 	// proration charge itself, i.e. when ProrationCollectedExternally is false. The tags are omitempty
 	// because the requirement is conditional; presence is enforced in Validate().
-	PaymentRef          string      `json:"payment_ref" pedantigo:"omitempty,minLength=1"`
-	ProratedAmountMinor AmountMinor `json:"prorated_amount_minor" pedantigo:"omitempty,gte=0"`
-	Currency            Currency    `json:"currency" pedantigo:"omitempty,iso4217"`
+	PaymentRef          string      `json:"payment_ref" validate:"omitempty,minLength=1"`
+	ProratedAmountMinor AmountMinor `json:"prorated_amount_minor" validate:"omitempty,gte=0"`
+	Currency            Currency    `json:"currency" validate:"omitempty,iso4217"`
 	// ProrationCollectedExternally declares that the caller already collected the prorated delta
 	// out-of-band (for example a one-time Order settled through Orders().CreateOrder). When true the
 	// library performs ONLY the provider transition — it does NOT raise a charge on the new mandate.
@@ -522,18 +522,18 @@ func (r *FinalizeUpgradeRequest) Validate() error {
 
 // ChargeSubscriptionRequest represents a request to perform an on-demand charge on a subscription.
 type ChargeSubscriptionRequest struct {
-	SubscriptionID string      `json:"subscription_id" pedantigo:"required,minLength=1"`
-	PaymentRef     string      `json:"payment_ref" pedantigo:"required,minLength=1"`
-	AmountMinor    AmountMinor `json:"amount_minor" pedantigo:"required,gt=0"`
-	Currency       Currency    `json:"currency" pedantigo:"required,iso4217"`
-	Remarks        string      `json:"remarks,omitempty" pedantigo:"omitempty,maxLength=500"`
+	SubscriptionID string      `json:"subscription_id" validate:"required,minLength=1"`
+	PaymentRef     string      `json:"payment_ref" validate:"required,minLength=1"`
+	AmountMinor    AmountMinor `json:"amount_minor" validate:"required,gt=0"`
+	Currency       Currency    `json:"currency" validate:"required,iso4217"`
+	Remarks        string      `json:"remarks,omitempty" validate:"omitempty,maxLength=500"`
 	// PaymentScheduleDate future-dates the charge (Cashfree payment_schedule_date, date-only
 	// "YYYY-MM-DD"). When zero, Cashfree charges immediately. Cashfree-only; Razorpay's
 	// CreateAddon has no scheduled-date concept.
 	PaymentScheduleDate *time.Time `json:"payment_schedule_date,omitempty"`
 	// Description populates the addon item description on Razorpay (item.description).
 	// Cashfree uses PaymentRemarks (mapped from Remarks) instead.
-	Description string `json:"description,omitempty" pedantigo:"omitempty,maxLength=500"`
+	Description string `json:"description,omitempty" validate:"omitempty,maxLength=500"`
 }
 
 // Validate enforces presence of mandatory fields.
