@@ -79,7 +79,7 @@ func NewClient(cfg *ClientConfig) (*MultiPayClient, error) {
 	supportMatrix := capabilities.NewSupportMatrix()
 
 	// Create capability validator for early validation before adapter dispatch
-	validator := capabilities.NewValidator(supportMatrix)
+	capabilityValidator := capabilities.NewValidator(supportMatrix)
 
 	// Use provided logger or noop logger if not configured
 	logger := cfg.Logger
@@ -101,15 +101,15 @@ func NewClient(cfg *ClientConfig) (*MultiPayClient, error) {
 	}
 
 	// Create all 7 orchestration services with the configured provider, adapter, validator, and pipeline
-	orderService := orchestration.NewOrderService(provider, adapter, validator, pipeline, logger, clock)
-	paymentService := orchestration.NewPaymentService(provider, adapter, validator, pipeline, logger, clock)
-	refundService := orchestration.NewRefundService(provider, adapter, validator, pipeline, logger, clock)
-	instrumentService := orchestration.NewInstrumentService(provider, adapter, validator, pipeline, logger, clock)
-	paymentLinkService := orchestration.NewPaymentLinkService(provider, adapter, validator, pipeline, logger, clock)
+	orderService := orchestration.NewOrderService(provider, adapter, capabilityValidator, pipeline, logger, clock)
+	paymentService := orchestration.NewPaymentService(provider, adapter, capabilityValidator, pipeline, logger, clock)
+	refundService := orchestration.NewRefundService(provider, adapter, capabilityValidator, pipeline, logger, clock)
+	instrumentService := orchestration.NewInstrumentService(provider, adapter, capabilityValidator, pipeline, logger, clock)
+	paymentLinkService := orchestration.NewPaymentLinkService(provider, adapter, capabilityValidator, pipeline, logger, clock)
 
 	// Create PlanService and SubscriptionService with validator for capability checks
 	planService := orchestration.NewPlanService(provider, adapter, pipeline, logger, clock)
-	subscriptionService := orchestration.NewSubscriptionService(provider, adapter, validator, pipeline, logger, clock)
+	subscriptionService := orchestration.NewSubscriptionService(provider, adapter, capabilityValidator, pipeline, logger, clock)
 
 	// WebhookService has a different constructor (requires Provider, Adapter, Pipeline, Store, EndpointRegistry, Logger)
 	endpointRegistry := routing.NewEndpointRegistry()

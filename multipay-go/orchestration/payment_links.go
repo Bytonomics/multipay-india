@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/SmrutAI/pedantigo/v2"
+	"github.com/SmrutAI/pedantigo/v2/validator"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/capabilities"
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
@@ -14,9 +14,9 @@ import (
 )
 
 var (
-	createPaymentLinkValidator = pedantigo.New[domain.CreatePaymentLinkRequest]()
-	getPaymentLinkValidator    = pedantigo.New[domain.GetPaymentLinkRequest]()
-	cancelPaymentLinkValidator = pedantigo.New[domain.CancelPaymentLinkRequest]()
+	createPaymentLinkValidator = validator.New[domain.CreatePaymentLinkRequest]()
+	getPaymentLinkValidator    = validator.New[domain.GetPaymentLinkRequest]()
+	cancelPaymentLinkValidator = validator.New[domain.CancelPaymentLinkRequest]()
 )
 
 // PaymentLinkService orchestrates payment link operations with validation, capability checking, and hooks.

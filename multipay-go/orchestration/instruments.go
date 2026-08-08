@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/SmrutAI/pedantigo/v2"
+	"github.com/SmrutAI/pedantigo/v2/validator"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/capabilities"
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
@@ -14,9 +14,9 @@ import (
 )
 
 var (
-	getInstrumentValidator    = pedantigo.New[domain.GetInstrumentRequest]()
-	listInstrumentsValidator  = pedantigo.New[domain.ListInstrumentsRequest]()
-	deleteInstrumentValidator = pedantigo.New[domain.DeleteInstrumentRequest]()
+	getInstrumentValidator    = validator.New[domain.GetInstrumentRequest]()
+	listInstrumentsValidator  = validator.New[domain.ListInstrumentsRequest]()
+	deleteInstrumentValidator = validator.New[domain.DeleteInstrumentRequest]()
 )
 
 // InstrumentService orchestrates instrument operations with validation, capability checking, and hooks.

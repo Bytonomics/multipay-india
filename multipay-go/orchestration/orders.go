@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/SmrutAI/pedantigo/v2"
+	"github.com/SmrutAI/pedantigo/v2/validator"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/capabilities"
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
@@ -14,9 +14,9 @@ import (
 )
 
 var (
-	createOrderValidator       = pedantigo.New[domain.CreateOrderRequest]()
-	getOrderValidator          = pedantigo.New[domain.GetOrderRequest]()
-	listOrderPaymentsValidator = pedantigo.New[domain.ListOrderPaymentsRequest]()
+	createOrderValidator       = validator.New[domain.CreateOrderRequest]()
+	getOrderValidator          = validator.New[domain.GetOrderRequest]()
+	listOrderPaymentsValidator = validator.New[domain.ListOrderPaymentsRequest]()
 )
 
 // OrderService orchestrates order operations across multiple payment providers.

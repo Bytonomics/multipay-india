@@ -358,7 +358,7 @@ Every orchestration service method MUST call its module-level validator as the *
 check, before building or sending anything to a provider SDK**:
 
 ```go
-var createPlanValidator = pedantigo.New[domain.CreatePlanRequest]()
+var createPlanValidator = validator.New[domain.CreatePlanRequest]()
 
 func (s *PlanService) CreatePlan(ctx context.Context, req *domain.CreatePlanRequest) (*domain.Plan, error) {
     if req == nil {
@@ -376,7 +376,7 @@ only compliant structures ever leave for Cashfree / Razorpay. Every existing ser
 new service method or request type MUST too. Adapters (`providers/*/`) are internal and are reached only via the
 orchestration services — do not treat a direct adapter call as a supported entry point.
 
-`pedantigo.New[T]().Validate(req)` runs the `validate:""` field constraints **and** invokes the request type's
+`validator.New[T]().Validate(req)` runs the `validate:""` field constraints **and** invokes the request type's
 custom `Validate() error` method. Note: `Validate()` does NOT enforce the `required` tag (pedantigo only enforces
 `required` during `Unmarshal()`), so mandatory presence is checked explicitly inside the custom `Validate()`.
 

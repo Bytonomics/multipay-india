@@ -51,8 +51,8 @@ func TestUpgradeSubscription_Cashfree_CreatesReauthSubscription(t *testing.T) {
 
 	logger := ports.NewNoopLogger()
 	pipeline := hooks.NewPipeline(logger)
-	validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
-	svc := NewSubscriptionService(domain.ProviderCashfree, adapter, validator, pipeline, logger, clock)
+	capabilityValidator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+	svc := NewSubscriptionService(domain.ProviderCashfree, adapter, capabilityValidator, pipeline, logger, clock)
 
 	req := &domain.UpgradeSubscriptionRequest{
 		SubscriptionID:    "sub_old",
@@ -169,8 +169,8 @@ func TestUpgradeSubscription_Razorpay_ChangesPlainImmediate(t *testing.T) {
 
 	logger := ports.NewNoopLogger()
 	pipeline := hooks.NewPipeline(logger)
-	validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
-	svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, validator, pipeline, logger, clock)
+	capabilityValidator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+	svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, capabilityValidator, pipeline, logger, clock)
 
 	req := &domain.UpgradeSubscriptionRequest{
 		SubscriptionID:    "sub_old",
@@ -233,8 +233,8 @@ func TestUpgradeSubscription_NilRequest(t *testing.T) {
 	adapter := &fakeAdapter{}
 	logger := ports.NewNoopLogger()
 	pipeline := hooks.NewPipeline(logger)
-	validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
-	svc := NewSubscriptionService(domain.ProviderCashfree, adapter, validator, pipeline, logger, clock)
+	capabilityValidator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+	svc := NewSubscriptionService(domain.ProviderCashfree, adapter, capabilityValidator, pipeline, logger, clock)
 
 	_, err := svc.UpgradeSubscription(context.Background(), nil)
 	if err == nil {
@@ -276,8 +276,8 @@ func TestFinalizeUpgrade_Cashfree_ChargesAndCancels(t *testing.T) {
 
 	logger := ports.NewNoopLogger()
 	pipeline := hooks.NewPipeline(logger)
-	validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
-	svc := NewSubscriptionService(domain.ProviderCashfree, adapter, validator, pipeline, logger, clock)
+	capabilityValidator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+	svc := NewSubscriptionService(domain.ProviderCashfree, adapter, capabilityValidator, pipeline, logger, clock)
 
 	req := &domain.FinalizeUpgradeRequest{
 		NewSubscriptionID:   "sub_new",
@@ -345,8 +345,8 @@ func TestFinalizeUpgrade_Razorpay_ReturnsEmptyPayment(t *testing.T) {
 
 	logger := ports.NewNoopLogger()
 	pipeline := hooks.NewPipeline(logger)
-	validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
-	svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, validator, pipeline, logger, clock)
+	capabilityValidator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+	svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, capabilityValidator, pipeline, logger, clock)
 
 	req := &domain.FinalizeUpgradeRequest{
 		NewSubscriptionID:   "sub_new",
@@ -395,8 +395,8 @@ func TestFinalizeUpgrade_Cashfree_ChargeError(t *testing.T) {
 
 	logger := ports.NewNoopLogger()
 	pipeline := hooks.NewPipeline(logger)
-	validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
-	svc := NewSubscriptionService(domain.ProviderCashfree, adapter, validator, pipeline, logger, clock)
+	capabilityValidator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+	svc := NewSubscriptionService(domain.ProviderCashfree, adapter, capabilityValidator, pipeline, logger, clock)
 
 	req := &domain.FinalizeUpgradeRequest{
 		NewSubscriptionID:   "sub_new",
@@ -449,8 +449,8 @@ func TestFinalizeUpgrade_Cashfree_ExternalProration_SkipsCharge(t *testing.T) {
 
 	logger := ports.NewNoopLogger()
 	pipeline := hooks.NewPipeline(logger)
-	validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
-	svc := NewSubscriptionService(domain.ProviderCashfree, adapter, validator, pipeline, logger, clock)
+	capabilityValidator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+	svc := NewSubscriptionService(domain.ProviderCashfree, adapter, capabilityValidator, pipeline, logger, clock)
 
 	res, err := svc.FinalizeUpgrade(context.Background(), &domain.FinalizeUpgradeRequest{
 		NewSubscriptionID:            "sub_new",
@@ -500,8 +500,8 @@ func TestFinalizeUpgrade_Cashfree_DefaultStillCharges(t *testing.T) {
 
 	logger := ports.NewNoopLogger()
 	pipeline := hooks.NewPipeline(logger)
-	validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
-	svc := NewSubscriptionService(domain.ProviderCashfree, adapter, validator, pipeline, logger, clock)
+	capabilityValidator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+	svc := NewSubscriptionService(domain.ProviderCashfree, adapter, capabilityValidator, pipeline, logger, clock)
 
 	res, err := svc.FinalizeUpgrade(context.Background(), &domain.FinalizeUpgradeRequest{
 		NewSubscriptionID:   "sub_new",
@@ -558,8 +558,8 @@ func TestFinalizeUpgrade_Razorpay_ExternalProration_NoOp(t *testing.T) {
 
 	logger := ports.NewNoopLogger()
 	pipeline := hooks.NewPipeline(logger)
-	validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
-	svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, validator, pipeline, logger, clock)
+	capabilityValidator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+	svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, capabilityValidator, pipeline, logger, clock)
 
 	res, err := svc.FinalizeUpgrade(context.Background(), &domain.FinalizeUpgradeRequest{
 		NewSubscriptionID:            "sub_new",
@@ -598,8 +598,8 @@ func TestUpgradeSubscription_CrossCycle_FirstChargeAtNewInterval(t *testing.T) {
 
 	logger := ports.NewNoopLogger()
 	pipeline := hooks.NewPipeline(logger)
-	validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
-	svc := NewSubscriptionService(domain.ProviderCashfree, adapter, validator, pipeline, logger, clock)
+	capabilityValidator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+	svc := NewSubscriptionService(domain.ProviderCashfree, adapter, capabilityValidator, pipeline, logger, clock)
 
 	req := &domain.UpgradeSubscriptionRequest{
 		SubscriptionID:           "sub_old",

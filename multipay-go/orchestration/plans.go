@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/SmrutAI/pedantigo/v2"
+	"github.com/SmrutAI/pedantigo/v2/validator"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 	"github.com/Bytonomics/multipay-india/multipay-go/hooks"
@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	createPlanValidator = pedantigo.New[domain.CreatePlanRequest]()
-	getPlanValidator    = pedantigo.New[domain.GetPlanRequest]()
+	createPlanValidator = validator.New[domain.CreatePlanRequest]()
+	getPlanValidator    = validator.New[domain.GetPlanRequest]()
 )
 
 // PlanService orchestrates plan operations across multiple payment providers.

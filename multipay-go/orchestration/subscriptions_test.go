@@ -323,8 +323,8 @@ func TestSubscriptionService_CreateSubscription_Pipeline(t *testing.T) {
 		logger := ports.NewNoopLogger()
 		pipeline := hooks.NewPipeline(logger)
 		clock := ports.NewRealClock()
-		validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
-		svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, validator, pipeline, logger, clock)
+		capabilityValidator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+		svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, capabilityValidator, pipeline, logger, clock)
 
 		_, err := svc.CreateSubscription(context.Background(), nil)
 		if err == nil {
@@ -347,8 +347,8 @@ func TestSubscriptionService_CreateSubscription_Pipeline(t *testing.T) {
 		logger := ports.NewNoopLogger()
 		pipeline := hooks.NewPipeline(logger)
 		clock := ports.NewRealClock()
-		validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
-		svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, validator, pipeline, logger, clock)
+		capabilityValidator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+		svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, capabilityValidator, pipeline, logger, clock)
 
 		req := &domain.CreateSubscriptionRequest{SubscriptionID: "s", CustomerEmail: "a@b.com", CustomerPhone: "12345", ReturnURL: "https://example.com/return"}
 		// missing both PlanID and PlanDetails — XOR violation caught by Validate()
@@ -372,8 +372,8 @@ func TestSubscriptionService_CreateSubscription_Pipeline(t *testing.T) {
 		logger := ports.NewNoopLogger()
 		pipeline := hooks.NewPipeline(logger)
 		clock := ports.NewRealClock()
-		validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
-		svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, validator, pipeline, logger, clock)
+		capabilityValidator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+		svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, capabilityValidator, pipeline, logger, clock)
 
 		req := &domain.CreateSubscriptionRequest{
 			SubscriptionID: "s",
@@ -401,8 +401,8 @@ func TestSubscriptionService_CreateSubscription_Pipeline(t *testing.T) {
 		logger := ports.NewNoopLogger()
 		pipeline := hooks.NewPipeline(logger)
 		clock := ports.NewRealClock()
-		validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
-		svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, validator, pipeline, logger, clock)
+		capabilityValidator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+		svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, capabilityValidator, pipeline, logger, clock)
 
 		req := &domain.CreateSubscriptionRequest{
 			SubscriptionID: "s",
@@ -426,7 +426,7 @@ func TestPreviewPlanChange(t *testing.T) {
 	logger := ports.NewNoopLogger()
 	pipeline := hooks.NewPipeline(logger)
 	clock := ports.NewRealClock()
-	validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+	capabilityValidator := capabilities.NewValidator(capabilities.NewSupportMatrix())
 
 	tests := []struct {
 		name                 string
@@ -508,7 +508,7 @@ func TestPreviewPlanChange(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc := NewSubscriptionService(domain.ProviderRazorpay, &fakeAdapter{}, validator, pipeline, logger, clock)
+			svc := NewSubscriptionService(domain.ProviderRazorpay, &fakeAdapter{}, capabilityValidator, pipeline, logger, clock)
 			quote, err := svc.PreviewPlanChange(tt.req)
 
 			if tt.expectErr {
@@ -668,8 +668,8 @@ func TestCreateSubscription_RecurringFieldBounds(t *testing.T) {
 			logger := ports.NewNoopLogger()
 			pipeline := hooks.NewPipeline(logger)
 			clock := ports.NewRealClock()
-			validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
-			svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, validator, pipeline, logger, clock)
+			capabilityValidator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+			svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, capabilityValidator, pipeline, logger, clock)
 
 			_, err := svc.CreateSubscription(context.Background(), &tt.recurring)
 
@@ -712,8 +712,8 @@ func TestCreateSubscription_FirstChargeWithMandate_StampsClock(t *testing.T) {
 
 	logger := ports.NewNoopLogger()
 	pipeline := hooks.NewPipeline(logger)
-	validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
-	svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, validator, pipeline, logger, clock)
+	capabilityValidator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+	svc := NewSubscriptionService(domain.ProviderRazorpay, adapter, capabilityValidator, pipeline, logger, clock)
 
 	req := &domain.CreateSubscriptionRequest{
 		PlanID:                 "plan_x",
@@ -797,8 +797,8 @@ func TestUpgradeSubscription_CrossCycleIntegration(t *testing.T) {
 			logger := ports.NewNoopLogger()
 			pipeline := hooks.NewPipeline(logger)
 			clock := ports.NewRealClock()
-			validator := capabilities.NewValidator(capabilities.NewSupportMatrix())
-			svc := NewSubscriptionService(domain.ProviderCashfree, adapter, validator, pipeline, logger, clock)
+			capabilityValidator := capabilities.NewValidator(capabilities.NewSupportMatrix())
+			svc := NewSubscriptionService(domain.ProviderCashfree, adapter, capabilityValidator, pipeline, logger, clock)
 
 			req := &domain.UpgradeSubscriptionRequest{
 				SubscriptionID:           "sub_old",

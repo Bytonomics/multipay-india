@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/SmrutAI/pedantigo/v2"
+	"github.com/SmrutAI/pedantigo/v2/validator"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/capabilities"
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
@@ -14,9 +14,9 @@ import (
 )
 
 var (
-	createRefundValidator = pedantigo.New[domain.CreateRefundRequest]()
-	getRefundValidator    = pedantigo.New[domain.GetRefundRequest]()
-	listRefundsValidator  = pedantigo.New[domain.ListRefundsRequest]()
+	createRefundValidator = validator.New[domain.CreateRefundRequest]()
+	getRefundValidator    = validator.New[domain.GetRefundRequest]()
+	listRefundsValidator  = validator.New[domain.ListRefundsRequest]()
 )
 
 // RefundService orchestrates refund operations across multiple payment providers.

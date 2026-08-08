@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SmrutAI/pedantigo/v2"
+	"github.com/SmrutAI/pedantigo/v2/validator"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 	"github.com/Bytonomics/multipay-india/multipay-go/hooks"
@@ -16,7 +16,7 @@ import (
 // TestCreatePlanRequest_Validation tests required field validation via JSON Unmarshal.
 // Required validation can ONLY be tested via Unmarshal, where JSON decoder can distinguish missing from zero.
 func TestCreatePlanRequest_Validation(t *testing.T) {
-	validator := pedantigo.New[domain.CreatePlanRequest]()
+	vl := validator.New[domain.CreatePlanRequest]()
 
 	// Valid JSON with all fields
 	validJSON := `{
@@ -32,7 +32,7 @@ func TestCreatePlanRequest_Validation(t *testing.T) {
 
 	// Case (a): valid JSON unmarshal
 	{
-		_, err := validator.Unmarshal([]byte(validJSON))
+		_, err := vl.Unmarshal([]byte(validJSON))
 		if err != nil {
 			t.Fatalf("expected nil for valid JSON, got %v", err)
 		}
@@ -41,7 +41,7 @@ func TestCreatePlanRequest_Validation(t *testing.T) {
 	// Case (b): missing plan_name (required field)
 	{
 		invalidJSON := `{"plan_id":"p1","plan_type":"PERIODIC","max_amount_minor":100000,"currency":"INR","amount_minor":50000,"interval":1,"interval_type":"MONTH"}`
-		_, err := validator.Unmarshal([]byte(invalidJSON))
+		_, err := vl.Unmarshal([]byte(invalidJSON))
 		if err == nil {
 			t.Fatalf("expected error for missing plan_name, got nil")
 		}
@@ -50,7 +50,7 @@ func TestCreatePlanRequest_Validation(t *testing.T) {
 	// Case (c): missing max_amount_minor (required field)
 	{
 		invalidJSON := `{"plan_id":"p1","plan_name":"Premium","plan_type":"PERIODIC","currency":"INR","amount_minor":50000,"interval":1,"interval_type":"MONTH"}`
-		_, err := validator.Unmarshal([]byte(invalidJSON))
+		_, err := vl.Unmarshal([]byte(invalidJSON))
 		if err == nil {
 			t.Fatalf("expected error for missing max_amount_minor, got nil")
 		}
@@ -59,7 +59,7 @@ func TestCreatePlanRequest_Validation(t *testing.T) {
 	// Case (d): invalid currency (iso4217 validation)
 	{
 		invalidJSON := `{"plan_id":"p1","plan_name":"Premium","plan_type":"PERIODIC","max_amount_minor":100000,"currency":"XX","amount_minor":50000,"interval":1,"interval_type":"MONTH"}`
-		_, err := validator.Unmarshal([]byte(invalidJSON))
+		_, err := vl.Unmarshal([]byte(invalidJSON))
 		if err == nil {
 			t.Fatalf("expected error for invalid currency, got nil")
 		}
@@ -68,7 +68,7 @@ func TestCreatePlanRequest_Validation(t *testing.T) {
 	// Case (e): missing plan_type (required field)
 	{
 		invalidJSON := `{"plan_id":"p1","plan_name":"Premium","max_amount_minor":100000,"currency":"INR","amount_minor":50000,"interval":1,"interval_type":"MONTH"}`
-		_, err := validator.Unmarshal([]byte(invalidJSON))
+		_, err := vl.Unmarshal([]byte(invalidJSON))
 		if err == nil {
 			t.Fatalf("expected error for missing plan_type, got nil")
 		}
@@ -77,7 +77,7 @@ func TestCreatePlanRequest_Validation(t *testing.T) {
 	// Case (f): missing plan_id (required field)
 	{
 		invalidJSON := `{"plan_name":"Premium","plan_type":"PERIODIC","max_amount_minor":100000,"currency":"INR","amount_minor":50000,"interval":1,"interval_type":"MONTH"}`
-		_, err := validator.Unmarshal([]byte(invalidJSON))
+		_, err := vl.Unmarshal([]byte(invalidJSON))
 		if err == nil {
 			t.Fatalf("expected error for missing plan_id, got nil")
 		}

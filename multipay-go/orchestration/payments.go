@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/SmrutAI/pedantigo/v2"
+	"github.com/SmrutAI/pedantigo/v2/validator"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/capabilities"
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
@@ -14,9 +14,9 @@ import (
 )
 
 var (
-	getPaymentValidator     = pedantigo.New[domain.GetPaymentRequest]()
-	listPaymentsValidator   = pedantigo.New[domain.ListPaymentsRequest]()
-	capturePaymentValidator = pedantigo.New[domain.CapturePaymentRequest]()
+	getPaymentValidator     = validator.New[domain.GetPaymentRequest]()
+	listPaymentsValidator   = validator.New[domain.ListPaymentsRequest]()
+	capturePaymentValidator = validator.New[domain.CapturePaymentRequest]()
 )
 
 // PaymentService orchestrates payment operations across multiple payment providers.

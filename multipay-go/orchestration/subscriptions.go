@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/SmrutAI/pedantigo/v2"
+	"github.com/SmrutAI/pedantigo/v2/validator"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/capabilities"
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
@@ -16,17 +16,17 @@ import (
 )
 
 var (
-	createSubscriptionValidator      = pedantigo.New[domain.CreateSubscriptionRequest]()
-	getSubscriptionValidator         = pedantigo.New[domain.GetSubscriptionRequest]()
-	cancelSubscriptionValidator      = pedantigo.New[domain.CancelSubscriptionRequest]()
-	pauseSubscriptionValidator       = pedantigo.New[domain.PauseSubscriptionRequest]()
-	resumeSubscriptionValidator      = pedantigo.New[domain.ResumeSubscriptionRequest]()
-	changePlanValidator              = pedantigo.New[domain.ChangePlanRequest]()
-	getSubscriptionPaymentsValidator = pedantigo.New[domain.GetSubscriptionPaymentsRequest]()
-	planChangePreviewValidator       = pedantigo.New[domain.PlanChangePreviewRequest]()
-	upgradeSubscriptionValidator     = pedantigo.New[domain.UpgradeSubscriptionRequest]()
-	finalizeUpgradeValidator         = pedantigo.New[domain.FinalizeUpgradeRequest]()
-	chargeSubscriptionValidator      = pedantigo.New[domain.ChargeSubscriptionRequest]()
+	createSubscriptionValidator      = validator.New[domain.CreateSubscriptionRequest]()
+	getSubscriptionValidator         = validator.New[domain.GetSubscriptionRequest]()
+	cancelSubscriptionValidator      = validator.New[domain.CancelSubscriptionRequest]()
+	pauseSubscriptionValidator       = validator.New[domain.PauseSubscriptionRequest]()
+	resumeSubscriptionValidator      = validator.New[domain.ResumeSubscriptionRequest]()
+	changePlanValidator              = validator.New[domain.ChangePlanRequest]()
+	getSubscriptionPaymentsValidator = validator.New[domain.GetSubscriptionPaymentsRequest]()
+	planChangePreviewValidator       = validator.New[domain.PlanChangePreviewRequest]()
+	upgradeSubscriptionValidator     = validator.New[domain.UpgradeSubscriptionRequest]()
+	finalizeUpgradeValidator         = validator.New[domain.FinalizeUpgradeRequest]()
+	chargeSubscriptionValidator      = validator.New[domain.ChargeSubscriptionRequest]()
 )
 
 // SubscriptionService orchestrates subscription operations across multiple payment providers.
