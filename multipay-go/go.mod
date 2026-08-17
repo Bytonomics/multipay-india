@@ -5,7 +5,7 @@ go 1.26
 toolchain go1.26.0
 
 require (
-	github.com/SmrutAI/pedantigo/v2 v2.0.1
+	github.com/SmrutAI/pedantigo/v2 v2.1.1
 	github.com/bojanz/currency v1.3.0
 	github.com/cashfree/cashfree-pg/v6 v6.0.5
 	github.com/razorpay/razorpay-go v1.4.1
@@ -31,6 +31,6 @@ require (
 require (
 	github.com/cockroachdb/apd/v3 v3.2.1 // indirect; transitive dep of bojanz/currency (decimal arithmetic, NOT a database)
 	github.com/getsentry/sentry-go v0.29.1 // indirect
-	golang.org/x/sys v0.45.0 // indirect
-	golang.org/x/text v0.37.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
 )
