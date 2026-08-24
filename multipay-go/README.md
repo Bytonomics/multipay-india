@@ -981,4 +981,4 @@ Contributions are welcome! Please ensure:
 
 ## License
 
-See [LICENSE](./LICENSE) file
+See [LICENSE](../LICENSE) file
