@@ -314,7 +314,7 @@ payload the `multipay-frontend-ts` client builds, so there is NO corresponding T
 3. If Cashfree: caller directs user to reauthorize via AuthLink before next step
 4. Call `FinalizeUpgrade(...)`
    - Cashfree, `ProrationCollectedExternally=false`: charges prorated on the new mandate, cancels the old subscription, returns the charge payment.
-   - Cashfree, `ProrationCollectedExternally=true`: cancels the old subscription only; the caller collected the delta itself. This is the mode the smritea-cloud control plane uses — it creates a one-time Order for the delta before the mandate is authorized.
+   - Cashfree, `ProrationCollectedExternally=true`: cancels the old subscription only; the caller collected the delta itself. This is the mode a caller uses when it creates a one-time Order for the delta before the mandate is authorized.
    - Razorpay: no-op, returns an empty payment.
    - Executes before/after hooks
 5. Return finalized upgrade state to caller

@@ -4,15 +4,39 @@ title: multipay-frontend-ts
 status: stable
 tags:
 - readme
+stale_after: 2026-12-31
+generated:
+  by: Tushar Dwivedi
+  at: 2026-08-25T00:00:00Z
 ---
 
 # multipay-frontend-ts
+
+
+| Section | What it covers |
+|---------|----------------|
+| [Package](#package) | npm: @bytonomics/multipay-frontend-ts |
+| [Two Entry Points](#two-entry-points) | Two Entry Points |
+| [Headless Usage](#headless-usage) | Headless Usage |
+| [Picker Usage](#picker-usage) | Picker Usage |
+| [Four Visual Variants](#four-visual-variants) | All variants are web-first, responsive (1-up on mobile, 2-3-up on desktop), and… |
+| [Theming](#theming) | Theming |
+| [Branding Customization](#branding-customization) | Branding Customization |
+| [Total Amount & Tax Disclaimer](#total-amount--tax-disclaimer) | Total Amount & Tax Disclaimer |
+| [Provider Types & PayU Placeholder](#provider-types--payu-placeholder) | Provider Types & PayU Placeholder |
+| [Imperative Control Hook](#imperative-control-hook) | usePaymentPicker provides imperative control for programmatic selection: |
+| [Error Handling](#error-handling) | Error Handling |
+| [Styling & CSS](#styling--css) | Styling & CSS |
+| [TypeScript Types](#typescript-types) | TypeScript Types |
+| [Integration Notes](#integration-notes) | Integration Notes |
+| [Build & Test](#build--test) | Build & Test |
+| [License](#license) | MIT |
 
 The frontend TypeScript/React library for the **multipay-india** payment-aggregator monorepo — providing headless checkout redirects and a React `<PaymentPicker>` component for selecting payment aggregators (Cashfree, Razorpay).
 
 ## Package
 
-**npm:** `@bytonomics/multipay-frontend-ts`
+**npm:** @bytonomics/multipay-frontend-ts
 
 **TypeScript:** Strictly typed, zero `any` — external/untyped values are converted at a single typed boundary.
 

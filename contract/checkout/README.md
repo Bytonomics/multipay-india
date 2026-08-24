@@ -4,9 +4,21 @@ title: Checkout Slice
 status: stable
 tags:
 - readme
+stale_after: 2026-12-31
+generated:
+  by: Tushar Dwivedi
+  at: 2026-08-25T00:00:00Z
 ---
 
 # Checkout Slice
+
+
+| Section | What it covers |
+|---------|----------------|
+| [Core Types](#core-types) | Core Types |
+| [Contract Validation](#contract-validation) | Both ports validate against canonical contract files: |
+| [Frontend Usage](#frontend-usage) | Backend creates order, receives CheckoutPayload |
+| [Important Notes](#important-notes) | Provider case sensitivity: provider is lowercase ("cashfree", "razorpay") |
 
 Frontend-bound, provider-agnostic checkout payload that enables JavaScript clients to drive vendor-hosted checkout redirects. Discriminated by `Provider`; only fields for the configured provider are populated.
 

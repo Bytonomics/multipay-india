@@ -4,6 +4,10 @@ title: multipay-india
 status: stable
 tags:
 - readme
+stale_after: 2026-12-31
+generated:
+  by: Tushar Dwivedi
+  at: 2026-08-25T00:00:00Z
 ---
 
 # multipay-india
@@ -223,7 +227,7 @@ Currency:    "JPY",
 ```
 
 The library handles provider-specific conversion internally:
-- **Cashfree** receives amounts in major units (rupees/dollars) — the library converts using ISO 4217 exponents via `bojanz/currency`
+- **Cashfree** receives amounts in major units (rupees/dollars) — the library converts using ISO 4217 exponents via bojanz/currency
 - **Razorpay** receives amounts in minor units (paisa/cents) — no conversion needed
 
 You never need to worry about provider differences. Just pass `AmountMinor` consistently.

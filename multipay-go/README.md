@@ -4,9 +4,33 @@ title: MultiPay Adapter
 status: stable
 tags:
 - readme
+stale_after: 2026-12-31
+generated:
+  by: Tushar Dwivedi
+  at: 2026-08-25T00:00:00Z
 ---
 
 # MultiPay Adapter
+
+
+| Section | What it covers |
+|---------|----------------|
+| [Overview](#overview) | MultiPay Adapter provides a abstraction layer over payment processing providers, allowing… |
+| [Installation](#installation) | Installation |
+| [Quick Start](#quick-start) | Quick Start |
+| [Provider Configuration](#provider-configuration) | Provider Configuration |
+| [Core Services](#core-services) | Core Services |
+| [Capability Checking](#capability-checking) | Before attempting an operation, check if the provider supports it: |
+| [Supported Capabilities Matrix](#supported-capabilities-matrix) | The following table shows all capabilities supported by Cashfree and Razorpay. Use this… |
+| [CallbackURL / ReturnURL Are Browser-Redirects Only](#callbackurl--returnurl-are-browser-redirects-only) | CallbackURL and ReturnURL are browser-redirect parameters only. When your payment gateway… |
+| [Webhook Setup](#webhook-setup) | Webhook Setup |
+| [Accessing Provider-Specific Details](#accessing-provider-specific-details) | While the library provides a consistent canonical API across providers, each provider… |
+| [Error Handling](#error-handling) | Error Handling |
+| [Multi-Instance Support](#multi-instance-support) | Create separate clients for different environments or providers: |
+| [Hook Pipeline](#hook-pipeline) | Hooks allow you to extend the library with custom observability and business logic. |
+| [Architecture](#architecture) | For detailed architecture information, see DESIGN.md. |
+| [Contributing](#contributing) | Contributions are welcome! Please ensure: |
+| [License](#license) | See LICENSE file |
 
 A unified Go library for integrating payment providers (Cashfree, Razorpay) with a single, consistent API. Each client is bound to one provider. Process orders, payments, refunds, and webhooks without provider-specific code.
 
@@ -506,7 +530,7 @@ Example: Register `https://api.yourapp.com/webhooks/cashfree/prod` in Cashfree's
 
 ### Mounting Webhook Handler
 
-#### With `net/http`
+#### With net/http
 
 ```go
 http.HandleFunc("/webhooks/payments", func(w http.ResponseWriter, r *http.Request) {
