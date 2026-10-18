@@ -375,8 +375,8 @@ const (
 	PlanChangeKindDowngrade        PlanChangeKind = "DOWNGRADE"
 )
 
-// PlanChangePreviewRequest is the PURE, generic input to PreviewPlanChange. The CALLER (e.g. the
-// studio control plane) decides the Kind and passes already-resolved amounts in minor units. This
+// PlanChangePreviewRequest is the PURE, generic input to PreviewPlanChange. The CALLER (e.g. a
+// billing service) decides the Kind and passes already-resolved amounts in minor units. This
 // type carries NO plan keys, no cycle strings, no DB concepts — only the money-math primitives.
 type PlanChangePreviewRequest struct {
 	Kind               PlanChangeKind `json:"kind" validate:"required,oneof=CREATE UPGRADE_SAME_CYCLE UPGRADE_CROSS_CYCLE DOWNGRADE"`
