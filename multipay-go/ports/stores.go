@@ -41,6 +41,7 @@ type WebhookStore interface {
 }
 
 // Logger provides structured logging at multiple severity levels.
+// A Logger is mandatory: every constructor that accepts one panics on nil, and no fallback logger is used.
 type Logger interface {
 	// Info logs an informational message.
 	Info(ctx context.Context, message string, keyvals ...any)
@@ -52,7 +53,7 @@ type Logger interface {
 	Debug(ctx context.Context, message string, keyvals ...any)
 }
 
-// NoopLogger is a no-op Logger for testing.
+// NoopLogger is a no-op Logger. Pass it explicitly when logs should be discarded; a nil Logger is never substituted.
 type NoopLogger struct{}
 
 func (l *NoopLogger) Info(ctx context.Context, message string, keyvals ...any)  {}

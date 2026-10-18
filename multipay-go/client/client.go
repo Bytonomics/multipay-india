@@ -46,7 +46,7 @@ type MultiPayClient struct {
 // NewClient creates a new MultiPayClient from the provided configuration.
 //
 // The client wires up all dependencies:
-// - Validates the config
+// - Validates the config (panics on a nil WebhookStore, Provider or Logger)
 // - Derives the configured provider identity from the adapter implementation
 // - Creates a capability support matrix from provider declarations
 // - Creates a capability validator for early unsupported-capability detection
@@ -68,6 +68,12 @@ func NewClient(cfg *ClientConfig) (*MultiPayClient, error) {
 		panic("ClientConfig.Provider is required (cannot be nil); a payment client must be bound to exactly one provider adapter")
 	}
 
+	// The logger is mandatory: a nil Logger is a broken caller, so crash at construction
+	// instead of substituting a fallback logger.
+	if cfg.Logger == nil {
+		panic("client.NewClient: logger is required")
+	}
+
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
@@ -81,11 +87,7 @@ func NewClient(cfg *ClientConfig) (*MultiPayClient, error) {
 	// Create capability validator for early validation before adapter dispatch
 	capabilityValidator := capabilities.NewValidator(supportMatrix)
 
-	// Use provided logger or noop logger if not configured
 	logger := cfg.Logger
-	if logger == nil {
-		logger = ports.NewNoopLogger()
-	}
 
 	// Create hook pipeline from configured hooks (empty if none provided)
 	var hookList []ports.Hook

@@ -22,13 +22,13 @@ type WebhookEmitter interface {
 // compile-time interface check
 var _ WebhookEmitter = (*Harness)(nil)
 
-// Config configures a Harness. Every dependency is an interface with a default,
-// so any of Store, Clock, Logger, Scheduler can be swapped in a test.
+// Config configures a Harness. Store, Clock and Scheduler default to standard test
+// implementations and can be swapped in a test. Logger is mandatory.
 type Config struct {
 	Provider            domain.Provider                           // default: domain.ProviderCashfree
 	Store               ports.WebhookStore                        // default: *InMemoryWebhookStore
 	Clock               ports.Clock                               // default: ports.NewRealClock()
-	Logger              ports.Logger                              // default: ports.NewNoopLogger()
+	Logger              ports.Logger                              // required: NewHarness panics if nil
 	Scheduler           Scheduler                                 // default: *WallClockScheduler
 	AccountID           string                                    // default: "test"
 	WebhookDelays       map[domain.WebhookEventType]time.Duration // per-event wall-clock delay
@@ -58,12 +58,16 @@ type Harness struct {
 // NewHarness builds a Harness from a REQUIRED, valid config. The config is
 // mandatory: a nil config is a programming error and panics — callers must pass an
 // explicit *Config (e.g. &Config{} for all-default test deps, or one with fields set).
-// The config's optional test-infra dependencies (Provider, Store, Clock, Logger,
-// Scheduler) default to their standard test implementations when left zero; Provider
-// defaults to domain.ProviderCashfree so the hardcoded capability support matrix lines up.
+// The config's optional test-infra dependencies (Provider, Store, Clock, Scheduler) default to
+// their standard test implementations when left zero; Provider defaults to
+// domain.ProviderCashfree so the hardcoded capability support matrix lines up.
+// The Logger is mandatory: NewHarness panics when cfg.Logger is nil.
 func NewHarness(cfg *Config) *Harness {
 	if cfg == nil {
 		panic("fake.NewHarness: cfg is required (cannot be nil); pass a valid *Config such as &Config{} or &Config{Provider: domain.ProviderCashfree}")
+	}
+	if cfg.Logger == nil {
+		panic("fake.NewHarness: logger is required")
 	}
 	provider := cfg.Provider
 	if provider == "" {
@@ -78,9 +82,6 @@ func NewHarness(cfg *Config) *Harness {
 		clk = ports.NewRealClock()
 	}
 	logger := cfg.Logger
-	if logger == nil {
-		logger = ports.NewNoopLogger()
-	}
 	sched := cfg.Scheduler
 	if sched == nil {
 		sched = NewWallClockScheduler()

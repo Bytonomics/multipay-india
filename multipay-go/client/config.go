@@ -8,9 +8,9 @@ import (
 
 // ClientConfig holds configuration for the MultiPayClient.
 // It specifies the configured payment provider adapter implementation,
-// and optional stores/services for hooks, webhooks, logging, and time operations.
+// and optional stores/services for hooks, webhooks, and time operations.
 //
-// Provider and WebhookStore are REQUIRED (NewClient panics on nil); Hooks/Logger/Clock are optional (nil = defaults or noop).
+// Provider, WebhookStore and Logger are REQUIRED (NewClient panics on nil); Hooks and Clock are optional (nil = defaults).
 type ClientConfig struct {
 	// Provider is the configured payment provider adapter implementation.
 	Provider ports.ProviderAdapter
@@ -24,8 +24,8 @@ type ClientConfig struct {
 	// It provides durable raw-payload capture, dedupe, and replay for webhook processing.
 	WebhookStore ports.WebhookStore
 
-	// Logger is an optional structured logger.
-	// If nil, a noop logger is used.
+	// Logger is a mandatory structured logger: NewClient panics if it is nil and no fallback is used.
+	// Pass ports.NewNoopLogger() explicitly when logs should be discarded.
 	Logger ports.Logger
 
 	// Clock is an optional time provider.

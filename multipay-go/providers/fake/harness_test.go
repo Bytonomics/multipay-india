@@ -6,10 +6,11 @@ import (
 	"time"
 
 	domain "github.com/Bytonomics/multipay-india/multipay-go/domain"
+	ports "github.com/Bytonomics/multipay-india/multipay-go/ports"
 )
 
 func TestHarness_CreateOrder_ReachesFakeAdapter(t *testing.T) {
-	h := NewHarness(&Config{})
+	h := NewHarness(&Config{Logger: ports.NewNoopLogger()})
 	h.Adapter.CreateOrderFunc = func(ctx context.Context, req *domain.CreateOrderRequest) (*domain.Order, error) {
 		return &domain.Order{OrderID: req.OrderID, ProviderOrderID: "cf_1", Status: domain.OrderCreated, SessionID: "sess_1", Checkout: &domain.CheckoutPayload{Provider: domain.ProviderCashfree, Environment: domain.EnvironmentProduction, SessionID: "sess_1"}}, nil
 	}
@@ -32,7 +33,7 @@ func TestHarness_CreateOrder_ReachesFakeAdapter(t *testing.T) {
 }
 
 func TestHarness_CreatePaymentLink_ReachesFakeAdapter(t *testing.T) {
-	h := NewHarness(&Config{})
+	h := NewHarness(&Config{Logger: ports.NewNoopLogger()})
 	h.Adapter.CreatePaymentLinkFunc = func(ctx context.Context, req *domain.CreatePaymentLinkRequest) (*domain.PaymentLink, error) {
 		return &domain.PaymentLink{LinkID: "pl_1", ProviderLinkID: "cf_pl_1", Status: domain.PaymentLinkStatusActive, LinkURL: "https://cashfree.com/link/pl_1"}, nil
 	}
@@ -49,7 +50,7 @@ func TestHarness_CreatePaymentLink_ReachesFakeAdapter(t *testing.T) {
 }
 
 func TestHarness_CreateSubscription_ReachesFakeAdapter(t *testing.T) {
-	h := NewHarness(&Config{})
+	h := NewHarness(&Config{Logger: ports.NewNoopLogger()})
 	h.Adapter.CreateSubscriptionFunc = func(ctx context.Context, req *domain.CreateSubscriptionRequest) (*domain.Subscription, error) {
 		return &domain.Subscription{SubscriptionID: req.SubscriptionID, ProviderSubscriptionID: "cf_sub_1", Status: domain.SubscriptionStatusInitialized, AuthLink: "https://auth.link"}, nil
 	}
@@ -66,7 +67,7 @@ func TestHarness_CreateSubscription_ReachesFakeAdapter(t *testing.T) {
 }
 
 func TestHarness_EmitWebhookAfter_DeliversToRegisteredHandler(t *testing.T) {
-	h := NewHarness(&Config{WebhookDelays: map[domain.WebhookEventType]time.Duration{domain.EventSubCharged: 10 * time.Millisecond}})
+	h := NewHarness(&Config{Logger: ports.NewNoopLogger(), WebhookDelays: map[domain.WebhookEventType]time.Duration{domain.EventSubCharged: 10 * time.Millisecond}})
 	var got *domain.WebhookEvent
 	handled := false
 	h.Client.Webhooks().RegisterHandler(domain.EventSubCharged, func(ctx context.Context, event *domain.WebhookEvent) error {
@@ -100,7 +101,7 @@ func TestHarness_EmitWebhookAfter_DeliversToRegisteredHandler(t *testing.T) {
 }
 
 func TestHarness_Webhook_DedupeSuppressesSecondDelivery(t *testing.T) {
-	h := NewHarness(&Config{DefaultWebhookDelay: 0})
+	h := NewHarness(&Config{Logger: ports.NewNoopLogger(), DefaultWebhookDelay: 0})
 	count := 0
 	h.Client.Webhooks().RegisterHandler(domain.EventSubCharged, func(ctx context.Context, event *domain.WebhookEvent) error {
 		count++

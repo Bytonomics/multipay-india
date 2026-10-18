@@ -16,8 +16,11 @@ type Pipeline struct {
 }
 
 // NewPipeline constructs a Pipeline with an ordered slice of hooks.
-// Hooks will execute in the order provided.
+// Hooks will execute in the order provided. The logger is mandatory: NewPipeline panics if it is nil.
 func NewPipeline(logger ports.Logger, hooks ...ports.Hook) *Pipeline {
+	if logger == nil {
+		panic("hooks.NewPipeline: logger is required")
+	}
 	return &Pipeline{
 		hooks:  hooks,
 		logger: logger,

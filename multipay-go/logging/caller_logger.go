@@ -20,7 +20,11 @@ type CallerLogger struct {
 // NewCallerLogger creates a new CallerLogger that wraps the given logger.
 // The skip parameter controls how many stack frames to skip when capturing caller info.
 // Typically, skip should be 1 to account for the NewCallerLogger frame itself.
+// The delegate is mandatory: NewCallerLogger panics if it is nil.
 func NewCallerLogger(delegate ports.Logger, skip int) *CallerLogger {
+	if delegate == nil {
+		panic("logging.NewCallerLogger: logger is required")
+	}
 	return &CallerLogger{
 		delegate: delegate,
 		skip:     skip,
