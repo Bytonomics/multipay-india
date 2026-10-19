@@ -49,7 +49,7 @@ func NewWebhookHandler(
 	if store == nil {
 		panic("WebhookStore is required (cannot be nil); it is the durable capture of received events")
 	}
-	if logger == nil {
+	if ports.IsNilLogger(logger) {
 		panic("logger is required (cannot be nil)")
 	}
 	// Wrap the logger to automatically capture caller information

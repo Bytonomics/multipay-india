@@ -31,7 +31,7 @@ type InstrumentService struct {
 
 // NewInstrumentService constructs an InstrumentService with dependency injection.
 func NewInstrumentService(provider domain.Provider, adapter ports.ProviderAdapter, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger, clock ports.Clock) *InstrumentService {
-	if logger == nil {
+	if ports.IsNilLogger(logger) {
 		panic("logger is required (cannot be nil)")
 	}
 	wrappedLogger := logging.NewCallerLogger(logger, 2)

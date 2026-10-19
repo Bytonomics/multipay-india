@@ -70,8 +70,8 @@ func NewClient(cfg *ClientConfig) (*MultiPayClient, error) {
 
 	// The logger is mandatory: a nil Logger is a broken caller, so crash at construction
 	// instead of substituting a fallback logger.
-	if cfg.Logger == nil {
-		panic("client.NewClient: logger is required")
+	if ports.IsNilLogger(cfg.Logger) {
+		panic("logger is required (cannot be nil)")
 	}
 
 	if err := cfg.Validate(); err != nil {

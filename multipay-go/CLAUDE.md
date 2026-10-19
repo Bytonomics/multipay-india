@@ -287,18 +287,34 @@ documentation). It is **immutable** after construction -- no runtime mutations. 
 
 ### Logger is Mandatory, Never Optional
 
-All services and handlers that accept `ports.Logger` **MUST** enforce non-nil at construction time with a panic:
+Every constructor that takes a `ports.Logger` **MUST** panic when the logger is missing. "Missing" means a nil
+interface OR an interface holding a typed nil pointer (for example a nil `*myLogger`). The check runs once, in
+the constructor, through `ports.IsNilLogger` (`ports/stores.go`):
 
 ```go
-if logger == nil {
+if ports.IsNilLogger(logger) {
     panic("logger is required (cannot be nil)")
 }
 wrappedLogger := logging.NewCallerLogger(logger, 2)
 ```
 
-Never check `if s.logger != nil` in method bodies. Logger is always assumed non-nil after construction.
+- Never write `logger == nil`: it does not catch a typed nil.
+- Never call `ports.IsNilLogger` or check `if s.logger != nil` in method bodies or on request paths. The logger is always assumed non-nil after construction.
+- There is NO fallback logger and no `ResolveLogger`. A nil logger is never replaced silently. To discard logs, pass `ports.NewNoopLogger()` explicitly.
 
-**Applied to:** All orchestration services, `WebhookHandler`, `AuditHook`, `MetricsHook`.
+**Applied to** (each calls `ports.IsNilLogger` and panics):
+
+| Package | Constructors |
+|---------|--------------|
+| `client` | `NewClient` (checks `cfg.Logger`) |
+| `hooks` | `NewPipeline`, `NewAuditHook` |
+| `logging` | `NewCallerLogger` |
+| `orchestration` | `NewOrderService`, `NewPaymentService`, `NewRefundService`, `NewInstrumentService`, `NewPaymentLinkService`, `NewPlanService`, `NewSubscriptionService`, `NewWebhookService` |
+| `routing` | `NewWebhookHandler` |
+| `providers/cashfree` | `NewAdapter` (checks `config.Logger`) |
+| `providers/fake` | `NewHarness` (checks `cfg.Logger`) |
+
+`MetricsHook` takes no logger, so it is not on this list.
 
 ### Amounts Are Always Minor Units — Never Major Units
 
@@ -343,6 +359,7 @@ Rules:
 - `Provider` is the `ports.ProviderAdapter` implementation
 - Provider identity is derived internally via `cfg.Provider.ProviderName()`
 - `WebhookStore` is mandatory — `NewClient` panics if nil (durable capture for dedup + replay)
+- `Logger` is mandatory — `NewClient` panics if it is nil or a typed nil (see "Logger is Mandatory, Never Optional"); pass `ports.NewNoopLogger()` to discard logs
 - Request structs and service methods must remain provider-free
 - Use `domain.EnvironmentSandbox` (`"SANDBOX"`) / `domain.EnvironmentProduction` (`"PRODUCTION"`) for provider configs — values are UPPERCASE
 

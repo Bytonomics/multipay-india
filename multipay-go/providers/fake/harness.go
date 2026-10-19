@@ -57,17 +57,17 @@ type Harness struct {
 
 // NewHarness builds a Harness from a REQUIRED, valid config. The config is
 // mandatory: a nil config is a programming error and panics — callers must pass an
-// explicit *Config (e.g. &Config{} for all-default test deps, or one with fields set).
-// The config's optional test-infra dependencies (Provider, Store, Clock, Scheduler) default to
-// their standard test implementations when left zero; Provider defaults to
+// explicit *Config (e.g. &Config{Logger: ports.NewNoopLogger()} for all-default test deps, or one with
+// fields set). The config's optional test-infra dependencies (Provider, Store, Clock, Scheduler) default
+// to their standard test implementations when left zero; Provider defaults to
 // domain.ProviderCashfree so the hardcoded capability support matrix lines up.
-// The Logger is mandatory: NewHarness panics when cfg.Logger is nil.
+// The Logger is mandatory: NewHarness panics when cfg.Logger is missing (nil or typed nil).
 func NewHarness(cfg *Config) *Harness {
 	if cfg == nil {
-		panic("fake.NewHarness: cfg is required (cannot be nil); pass a valid *Config such as &Config{} or &Config{Provider: domain.ProviderCashfree}")
+		panic("fake.NewHarness: cfg is required (cannot be nil); pass a valid *Config such as &Config{Logger: ports.NewNoopLogger()}")
 	}
-	if cfg.Logger == nil {
-		panic("fake.NewHarness: logger is required")
+	if ports.IsNilLogger(cfg.Logger) {
+		panic("logger is required (cannot be nil)")
 	}
 	provider := cfg.Provider
 	if provider == "" {

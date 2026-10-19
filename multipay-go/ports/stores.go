@@ -2,6 +2,7 @@ package ports
 
 import (
 	"context"
+	"reflect"
 	"time"
 
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
@@ -41,7 +42,9 @@ type WebhookStore interface {
 }
 
 // Logger provides structured logging at multiple severity levels.
-// A Logger is mandatory: every constructor that accepts one panics on nil, and no fallback logger is used.
+// A Logger is mandatory: every constructor that accepts one panics when it is missing, and no fallback
+// logger is used. A typed nil (for example a nil *myLogger stored in the interface) also counts as
+// missing; use IsNilLogger to test for it.
 type Logger interface {
 	// Info logs an informational message.
 	Info(ctx context.Context, message string, keyvals ...any)
@@ -51,6 +54,21 @@ type Logger interface {
 
 	// Debug logs a debug message.
 	Debug(ctx context.Context, message string, keyvals ...any)
+}
+
+// IsNilLogger reports whether l is missing. It returns true for a nil interface, and also for an
+// interface that holds a typed nil: a nil Pointer, Map, Func, Chan or Slice value. Such a value
+// passes a plain `l == nil` check, which is why constructors use this function instead.
+// Call it only in constructors and config entry points, never on request paths or in method bodies.
+func IsNilLogger(l Logger) bool {
+	if l == nil {
+		return true
+	}
+	v := reflect.ValueOf(l)
+	k := v.Kind()
+	nilable := k == reflect.Pointer || k == reflect.Map || k == reflect.Func ||
+		k == reflect.Chan || k == reflect.Slice
+	return nilable && v.IsNil()
 }
 
 // NoopLogger is a no-op Logger. Pass it explicitly when logs should be discarded; a nil Logger is never substituted.

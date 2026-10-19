@@ -44,7 +44,7 @@ type SubscriptionService struct {
 // NewSubscriptionService constructs a SubscriptionService with required dependencies.
 // Logger is mandatory and will panic if nil.
 func NewSubscriptionService(provider domain.Provider, adapter ports.ProviderAdapter, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger, clock ports.Clock) *SubscriptionService {
-	if logger == nil {
+	if ports.IsNilLogger(logger) {
 		panic("logger is required (cannot be nil)")
 	}
 	wrappedLogger := logging.NewCallerLogger(logger, 2)

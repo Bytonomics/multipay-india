@@ -24,8 +24,7 @@ type ClientConfig struct {
 	// It provides durable raw-payload capture, dedupe, and replay for webhook processing.
 	WebhookStore ports.WebhookStore
 
-	// Logger is a mandatory structured logger: NewClient panics if it is nil and no fallback is used.
-	// Pass ports.NewNoopLogger() explicitly when logs should be discarded.
+	// Logger is a mandatory structured logger. NewClient panics if it is nil. Pass ports.NewNoopLogger() explicitly when logs should be discarded.
 	Logger ports.Logger
 
 	// Clock is an optional time provider.

@@ -31,7 +31,7 @@ type PlanService struct {
 // NewPlanService constructs a PlanService with required dependencies.
 // Logger is mandatory and will panic if nil.
 func NewPlanService(provider domain.Provider, adapter ports.ProviderAdapter, pipeline *hooks.Pipeline, logger ports.Logger, clock ports.Clock) *PlanService {
-	if logger == nil {
+	if ports.IsNilLogger(logger) {
 		panic("logger is required (cannot be nil)")
 	}
 	wrappedLogger := logging.NewCallerLogger(logger, 2)

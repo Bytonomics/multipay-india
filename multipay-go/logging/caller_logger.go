@@ -22,8 +22,8 @@ type CallerLogger struct {
 // Typically, skip should be 1 to account for the NewCallerLogger frame itself.
 // The delegate is mandatory: NewCallerLogger panics if it is nil.
 func NewCallerLogger(delegate ports.Logger, skip int) *CallerLogger {
-	if delegate == nil {
-		panic("logging.NewCallerLogger: logger is required")
+	if ports.IsNilLogger(delegate) {
+		panic("logger is required (cannot be nil)")
 	}
 	return &CallerLogger{
 		delegate: delegate,

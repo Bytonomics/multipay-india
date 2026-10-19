@@ -171,12 +171,13 @@ ClientID:      "xxx",
 ClientSecret:  "xxx",
 WebhookSecret: "xxx",
 Environment:   domain.EnvironmentSandbox,
+Logger:        yourLogger, // mandatory: NewAdapter panics when nil; pass ports.NewNoopLogger() to discard logs
 })
 
 mp, _ := client.NewClient(&client.ClientConfig{
 Provider:     adapter,
 WebhookStore: yourStore, // mandatory — durable webhook capture for dedup + replay
-Logger:       yourLogger,
+Logger:       yourLogger, // mandatory: NewClient panics when nil; pass ports.NewNoopLogger() to discard logs
 })
 
 order, err := mp.Orders().CreateOrder(context.Background(), &domain.CreateOrderRequest{

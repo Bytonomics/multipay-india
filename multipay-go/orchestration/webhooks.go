@@ -32,7 +32,7 @@ func NewWebhookService(
 	registry *routing.EndpointRegistry,
 	logger ports.Logger,
 ) *WebhookService {
-	if logger == nil {
+	if ports.IsNilLogger(logger) {
 		panic("logger is required (cannot be nil)")
 	}
 	wrappedLogger := logging.NewCallerLogger(logger, 2)

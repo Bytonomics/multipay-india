@@ -31,7 +31,7 @@ type PaymentLinkService struct {
 
 // NewPaymentLinkService constructs a PaymentLinkService with dependency injection.
 func NewPaymentLinkService(provider domain.Provider, adapter ports.ProviderAdapter, validator *capabilities.Validator, pipeline *hooks.Pipeline, logger ports.Logger, clock ports.Clock) *PaymentLinkService {
-	if logger == nil {
+	if ports.IsNilLogger(logger) {
 		panic("logger is required (cannot be nil)")
 	}
 	wrappedLogger := logging.NewCallerLogger(logger, 2)

@@ -13,7 +13,7 @@ type AuditHook struct {
 
 // NewAuditHook constructs an AuditHook with the provided logger.
 func NewAuditHook(logger ports.Logger) *AuditHook {
-	if logger == nil {
+	if ports.IsNilLogger(logger) {
 		panic("logger is required (cannot be nil)")
 	}
 	return &AuditHook{

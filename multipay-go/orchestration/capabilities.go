@@ -89,9 +89,13 @@ func (s *CapabilityService) AllCapabilities(ctx context.Context, provider domain
 		capabilities.CapUPICreate,
 		capabilities.CapVPAValidate,
 
-		// Cashfree-specific subscription capabilities
+		// Subscription capabilities (provider support differs; see capabilities/matrix.go)
 		capabilities.CapSubscriptionManualCharge,
 		capabilities.CapSubscriptionEligibility,
+		// VERIFY BEFORE RELYING: Cashfree support for this capability is only partly backed by vendor
+		// documents. See the note on this capability in capabilities/matrix.go.
+		capabilities.CapSubscriptionUpgradeProration,
+		capabilities.CapSubscriptionCancelAtCycleEnd,
 
 		// Settlement capabilities
 		capabilities.CapSettlementOrderFetch,

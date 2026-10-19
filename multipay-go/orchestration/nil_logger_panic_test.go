@@ -3,8 +3,6 @@ package orchestration_test
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/Bytonomics/multipay-india/multipay-go/capabilities"
 	"github.com/Bytonomics/multipay-india/multipay-go/domain"
 	"github.com/Bytonomics/multipay-india/multipay-go/hooks"
@@ -16,6 +14,33 @@ import (
 
 // The panic-message contract for logger-taking service constructors is pinned here.
 // Non-logger dependencies are real instances so the only nil under test is the logger.
+// panicsWithValueOrFail fails the test unless fn panics with exactly want.
+func panicsWithValueOrFail(t *testing.T, want string, fn func(), msg string) {
+	t.Helper()
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Errorf("%s: expected panic %q, got none", msg, want)
+			return
+		}
+		if r != want {
+			t.Errorf("%s: panic value = %v, want %q", msg, r, want)
+		}
+	}()
+	fn()
+}
+
+// notPanicsOrFail fails the test if fn panics.
+func notPanicsOrFail(t *testing.T, fn func(), msg string) {
+	t.Helper()
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("%s: unexpected panic: %v", msg, r)
+		}
+	}()
+	fn()
+}
+
 func TestServiceConstructors_LoggerRequired(t *testing.T) {
 	const wantPanic = "logger is required (cannot be nil)"
 
@@ -75,13 +100,19 @@ func TestServiceConstructors_LoggerRequired(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name+"/nil logger panics", func(t *testing.T) {
-			assert.PanicsWithValue(t, wantPanic, func() {
+			panicsWithValueOrFail(t, wantPanic, func() {
 				tt.construct(nil)
 			}, "constructor must panic with the exact message when the logger is nil")
 		})
 
+		t.Run(tt.name+"/typed nil pointer panics", func(t *testing.T) {
+			panicsWithValueOrFail(t, wantPanic, func() {
+				tt.construct((*ports.NoopLogger)(nil))
+			}, "constructor must panic with the exact message when the logger is a typed nil pointer")
+		})
+
 		t.Run(tt.name+"/real logger does not panic", func(t *testing.T) {
-			assert.NotPanics(t, func() {
+			notPanicsOrFail(t, func() {
 				tt.construct(ports.NewNoopLogger())
 			}, "constructor must accept an explicitly passed logger")
 		})

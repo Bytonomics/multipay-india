@@ -70,8 +70,8 @@ func NewAdapter(config *Config) (*Adapter, error) {
 	// Logger is mandatory and must never be nil — production wires a real logger via the
 	// observability bundle. A nil logger is a broken caller, so crash at construction rather than
 	// silently degrading to a no-op (unit tests pass ports.NewNoopLogger() explicitly).
-	if config.Logger == nil {
-		panic("cashfree adapter requires a non-nil Logger (pass NewNoopLogger only in unit tests)")
+	if ports.IsNilLogger(config.Logger) {
+		panic("logger is required (cannot be nil)")
 	}
 
 	if !config.Environment.IsValid() {

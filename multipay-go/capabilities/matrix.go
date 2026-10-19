@@ -40,18 +40,30 @@ func NewSupportMatrix() *SupportMatrix {
 		CapWebhookConsume:    true,
 
 		// Cashfree-specific capabilities
-		CapInstrumentCryptogram:         true,
-		CapOfferCreate:                  true,
-		CapOfferFetch:                   true,
-		CapEligibilityFetch:             true,
-		CapPaymentLinkListOrders:        true,
-		CapSettlementOrderFetch:         true,
-		CapSettlementList:               true,
-		CapSettlementReconFetch:         true,
-		CapReconFetch:                   true,
-		CapSubscriptionManualCharge:     true,
+		CapInstrumentCryptogram:     true,
+		CapOfferCreate:              true,
+		CapOfferFetch:               true,
+		CapEligibilityFetch:         true,
+		CapPaymentLinkListOrders:    true,
+		CapSettlementOrderFetch:     true,
+		CapSettlementList:           true,
+		CapSettlementReconFetch:     true,
+		CapReconFetch:               true,
+		CapSubscriptionManualCharge: true,
+		// PARTLY VERIFIED (vendor documents checked 2026-10-19). This capability is a library composite:
+		// the library computes the prorated delta and raises a manual charge. Cashfree documents raising a
+		// charge with POST /pg/subscriptions/pay and payment_type CHARGE for on-demand subscriptions
+		// (https://www.cashfree.com/docs/payments/subscription/charge). Cashfree documents that CHANGE_PLAN
+		// and PAUSE are not supported for on-demand subscriptions
+		// (https://www.cashfree.com/docs/api-reference/payments/latest/subscription/mandate/manage).
+		// The documents do not say whether a PERIODIC subscription accepts an extra ad-hoc charge.
+		// An agent or developer MUST verify this with Cashfree documents or support before extending this
+		// capability or relying on it for periodic subscriptions.
 		CapSubscriptionUpgradeProration: true,
 		CapSubscriptionEligibility:      true,
+		// false means NOT DOCUMENTED, not proven unsupported (checked 2026-10-19). The Manage Subscription
+		// CANCEL action lists no cancel-at-cycle-end or effective-date parameter. Re-check the vendor
+		// documents before you change this value.
 		CapSubscriptionCancelAtCycleEnd: false,
 		CapSubscriptionList:             false,
 		CapPlanList:                     false,
@@ -128,9 +140,18 @@ func NewSupportMatrix() *SupportMatrix {
 		CapVPAValidate:       true,
 
 		// Cashfree-specific capabilities (supported by Razorpay)
-		CapSubscriptionManualCharge:     true,
+		CapSubscriptionManualCharge: true,
+		// PARTLY VERIFIED (vendor documents checked 2026-10-19). Razorpay documents its own proration for
+		// an immediate plan change (Update a Subscription, schedule_change_at "now"; minimum difference 50
+		// subunits): https://razorpay.com/docs/api/payments/subscriptions/update-subscription
+		// The charge flow that the library uses for Razorpay was NOT compared with the vendor documents.
+		// Verify it before you change the Razorpay upgrade flow.
 		CapSubscriptionUpgradeProration: true,
 		CapSubscriptionEligibility:      false,
+		// VERIFIED (vendor documents checked 2026-10-19): Cancel Subscription accepts the boolean body
+		// parameter cancel_at_cycle_end (true cancels at the end of the billing cycle):
+		// https://razorpay.com/docs/api/payments/subscriptions/cancel-subscription/
+		// The adapter forwards it (providers/razorpay/subscriptions.go).
 		CapSubscriptionCancelAtCycleEnd: true,
 
 		// Cashfree-only capabilities (not supported by Razorpay)

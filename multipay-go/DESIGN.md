@@ -625,7 +625,7 @@ The `SupportMatrix` is immutable after construction — built from hardcoded map
 ```mermaid
 flowchart LR
     Config["ClientConfig\nProvider ports.ProviderAdapter"] --> NewClient
-    NewClient --> Logger["Logger / NoopLogger"]
+    NewClient --> Logger["Logger (mandatory)"]
     NewClient --> Clock["Clock / RealClock"]
     NewClient --> SM["SupportMatrix"]
     NewClient --> CV["CapValidator"]
@@ -645,8 +645,8 @@ flowchart LR
 
 **Explanation**: The MultiPayClient is constructed from a ClientConfig in a deterministic flow:
 
-1. **Validate Config**: `Provider` (`ports.ProviderAdapter`) must be non-nil
-2. **Default Logger/Clock**: If `cfg.Logger` is nil, use `ports.NewNoopLogger()`; if `cfg.Clock` is nil, use `ports.NewRealClock()`
+1. **Validate Config**: `NewClient` panics when `WebhookStore` is nil, when `Provider` (`ports.ProviderAdapter`) is nil, or when `Logger` is missing (nil or a typed nil, checked with `ports.IsNilLogger`). There is no fallback logger; to discard logs the caller passes `ports.NewNoopLogger()`. It then runs `cfg.Validate()`
+2. **Default Clock**: If `cfg.Clock` is nil, use `ports.NewRealClock()`. The logger is never defaulted
 3. **Create Support Matrix**: Static, immutable capability map for both Cashfree and Razorpay
 4. **Create Capability Validator**: Uses the support matrix for early unsupported-capability errors
 5. **Create Hook Pipeline**: Wraps configured hooks with panic recovery; accepts logger
@@ -888,7 +888,7 @@ mockOrder := &domain.Order{
 
 ### 6. Configuration and Multi-Account Support
 
-- **ClientConfig**: Contains the bound `Provider` (`ports.ProviderAdapter`), optional hooks, webhook store, logger, and clock
+- **ClientConfig**: Contains the bound `Provider` (`ports.ProviderAdapter`), optional hooks, the mandatory webhook store and logger, and an optional clock
 - **Multi-Instance**: Multiple `MultiPayClient` instances can coexist in one process with different provider/account bindings
 - **Thread-Safe**: No package-level mutable state. Each `MultiPayClient` owns its dependencies independently; Cashfree SDK v6 uses instance-based architecture with no globals
 - **Webhook Segregation**: Separate endpoints per provider+account via `routing.EndpointRegistry`
@@ -984,11 +984,11 @@ The library provides built-in observability via hooks and structured logging:
 4. **Custom Hooks**: Callers can implement `ports.Hook` (Before/After/OnError) for additional observability
 5. **Panic Recovery**: All hook phases have `defer recover()` with full stack traces logged via `HookPanicError`
 
-Logger is mandatory (panics on nil at construction). All log methods accept `context.Context` for trace correlation.
+The logger is mandatory. Every constructor that takes a `ports.Logger` panics when it is nil or holds a typed nil pointer. The check runs once, in the constructor, through `ports.IsNilLogger` (`ports/stores.go`), never in method bodies. The constructors are `hooks.NewPipeline`, `hooks.NewAuditHook`, `logging.NewCallerLogger`, `client.NewClient`, `fake.NewHarness`, `routing.NewWebhookHandler`, `cashfree.NewAdapter`, and the orchestration services `NewOrderService`, `NewPaymentService`, `NewRefundService`, `NewInstrumentService`, `NewPaymentLinkService`, `NewPlanService`, `NewSubscriptionService`, `NewWebhookService`. There is NO fallback logger and no `ResolveLogger`; `ports.NewNoopLogger()` is the explicit way to discard logs. All log methods accept `context.Context` for trace correlation.
 
 ## Security Considerations
 
-1. **Webhook Signature Verification**: HMAC-SHA256 verification per provider, constant-time compare via `crypto/subtle`. **Cashfree**: `base64(HMAC-SHA256(x-webhook-timestamp + rawBody, secret))` compared against the `x-webhook-signature` header (both `x-webhook-signature` and `x-webhook-timestamp` headers are required). The Cashfree adapter's `VerifySignature` tries `Config.ClientSecret` first (Cashfree's documented default — the merchant Secret Key). If that fails and `Config.WebhookSecret` is set and differs, it **falls back** to `WebhookSecret` (the optional per-endpoint webhook secret some dashboards generate). Every path logs the outcome via `Config.Logger` (a required `ports.Logger`; `NewAdapter` panics if nil — production wires a real logger, tests pass `NewNoopLogger()`) with a `secret_used` key (`client_secret` / `webhook_secret`) so operators can learn which secret Cashfree actually signs with; when both fail it logs both errors at Error and returns the failure. **Razorpay**: `X-Razorpay-Signature`, verified with `WebhookSecret`.
+1. **Webhook Signature Verification**: HMAC-SHA256 verification per provider, constant-time compare via `crypto/subtle`. **Cashfree**: `base64(HMAC-SHA256(x-webhook-timestamp + rawBody, secret))` compared against the `x-webhook-signature` header (both `x-webhook-signature` and `x-webhook-timestamp` headers are required). The Cashfree adapter's `VerifySignature` tries `Config.ClientSecret` first (Cashfree's documented default — the merchant Secret Key). If that fails and `Config.WebhookSecret` is set and differs, it **falls back** to `WebhookSecret` (the optional per-endpoint webhook secret some dashboards generate). Every path logs the outcome via `Config.Logger` (a required `ports.Logger`; `NewAdapter` panics if it is nil or a typed nil — production wires a real logger, tests pass `ports.NewNoopLogger()`) with a `secret_used` key (`client_secret` / `webhook_secret`) so operators can learn which secret Cashfree actually signs with; when both fail it logs both errors at Error and returns the failure. **Razorpay**: `X-Razorpay-Signature`, verified with `WebhookSecret`.
 2. **Credential Isolation**: Provider credentials are never logged; `CallerLogger` only adds caller location, not request data
 3. **Provider Client Architecture**: Cashfree SDK v6 uses instance-based `*Cashfree` struct (no package-level globals); each adapter instance owns its client, ensuring thread-safe concurrent calls without mutexes
 4. **POST-Only Webhooks**: `WebhookHandler.ServeHTTP` rejects non-POST requests with 405
@@ -1018,12 +1018,13 @@ The fake harness enables comprehensive testing without contacting Cashfree or Ra
 - `WebhookEnvelope` (`adapter.go`) — The fake's self-describing JSON webhook payload (`EventType`, `DedupeKey`, `RawVendorStatus`, and optional `Order`/`Payment`/`Subscription`); `Marshal()` returns its JSON bytes.
 - `InMemoryWebhookStore` (`store.go`) — An in-memory `ports.WebhookStore` with real dedupe semantics (records processed dedupe keys; captures raw payloads).
 - `Scheduler` (`scheduler.go`) — Injectable delay seam: `WallClockScheduler` (default; real `time.AfterFunc` delays, `Wait()` blocks until every scheduled emission has been delivered) and `ImmediateScheduler` (runs synchronously).
-- `Harness` (`harness.go`) — Wires `client.NewClient(Provider: FakeAdapter, WebhookStore, Clock, Logger)`; `Config` injects every dependency as an interface with defaults; **`NewHarness` requires a non-nil `*Config` (it panics on nil)** — pass `&Config{}` for all-defaults; `EmitWebhookAfter(*WebhookEnvelope)` drives the REAL `WebhookService.HandleEvent` after the event's configured wall-clock delay; `WaitForWebhooks()` blocks until delivery; `WebhookErrors()` returns any delivery errors for assertions. `Harness` implements the `WebhookEmitter` interface.
+- `Harness` (`harness.go`) — Wires `client.NewClient(Provider: FakeAdapter, WebhookStore, Clock, Logger)`; `Config` injects every dependency as an interface with defaults, except `Logger`, which is mandatory; **`NewHarness` requires a non-nil `*Config` and panics on a nil config or on a missing (nil or typed nil) `Config.Logger`** — pass `&Config{Logger: ports.NewNoopLogger()}` for all-defaults; `EmitWebhookAfter(*WebhookEnvelope)` drives the REAL `WebhookService.HandleEvent` after the event's configured wall-clock delay; `WaitForWebhooks()` blocks until delivery; `WebhookErrors()` returns any delivery errors for assertions. `Harness` implements the `WebhookEmitter` interface.
 
 **Minimal usage example:**
 
 ```go
 h := fake.NewHarness(&fake.Config{
+    Logger:        ports.NewNoopLogger(), // mandatory; NewHarness panics when missing
     WebhookDelays: map[domain.WebhookEventType]time.Duration{domain.EventSubCharged: 2 * time.Second},
 })
 h.Adapter.CreateOrderFunc = func(ctx context.Context, req *domain.CreateOrderRequest) (*domain.Order, error) {
