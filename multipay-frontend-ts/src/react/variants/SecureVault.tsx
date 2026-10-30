@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import type { PickerVariantProps } from "../types";
 import styles from "./secure-vault.module.css";
 import { ProviderSlot } from "../ProviderSlot";
@@ -17,7 +18,7 @@ export function SecureVault({
   selected,
   onSelect,
   theme,
-}: PickerVariantProps): JSX.Element {
+}: PickerVariantProps): ReactElement {
   return (
     <div className={styles.secureVault} data-theme={theme}>
       <div className={styles.vaultFrame}>

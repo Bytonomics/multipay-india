@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import styles from "./styles/components.module.css";
 
 export interface PickerFooterProps {
@@ -6,7 +7,7 @@ export interface PickerFooterProps {
 
 export function PickerFooter({
   footerText,
-}: PickerFooterProps): JSX.Element | null {
+}: PickerFooterProps): ReactElement | null {
   if (!footerText) {
     return null;
   }

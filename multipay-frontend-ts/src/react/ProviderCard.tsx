@@ -1,4 +1,4 @@
-import type { KeyboardEvent, ReactNode } from "react";
+import type { KeyboardEvent, ReactElement, ReactNode } from "react";
 import type { PickerProviderView } from "./types";
 import { Provider } from "../core/types";
 import styles from "./styles/card.module.css";
@@ -15,7 +15,7 @@ export function ProviderCard({
   selected,
   onClick,
   onRetry,
-}: ProviderCardProps): JSX.Element {
+}: ProviderCardProps): ReactElement {
   const { id, entry, state } = view;
   const loading = state.loading;
   const error = state.error;

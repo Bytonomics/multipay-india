@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import type { PickerBranding } from "./types";
 import styles from "./styles/components.module.css";
 
@@ -7,7 +8,7 @@ export interface PickerHeaderProps {
 
 export function PickerHeader({
   branding,
-}: PickerHeaderProps): JSX.Element | null {
+}: PickerHeaderProps): ReactElement | null {
   if (!branding) {
     return null;
   }

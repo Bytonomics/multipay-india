@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import styles from "./styles/components.module.css";
 
 export interface ErrorBannerProps {
@@ -8,7 +9,7 @@ export interface ErrorBannerProps {
 export function ErrorBanner({
   message,
   onRetry,
-}: ErrorBannerProps): JSX.Element {
+}: ErrorBannerProps): ReactElement {
   return (
     <div className={styles.errorBanner} role="alert" aria-live="assertive">
       <p className={styles.errorMessage}>{message}</p>

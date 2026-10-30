@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   useCallback,
+  type ReactElement,
 } from "react";
 import type {
   PaymentPickerProps,
@@ -248,7 +249,7 @@ export const PaymentPicker = forwardRef<PickerControls, PaymentPickerProps>(
       taxNote: taxNoteText,
     };
 
-    let variantComponent: JSX.Element;
+    let variantComponent: ReactElement;
 
     switch (variant) {
       case PickerVariant.DYNAMIC_STACK:

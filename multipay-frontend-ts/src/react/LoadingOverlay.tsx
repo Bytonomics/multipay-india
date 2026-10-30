@@ -1,10 +1,13 @@
+import type { ReactElement } from "react";
 import styles from "./styles/components.module.css";
 
 export interface LoadingOverlayProps {
   provider: string;
 }
 
-export function LoadingOverlay({ provider }: LoadingOverlayProps): JSX.Element {
+export function LoadingOverlay({
+  provider,
+}: LoadingOverlayProps): ReactElement {
   return (
     <div className={styles.loadingOverlay} role="status" aria-live="polite">
       <div className={styles.spinner} aria-hidden="true" />

@@ -860,7 +860,7 @@ describe("PaymentPicker Component", () => {
 
   describe("Assertion 7: PickerControls via ref", () => {
     it("should expose the imperative control surface via ref", async () => {
-      const mockRef: React.RefObject<PickerControls> = { current: null };
+      const mockRef: React.RefObject<PickerControls | null> = { current: null };
 
       const props = {
         ...defaultProps,
@@ -886,7 +886,7 @@ describe("PaymentPicker Component", () => {
 
     it("should provide selectProvider control method via ref", async () => {
       const mockOnSelect = vi.fn();
-      const mockRef: React.RefObject<PickerControls> = { current: null };
+      const mockRef: React.RefObject<PickerControls | null> = { current: null };
 
       const props = {
         ...defaultProps,
@@ -910,7 +910,7 @@ describe("PaymentPicker Component", () => {
     });
 
     it("should provide getSelectedProvider control method via ref", async () => {
-      const mockRef: React.RefObject<PickerControls> = { current: null };
+      const mockRef: React.RefObject<PickerControls | null> = { current: null };
 
       const props = {
         ...defaultProps,
@@ -934,7 +934,7 @@ describe("PaymentPicker Component", () => {
     });
 
     it("should provide isSelected control method via ref", async () => {
-      const mockRef: React.RefObject<PickerControls> = { current: null };
+      const mockRef: React.RefObject<PickerControls | null> = { current: null };
 
       const props = {
         ...defaultProps,
@@ -958,7 +958,7 @@ describe("PaymentPicker Component", () => {
     });
 
     it("should provide focus and blur control methods via ref", async () => {
-      const mockRef: React.RefObject<PickerControls> = { current: null };
+      const mockRef: React.RefObject<PickerControls | null> = { current: null };
 
       const props = {
         ...defaultProps,
